@@ -10,7 +10,7 @@ rm -rf "$PROJECT_DIR/Binaries"
 rm -rf "$PROJECT_DIR/Intermediate"
 rm -rf "$PROJECT_DIR/.vs"
 
-echo "Building project with UE 5.7..."
+echo "Building project with Unreal Engine..."
 "$UE57/Engine/Build/BatchFiles/Linux/Build.sh" simulatorEditor Linux Development "$PROJECT_FILE"
 
 echo "Done."

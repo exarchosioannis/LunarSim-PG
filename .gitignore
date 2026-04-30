@@ -55,7 +55,6 @@ Thumbs.db
 *.log
 
 # Bags
-# Do NOT ignore bags/ if you want them on the laptop too
-# bags/
+bags/
 # Unreal Starter Content
 Content/StarterContent/
