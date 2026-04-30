@@ -1,0 +1,42 @@
+﻿{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "TempoROS",
+	"Description": "Add ROS support to your Unreal project via rclcpp\nNOTE: After enabling this plugin, users must run the Setup.sh script to download third party dependencies.",
+	"Category": "Tempo",
+	"CreatedBy": "Tempo Simulation, LLC",
+	"CreatedByURL": "http://temposimulation.com",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "TempoROS",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "TempoROSBootstrap",
+			"Type": "Runtime",
+			"LoadingPhase": "EarliestPossible"
+		}
+	],
+	"PreBuildSteps": {
+		"Win64": [
+			"\"$(EngineDir)\\Binaries\\ThirdParty\\Python3\\Win64\\python.exe\" \"$(PluginDir)\\Content\\Python\\gen_ros_idl.py\" \"$(EngineDir)\" \"$(ProjectFile)\" \"$(ProjectDir)\" \"$(PluginDir)\" \"$(TargetName)\" \"$(TargetConfiguration)\" \"$(TargetPlatform)\" \"$(PluginDir)\\Source\\ThirdParty\\rclcpp\"",
+			"\"$(EngineDir)\\Binaries\\ThirdParty\\Python3\\Win64\\python.exe\" \"$(PluginDir)\\Content\\Python\\gen_ros_bp.py\" \"$(ProjectDir)\" \"$(PluginDir)\""
+		],
+		"Mac": [
+			"\"$(EngineDir)/Binaries/ThirdParty/Python3/Mac/bin/python3\" \"$(PluginDir)/Content/Python/gen_ros_idl.py\" \"$(EngineDir)\" \"$(ProjectFile)\" \"$(ProjectDir)\" \"$(PluginDir)\" \"$(TargetName)\" \"$(TargetConfiguration)\" \"$(TargetPlatform)\" \"$(PluginDir)/Source/ThirdParty/rclcpp\"",
+			"\"$(EngineDir)/Binaries/ThirdParty/Python3/Mac/bin/python3\" \"$(PluginDir)/Content/Python/gen_ros_bp.py\" \"$(ProjectDir)\" \"$(PluginDir)\""
+		],
+		"Linux": [
+			"\"$(EngineDir)/Binaries/ThirdParty/Python3/Linux/bin/python3\" \"$(PluginDir)/Content/Python/gen_ros_idl.py\" \"$(EngineDir)\" \"$(ProjectFile)\" \"$(ProjectDir)\" \"$(PluginDir)\" \"$(TargetName)\" \"$(TargetConfiguration)\" \"$(TargetPlatform)\" \"$(PluginDir)/Source/ThirdParty/rclcpp\"",
+			"\"$(EngineDir)/Binaries/ThirdParty/Python3/Linux/bin/python3\" \"$(PluginDir)/Content/Python/gen_ros_bp.py\" \"$(ProjectDir)\" \"$(PluginDir)\""
+		]
+	}
+}

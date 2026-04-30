@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>simulator_ros</name>
+  <version>0.0.0</version>
+  <description>ROS 2 package for UE5 simulator</description>
+  <maintainer email="exarchosjohn9@gmail.com.com">exarchos</maintainer>
+  <license>TODO</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>joy</exec_depend>
+  <exec_depend>teleop_twist_joy</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

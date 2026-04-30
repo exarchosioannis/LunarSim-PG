@@ -1,0 +1,29 @@
+services:
+  ros:
+    build: .
+    image: sim-ros:humble
+    container_name: sim_ros
+    network_mode: host
+    privileged: true
+
+    environment:
+      ROS_DOMAIN_ID: "0"
+      RMW_IMPLEMENTATION: "rmw_cyclonedds_cpp"
+      DISPLAY: "${DISPLAY}"
+      QT_X11_NO_MITSHM: "1"
+      XAUTHORITY: "/root/.Xauthority"
+
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOME}/.Xauthority:/root/.Xauthority:ro
+      - ../bags:/ws/bags
+      - ../ros2_ws:/ws/ros2_ws
+      - ./scripts:/ws/scripts
+      
+    devices:
+      - /dev/dri:/dev/dri
+      - /dev/input:/dev/input
+
+    stdin_open: true
+    tty: true
+    command: bash

@@ -1,0 +1,61 @@
+# Build outputs
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# Unreal generated project files
+*.opensdf
+*.sdf
+*.sln
+*.suo
+*.xcodeproj
+*.xcworkspace
+*.code-workspace
+
+# Compiled libraries / binaries
+*.so
+*.sym
+*.debug
+*.dll
+*.dylib
+*.exe
+*.pdb
+
+# Unreal local developer content
+Content/Developers/
+
+# Plugin generated files
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+
+# ROS2 generated folders
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# Python / env
+TempoEnv/
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# OS / editor junk
+.vscode/
+.cache/
+.idea/
+*.swp
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Bags
+# Do NOT ignore bags/ if you want them on the laptop too
+# bags/
+# Unreal Starter Content
+Content/StarterContent/

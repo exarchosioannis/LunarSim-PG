@@ -1,0 +1,2 @@
+#!/bin/bash
+ros2 topic pub /sim_camera/control std_msgs/msg/Int32 "{data: 0}" --once && echo "[OK] Capture stopped"
