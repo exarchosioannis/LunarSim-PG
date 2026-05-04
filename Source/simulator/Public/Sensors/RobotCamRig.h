@@ -2,20 +2,15 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "TempoROSNode.h"
-#include "RHIGPUReadback.h"
 #include "Capture/CaptureManager.h"
-
-#include "sensor_msgs/msg/image.hpp"
-#include "sensor_msgs/msg/camera_info.hpp"
-#include "std_msgs/msg/int32.hpp"
+#include "Sensors/RgbCameraCaptureComponent.h"
+#include "Sensors/CameraRosPublisherComponent.h"
 
 #include "RobotCamRig.generated.h"
 
 class USceneComponent;
 class UCameraComponent;
 class USceneCaptureComponent2D;
-class UTextureRenderTarget2D;
 class AGTCamera;
 
 UCLASS()
@@ -45,8 +40,11 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	USceneCaptureComponent2D* RGBCapture = nullptr;
 
-	UPROPERTY(Transient)
-	UTextureRenderTarget2D* RGBRenderTarget = nullptr;
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	URgbCameraCaptureComponent* RgbCaptureComponent = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	UCameraRosPublisherComponent* RosPublisherComponent = nullptr;
 
 	//Ground Truth Camera
 	UPROPERTY(EditAnywhere, Category = "GroundTruth")
@@ -78,44 +76,18 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Camera|Realism", meta=(EditCondition="bUseFixedExposure", ClampMin="-10.0", ClampMax="10.0"))
 	float ExposureCompensation = 1.5f;
 
-	//ROS
-	UPROPERTY()
-	UTempoROSNode* ROSNode = nullptr;
-
-	//GPU Readback
-	TUniquePtr<FRHIGPUTextureReadback> GPUReadback;
-	bool bReadbackInFlight = false;
-
-	//Reusable ROS Messages
-	builtin_interfaces::msg::Time PendingStamp;
-	sensor_msgs::msg::Image ReusableImgMsg;
-	sensor_msgs::msg::CameraInfo ReusableCamInfoMsg;
-	std_msgs::msg::Int32 ReusableFrameIndexMsg;
-
 	//Publish Helpers
 	void PublishRgb();
-	void PublishCameraInfo(const builtin_interfaces::msg::Time& Stamp);
 
 	FCaptureFrameInfo CreateSynchronizedFrame(double CaptureTimeSeconds);
 
 	//RGB Readback
-	void StartRgbReadback();
-	void FinishRgbReadbackAndPublish();
+	void StartRgbCaptureAndPublish();
+	void PollRgbCaptureAndPublish();
 
 	//Update Helpers
 	void UpdatePublishTimer(float DeltaSeconds);
 
-	//Setup
-	void SetupRenderTarget();
-	void SetupReusableMessages();
-	void SetupRos();
-	void ApplyRoverCameraLook();
-
-	//Frame tracking for readback
-	int32 CurrentFrameIndex = 0;
-	//Session tracking for validation
-	int32 CurrentSessionId = 0;
-
 	//command helper
-	void OnCaptureControl(const std_msgs::msg::Int32& Msg);
+	void OnCaptureControl(int32 ControlValue);
 };

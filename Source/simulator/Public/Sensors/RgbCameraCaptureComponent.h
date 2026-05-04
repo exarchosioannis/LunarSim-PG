@@ -1,0 +1,60 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Components/ActorComponent.h"
+#include "RHIGPUReadback.h"
+#include "Capture/CaptureTypes.h"
+#include "RgbCameraCaptureComponent.generated.h"
+
+class USceneCaptureComponent2D;
+class UTextureRenderTarget2D;
+
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+class SIMULATOR_API URgbCameraCaptureComponent : public UActorComponent
+{
+	GENERATED_BODY()
+
+public:
+	URgbCameraCaptureComponent();
+
+	void Initialize(
+		USceneCaptureComponent2D* InSceneCapture,
+		int32 InWidth,
+		int32 InHeight,
+		bool bInUseGammaCorrection,
+		float InOutputGamma,
+		bool bInUseFixedExposure,
+		float InExposureCompensation
+	);
+
+	bool StartCaptureAsync(const FCaptureFrameInfo& FrameInfo);
+	bool PollReadback(TArray<uint8>& OutPixels, FCaptureFrameInfo& OutFrameInfo);
+
+	bool IsCaptureInProgress() const;
+	UTextureRenderTarget2D* GetRenderTarget() const;
+
+protected:
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+private:
+	void SetupRenderTarget();
+	void ApplyCameraLook();
+
+	UPROPERTY()
+	USceneCaptureComponent2D* SceneCapture = nullptr;
+
+	UPROPERTY(Transient)
+	UTextureRenderTarget2D* RGBRenderTarget = nullptr;
+
+	TUniquePtr<FRHIGPUTextureReadback> GPUReadback;
+
+	bool bReadbackInFlight = false;
+	FCaptureFrameInfo PendingFrameInfo;
+
+	int32 Width = 1280;
+	int32 Height = 720;
+	bool bUseGammaCorrection = true;
+	float OutputGamma = 2.2f;
+	bool bUseFixedExposure = true;
+	float ExposureCompensation = 1.5f;
+};

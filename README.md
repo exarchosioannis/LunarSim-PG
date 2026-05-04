@@ -1,25 +1,34 @@
 # Capture Synchronization: ROS + UnrealGT
 
-This project captures simulator data in two places:
+This project captures synchronized simulator data for autonomy and perception datasets.
+
+The main outputs are:
 
 1. **ROS bag**
    - RGB image
    - camera info
    - frame index
 
-2. **UnrealGT**
+2. **UnrealGT dataset**
    - RGB ground truth image
    - Depth image
    - Segmentation image
    - Bounding boxes
 
-The goal is simple: every ROS frame must match the correct UnrealGT files.
+3. **Capture manifest**
+   - session id
+   - frame index
+   - timestamp
+   - rover pose
+   - camera pose
+
+The goal is simple: every ROS frame must match the correct UnrealGT files and the correct manifest row.
 
 ---
 
 ## Main idea
 
-Every capture frame gets one shared frame number:
+Every captured frame gets one shared frame number:
 
 ```text
 frame_index = 1, 2, 3, ...
@@ -27,21 +36,25 @@ frame_index = 1, 2, 3, ...
 
 This frame index is created by `CaptureManager`.
 
-The same frame index is then used by both ROS and UnrealGT.
+The same frame index is then used by ROS, UnrealGT and the manifest.
+
 
 For example, for frame `25`:
 
 ```text
 ROS:
-  /sim_camera/frame_index = 25
-  /sim_camera/rgb/image_raw/compressed
-  /sim_camera/camera_info
+  /left_camera/frame_index = 25
+  /left_camera/rgb/image_raw/compressed
+  /left_camera/camera_info
 
 UnrealGT:
   RGB/25.png
   Depth/25.png
   Segmentation/25.png
   BoundingBoxes/25.txt
+
+Manifest:
+  row with frame_index = 25
 ```
 
 So later, if we want to combine ROS and UnrealGT, we match by frame number.
@@ -52,7 +65,7 @@ So later, if we want to combine ROS and UnrealGT, we match by frame number.
 
 `CaptureManager` is the source of truth.
 
-It creates:
+It creates the synchronization data for each frame:
 
 ```text
 SessionId
@@ -60,7 +73,7 @@ FrameIndex
 StampSeconds
 ```
 
-Every time a new frame is captured, `CaptureManager::NextFrame()` increases the frame index:
+Every time a new frame is captured, `CaptureManager` increases the frame index:
 
 ```text
 1, 2, 3, 4, ...
@@ -73,6 +86,74 @@ ROS
 UnrealGT
 Capture manifest
 ```
+
+The important rule is that other systems do not create their own frame index or timestamp.
+They receive the frame information that was created by `CaptureManager`.
+
+---
+
+## Capture flow
+
+For every captured frame, the flow is:
+
+```text
+RobotCamRig asks CaptureManager for one frame
+CaptureManager returns FCaptureFrameInfo
+RobotCamRig passes the same frame info to UnrealGT
+RobotCamRig passes the same frame info to RGB capture
+RobotCamRig passes the same frame info to ROS publishing
+Manifest stores the same frame info
+```
+
+So one captured frame has one shared:
+
+```text
+SessionId
+FrameIndex
+StampSeconds
+```
+
+---
+
+## Current code structure
+
+The capture system is split into small responsibilities.
+
+```text
+RobotCamRig
+  - high-level coordinator
+  - controls capture timing
+  - asks CaptureManager for the next frame
+  - triggers UnrealGT capture
+  - starts and polls RGB capture
+  - asks the ROS publisher component to publish
+
+CaptureManager
+  - source of truth for SessionId, FrameIndex and StampSeconds
+  - writes the capture manifest
+  - records rover and camera pose for each frame
+
+RgbCameraCaptureComponent
+  - owns the RGB render target
+  - owns the GPU readback logic
+  - starts async RGB readback
+  - stores the pending FCaptureFrameInfo
+  - returns pixels together with the same FCaptureFrameInfo
+
+CameraRosPublisherComponent
+  - owns the ROS node
+  - owns ROS publishers and subscriber
+  - builds and reuses ROS messages
+  - publishes RGB image, camera_info and frame_index
+  - uses FrameInfo.StampSeconds for ROS timestamps
+  - uses FrameInfo.FrameIndex for /sim_camera/frame_index
+
+GTCamera
+  - bridge to UnrealGT / Blueprint ground-truth generation
+  - receives the same FrameIndex, StampSeconds and SessionId
+```
+
+This keeps `RobotCamRig` simple. It coordinates the capture, but it does not directly handle all ROS and GPU readback details.
 
 ---
 
@@ -92,9 +173,11 @@ So for each frame:
 
 ```text
 frame_index = k
-image.header.stamp = timestamp for k
-camera_info.header.stamp = timestamp for k
+image.header.stamp = stamp_seconds for k
+camera_info.header.stamp = stamp_seconds for k
 ```
+
+The `frame_index` topic is used to match ROS messages with UnrealGT files and the manifest.
 
 ---
 
@@ -118,6 +201,27 @@ BoundingBoxes/2.txt
 
 This means the UnrealGT files are aligned with ROS by filename.
 
+The UnrealGT files do not need to store the timestamp inside each PNG or TXT file.
+Their timestamp is defined by the manifest row with the same `frame_index`.
+
+For example:
+
+```text
+RGB/25.png
+Depth/25.png
+Segmentation/25.png
+BoundingBoxes/25.txt
+```
+
+all correspond to:
+
+```text
+manifest row with frame_index = 25
+ROS /sim_camera/frame_index = 25
+ROS image timestamp = manifest stamp_seconds for frame 25
+ROS camera_info timestamp = manifest stamp_seconds for frame 25
+```
+
 ---
 
 ## Capture manifest
@@ -131,10 +235,12 @@ Saved/CaptureManifests/
 Example file:
 
 ```text
-2026-04-28_10-59-17_session_1.csv
+2026-05-04_18-24-45_session_1.csv
 ```
 
-It contains:
+It contains the synchronization information for each frame.
+
+Basic columns:
 
 ```csv
 session_id,frame_index,stamp_seconds
@@ -151,7 +257,39 @@ Frame 2 happened at timestamp 9.196653258
 Frame 3 happened at timestamp 9.272525717
 ```
 
-Later, a Python script can use this manifest to add the UnrealGT data into a ROS bag.
+The manifest can also contain rover and camera pose data for each frame.
+
+Later, a Python script can use this manifest to combine UnrealGT files with the ROS bag.
+
+---
+
+## Rover pose system
+
+The rover has a `UCapturePoseSourceComponent`.
+
+This component does not store its own position.
+It reads the world transform of the actor that owns it.
+
+For `RoverRobot`, it reads:
+
+```text
+RoverRobot actor location
+RoverRobot actor rotation
+```
+
+`CaptureManager` finds the pose source named `rover_base`.
+On every captured frame, `CaptureManager` writes the rover actor pose into the manifest CSV.
+
+The CSV gives one rover pose per frame:
+
+```text
+frame_index
+timestamp
+rover position in Unreal centimeters
+rover rotation in Unreal degrees
+```
+
+The rover trajectory is the sequence of these rows ordered by `frame_index`.
 
 ---
 
@@ -161,22 +299,30 @@ For each frame, all systems use the same information:
 
 ```text
 CaptureManager creates:
+  SessionId
   FrameIndex
-  Timestamp
+  StampSeconds
 
 ROS uses:
   FrameIndex
-  Timestamp
+  StampSeconds
 
 UnrealGT uses:
   FrameIndex
 
 Manifest stores:
+  SessionId
   FrameIndex
-  Timestamp
+  StampSeconds
 ```
 
 So frame `k` always refers to the same capture moment.
+
+The synchronization rule is:
+
+```text
+UnrealGT file name k  <->  manifest row k  <->  ROS frame_index k
+```
 
 ---
 
@@ -185,23 +331,29 @@ So frame `k` always refers to the same capture moment.
 We tested one capture and got:
 
 ```text
-ROS frame_index:        1–103
-UnrealGT RGB:           1–103
-UnrealGT Depth:         1–103
-UnrealGT Segmentation:  1–103
-UnrealGT BoundingBoxes: 1–103
-Manifest:               1–103
+ROS RGB images:         243
+ROS camera_info:        243
+ROS frame_index:        243
+
+UnrealGT RGB:           243
+UnrealGT Depth:         243
+UnrealGT Segmentation:  243
+UnrealGT BoundingBoxes: 243
+
+Manifest frames:        243
 ```
 
-The manifest also matched the ROS timestamps.
+The frame counts matched across ROS, UnrealGT and the manifest.
 
-The maximum timestamp difference was around:
+We also checked the ROS timestamps against the manifest timestamps:
 
 ```text
-0.000000001 seconds
+Max |RGB - manifest|:        0.000000001000 seconds
+Max |CameraInfo - manifest|: 0.000000001000 seconds
+Max |RGB - CameraInfo|:      0.000000000000 seconds
 ```
 
-This is only floating-point / decimal precision. It is not a real timing mismatch.
+So the ROS RGB image and ROS camera_info messages use the same timestamp as the manifest for each frame.
 
 ---
 
@@ -216,7 +368,7 @@ manifest: 9.272525717
 ROS:      9.272525716
 ```
 
-This happens because the timestamp is converted between C++ `double`, CSV text, and ROS `sec/nanosec`.
+This happens because the timestamp is converted between C++ `double`, CSV text and ROS `sec/nanosec`.
 
 It is safe for evaluation. It is far smaller than one frame interval.
 
@@ -273,24 +425,3 @@ FrameIndex 2
 ```
 
 So later we can safely combine ROS and UnrealGT data by using `frame_index`.
-
-## Rover pose system
-
-The rover has a UCapturePoseSourceComponent.
-This component does not store its own position.
-It reads the world transform of the actor that owns it.
-
-For RoverRobot, it reads:
-- RoverRobot actor location
-- RoverRobot actor rotation
-
-CaptureManager finds the pose source named "rover_base".
-On every captured frame, CaptureManager writes the rover actor pose into the manifest CSV.
-
-The CSV gives one rover pose per frame:
-- frame_index
-- timestamp
-- rover position in Unreal centimeters
-- rover rotation in Unreal degrees
-
-The rover trajectory is the sequence of these rows ordered by frame_index.
