@@ -1,0 +1,16 @@
+/Intermediate
+/Content
+/.vscode
+/Saved
+/DerivedDataCache
+/bags
+/ros2_ws
+/.git
+/docker
+/Plugins/unrealgt/Examples
+/Plugins/unrealgt/Intermediate
+/Plugins/unrealgt/Content
+/Plugins/unrealgt/.github
+/Plugins/TempoROS/Intermediate
+/Plugins/TempoROS/Content
+/Plugins/TempoROS/Scripts

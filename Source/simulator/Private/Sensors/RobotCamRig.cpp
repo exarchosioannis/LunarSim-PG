@@ -4,6 +4,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "Capture/CaptureManager.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "Engine/Scene.h"
@@ -182,6 +183,19 @@ void ARobotCamRig::UpdatePublishTimer(float DeltaSeconds)
 	}
 }
 
+FCaptureFrameInfo ARobotCamRig::CreateSynchronizedFrame(double CaptureTimeSeconds)
+{
+	FCaptureFramePoseData PoseData;
+
+	if (Camera) {
+		PoseData.LeftCameraPose.bValid = true;
+		PoseData.LeftCameraPose.Position = Camera->GetComponentLocation();
+		PoseData.LeftCameraPose.Rotation = Camera->GetComponentRotation();
+	}
+
+	return CaptureManager ? CaptureManager->NextFrameWithPose(CaptureTimeSeconds, PoseData) : FCaptureFrameInfo();
+}
+
 void ARobotCamRig::PublishRgb()
 {
 	if (!ROSNode || !RGBRenderTarget || !RGBCapture || !GPUReadback.IsValid()) return;
@@ -202,7 +216,8 @@ void ARobotCamRig::StartRgbReadback()
 	PendingStamp = ToRosTime(CaptureTimeSeconds);
 	
 	// Get the next frame info from CaptureManager
-	const FCaptureFrameInfo FrameInfo = CaptureManager ? CaptureManager->NextFrame(CaptureTimeSeconds) : FCaptureFrameInfo();
+	// Get synchronized frame info from CaptureManager
+	const FCaptureFrameInfo FrameInfo = CreateSynchronizedFrame(CaptureTimeSeconds);
 	CurrentFrameIndex = FrameInfo.FrameIndex;
 	CurrentSessionId = FrameInfo.SessionId;
 	

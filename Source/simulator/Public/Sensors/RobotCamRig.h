@@ -96,6 +96,8 @@ private:
 	void PublishRgb();
 	void PublishCameraInfo(const builtin_interfaces::msg::Time& Stamp);
 
+	FCaptureFrameInfo CreateSynchronizedFrame(double CaptureTimeSeconds);
+
 	//RGB Readback
 	void StartRgbReadback();
 	void FinishRgbReadbackAndPublish();

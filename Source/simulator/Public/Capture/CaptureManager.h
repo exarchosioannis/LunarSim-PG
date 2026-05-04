@@ -3,7 +3,10 @@
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "Capture/CaptureTypes.h"
+#include "Capture/CapturePoseTypes.h"
 #include "CaptureManager.generated.h"
+
+class UCapturePoseSourceComponent;
 
 UCLASS()
 class SIMULATOR_API UCaptureManager : public UObject
@@ -26,15 +29,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Capture")
 	FCaptureFrameInfo NextFrame(double StampSeconds);
 
+	UFUNCTION(BlueprintCallable, Category = "Capture")
+	FCaptureFrameInfo NextFrameWithPose(double StampSeconds, const FCaptureFramePoseData& PoseData);
+
 	UFUNCTION(BlueprintPure, Category = "Capture")
 	const FCaptureConfig& GetConfig() const;
 
 	UFUNCTION(BlueprintPure, Category = "Capture")
 	bool IsSessionValid(int32 SessionId) const;
 
+	UFUNCTION(BlueprintCallable, Category = "Capture|Pose")
+	void SetRoverPoseSource(UCapturePoseSourceComponent* InRoverPoseSource);
+
 private:
 	void StartManifest();
-	void AppendManifestRow(const FCaptureFrameInfo& FrameInfo);
+	void AppendManifestRow(const FCaptureFrameInfo& FrameInfo, const FCaptureFramePoseData& PoseData);
+	
+	UCapturePoseSourceComponent* FindPoseSourceByName(FName SourceName) const;
 
 	bool bCaptureEnabled = false;
 
@@ -45,4 +56,7 @@ private:
 	FCaptureConfig Config;
 
 	FString ManifestFilePath;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Capture|Pose", meta = (AllowPrivateAccess = "true"))
+	UCapturePoseSourceComponent* RoverPoseSource = nullptr;
 };

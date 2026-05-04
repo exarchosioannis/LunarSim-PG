@@ -11,8 +11,8 @@ class USceneComponent;
 class UStaticMeshComponent;
 class USpringArmComponent;
 class UCameraComponent;
-class ARobotCamRig;
 class UInputComponent;
+class UCapturePoseSourceComponent;
 
 UCLASS()
 class SIMULATOR_API ARoverRobot : public APawn
@@ -26,6 +26,9 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Capture|Pose")
+	UCapturePoseSourceComponent* RoverPoseSource;
 
 private:
 	//Components
@@ -83,16 +86,6 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Robot|Camera")
 	float MaxCameraPitch = -5.0f;
-
-	//Camera Rig
-	UPROPERTY(EditAnywhere, Category = "Robot|Sensors")
-	ARobotCamRig* CameraRig = nullptr;
-
-	UPROPERTY(EditAnywhere, Category = "Robot|Sensors")
-	FTransform CameraMount = FTransform(
-		FRotator(0.f, 90.f, 0.f),
-		FVector(-40.f, 80.f, 210.f)
-	);
 
 	//ROS Callbacks
 	void OnCmdVel(const FTwist& Msg);

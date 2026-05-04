@@ -7,8 +7,8 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
-#include "Sensors/RobotCamRig.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Capture/CapturePoseSourceComponent.h"
 
 //Constructor
 ARoverRobot::ARoverRobot()
@@ -17,6 +17,7 @@ ARoverRobot::ARoverRobot()
 
 	SetupRoverComponents();
 	SetupThirdPersonCamera();
+	RoverPoseSource = CreateDefaultSubobject<UCapturePoseSourceComponent>(TEXT("RoverPoseSource"));
 
 	AutoPossessPlayer = EAutoReceiveInput::Player0;
 }
@@ -32,11 +33,6 @@ void ARoverRobot::BeginPlay()
 	);
 
 	LastCmdTime = GetWorld()->GetTimeSeconds();
-	//Camera Rig Setup
-	if (CameraRig){
-		CameraRig->AttachToActor(this, FAttachmentTransformRules::KeepRelativeTransform);
-		CameraRig->SetActorRelativeTransform(CameraMount);
-	}
 
 	//Player Controller Setup
 	if (APlayerController* PC = GetWorld()->GetFirstPlayerController()){
@@ -139,7 +135,6 @@ void ARoverRobot::UpdateMovement(float DeltaTime)
 void ARoverRobot::LookYaw(float Value)
 {
 	if (!SpringArm || FMath::IsNearlyZero(Value)) return;
-
 	FRotator Rot = SpringArm->GetRelativeRotation();
 	Rot.Yaw += Value * MouseYawSpeed;
 	SpringArm->SetRelativeRotation(Rot);
@@ -149,7 +144,6 @@ void ARoverRobot::LookYaw(float Value)
 void ARoverRobot::LookPitch(float Value)
 {
 	if (!SpringArm || FMath::IsNearlyZero(Value)) return;
-	
 	FRotator Rot = SpringArm->GetRelativeRotation();
 	Rot.Pitch = FMath::Clamp(Rot.Pitch - Value * MousePitchSpeed, MinCameraPitch, MaxCameraPitch);
 	SpringArm->SetRelativeRotation(Rot);

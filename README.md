@@ -273,3 +273,24 @@ FrameIndex 2
 ```
 
 So later we can safely combine ROS and UnrealGT data by using `frame_index`.
+
+## Rover pose system
+
+The rover has a UCapturePoseSourceComponent.
+This component does not store its own position.
+It reads the world transform of the actor that owns it.
+
+For RoverRobot, it reads:
+- RoverRobot actor location
+- RoverRobot actor rotation
+
+CaptureManager finds the pose source named "rover_base".
+On every captured frame, CaptureManager writes the rover actor pose into the manifest CSV.
+
+The CSV gives one rover pose per frame:
+- frame_index
+- timestamp
+- rover position in Unreal centimeters
+- rover rotation in Unreal degrees
+
+The rover trajectory is the sequence of these rows ordered by frame_index.
