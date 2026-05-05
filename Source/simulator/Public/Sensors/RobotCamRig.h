@@ -12,6 +12,7 @@ class USceneComponent;
 class UCameraComponent;
 class USceneCaptureComponent2D;
 class AGTCamera;
+class ARoverRobot;
 
 UCLASS()
 class SIMULATOR_API ARobotCamRig : public AActor
@@ -49,6 +50,10 @@ private:
 	//Ground Truth Camera
 	UPROPERTY(EditAnywhere, Category = "GroundTruth")
 	AGTCamera* GroundTruthCamera = nullptr;
+	
+	//Rover
+	UPROPERTY(EditAnywhere, Category = "Robot")
+	ARoverRobot* RoverRobot = nullptr;
 
 	//Capture Management
 	UPROPERTY()
@@ -64,7 +69,7 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	int32 Height = 720;
 	UPROPERTY(EditAnywhere, Category = "Camera")
-	FString FrameId = TEXT("camera_link");
+	FString FrameId = TEXT("left_camera");
 
 	//Camera Realism
 	UPROPERTY(EditAnywhere, Category = "Camera|Realism")
@@ -78,8 +83,6 @@ private:
 
 	//Publish Helpers
 	void PublishRgb();
-
-	FCaptureFrameInfo CreateSynchronizedFrame(double CaptureTimeSeconds);
 
 	//RGB Readback
 	void StartRgbCaptureAndPublish();

@@ -2,8 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+
 #include "TempoROSNode.h"
 #include "TempoROSTypes.h"
+
+#include "Capture/CaptureTypes.h"
+
+#include "geometry_msgs/msg/pose_stamped.hpp"
+#include "builtin_interfaces/msg/time.hpp"
 
 #include "RoverRobot.generated.h"
 
@@ -22,16 +28,19 @@ class SIMULATOR_API ARoverRobot : public APawn
 public:
 	ARoverRobot();
 
+	// Called by RobotCamRig when a synchronized capture frame is created.
+	void PublishGroundTruthPose(const FCaptureFrameInfo& FrameInfo);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Capture|Pose")
-	UCapturePoseSourceComponent* RoverPoseSource;
+	UCapturePoseSourceComponent* RoverPoseSource = nullptr;
 
 private:
-	//Components
+	// Components
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	USceneComponent* Root = nullptr;
 
@@ -44,17 +53,28 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "Robot|Camera")
 	UCameraComponent* FollowCamera = nullptr;
 
-	//ROS
+	// ROS
 	UPROPERTY()
 	UTempoROSNode* ROSNode = nullptr;
 
-	//Movement State
+	UPROPERTY(EditAnywhere, Category = "Robot|ROS")
+	FString CmdVelTopic = TEXT("/cmd_vel");
+
+	UPROPERTY(EditAnywhere, Category = "Robot|ROS")
+	FString GroundTruthPoseTopic = TEXT("/rover/gt/pose");
+
+	UPROPERTY(EditAnywhere, Category = "Robot|ROS")
+	FString GroundTruthPoseFrameId = TEXT("map");
+
+	geometry_msgs::msg::PoseStamped ReusablePoseMsg;
+
+	// Movement State
 	FTwist CurrentTwist;
 	float LastCmdTime = 0.0f;
 	float LinearCmd = 0.0f;
 	float YawCmd = 0.0f;
 
-	//Movement Settings
+	// Movement Settings
 	UPROPERTY(EditAnywhere, Category = "Robot|Limits")
 	float MaxLinearCmPerSec = 200.0f;
 
@@ -70,11 +90,11 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Robot|Safety")
 	float CmdTimeoutSec = 0.75f;
 
-	//Mesh Settings
+	// Mesh Settings
 	UPROPERTY(EditAnywhere, Category = "Robot|Frame")
 	FRotator MeshForwardFix = FRotator(0.f, 90.f, 0.f);
 
-	//Camera Control Settings
+	// Camera Control Settings
 	UPROPERTY(EditAnywhere, Category = "Robot|Camera")
 	float MouseYawSpeed = 1.5f;
 
@@ -87,17 +107,23 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Robot|Camera")
 	float MaxCameraPitch = -5.0f;
 
-	//ROS Callbacks
+	// ROS setup / callbacks
+	void SetupRos();
 	void OnCmdVel(const FTwist& Msg);
 
-	//Camera Input
+	// ROS ground-truth pose helpers
+	builtin_interfaces::msg::Time ToRosTime(double StampSeconds) const;
+	FVector UnrealLocationToRosMeters(const FVector& UnrealLocation) const;
+	FQuat UnrealYawToRosQuat(const FRotator& UnrealRotation) const;
+
+	// Camera input
 	void LookYaw(float Value);
 	void LookPitch(float Value);
 
-	//Movement Helpers
+	// Movement helpers
 	void UpdateMovement(float DeltaTime);
 
-	//Setup
+	// Setup
 	void SetupRoverComponents();
 	void SetupThirdPersonCamera();
 };

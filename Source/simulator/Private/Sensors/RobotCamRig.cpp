@@ -8,6 +8,7 @@
 #include "Sensors/GTCamera.h"
 #include "Sensors/RgbCameraCaptureComponent.h"
 #include "Sensors/CameraRosPublisherComponent.h"
+#include "Robots/RoverRobot.h"
 
 //TempoROS message traits - moved to CameraRosPublisherComponent
 
@@ -53,24 +54,25 @@ void ARobotCamRig::BeginPlay()
 		);
 	}
 	
-	       // Initialize ROS publisher component
-	       if (RosPublisherComponent && Camera) {
-		       RosPublisherComponent->Initialize(
-			       Width,
-			       Height,
-			       TEXT("left_camera"),
-			       TEXT("/left_camera"),
-			       Camera
-		       );
-		       // Bind to capture control delegate
-		       RosPublisherComponent->OnCaptureControlReceived.AddUObject(this, &ARobotCamRig::OnCaptureControl);
-	       }
+	// Initialize ROS publisher component
+	if (RosPublisherComponent && Camera) {
+		RosPublisherComponent->Initialize(
+			Width,
+			Height,
+			FrameId,
+			TEXT("/left_camera"),
+			Camera
+		);
+		// Bind to capture control delegate
+		RosPublisherComponent->OnCaptureControlReceived.AddUObject(this, &ARobotCamRig::OnCaptureControl);
+	}
 	
 	//Create and initialize CaptureManager
 	CaptureManager = NewObject<UCaptureManager>(this);
 	if (CaptureManager)
 	{
 		CaptureManager->Initialize(CaptureConfig);
+		CaptureManager->SetLeftCameraPoseSource(Camera);
 	}
 }
 
@@ -102,17 +104,6 @@ void ARobotCamRig::UpdatePublishTimer(float DeltaSeconds)
 	}
 }
 
-FCaptureFrameInfo ARobotCamRig::CreateSynchronizedFrame(double CaptureTimeSeconds)
-{
-	FCaptureFramePoseData PoseData;
-	if (Camera) {
-		PoseData.LeftCameraPose.bValid = true;
-		PoseData.LeftCameraPose.Position = Camera->GetComponentLocation();
-		PoseData.LeftCameraPose.Rotation = Camera->GetComponentRotation();
-	}
-
-	return CaptureManager ? CaptureManager->NextFrameWithPose(CaptureTimeSeconds, PoseData) : FCaptureFrameInfo();
-}
 
 void ARobotCamRig::PublishRgb()
 {
@@ -134,7 +125,11 @@ void ARobotCamRig::StartRgbCaptureAndPublish()
 	if (!Config.bEnableGt && !Config.bEnableRosRgb) return;
 
 	const double CaptureTimeSeconds = GetWorld()->GetTimeSeconds();
-	const FCaptureFrameInfo FrameInfo = CreateSynchronizedFrame(CaptureTimeSeconds);
+	const FCaptureFrameInfo FrameInfo = CaptureManager->NextFrame(CaptureTimeSeconds);
+
+	if (RoverRobot) {
+		RoverRobot->PublishGroundTruthPose(FrameInfo);
+	}
 	
 	//GT capture only if enabled in config
 	if (Config.bEnableGt && GroundTruthCamera) {
@@ -144,7 +139,7 @@ void ARobotCamRig::StartRgbCaptureAndPublish()
 	
 	//ROS RGB capture only if enabled in config
 	if (Config.bEnableRosRgb) {
-		// Start async RGB capture
+		//Start async RGB capture
 		if (!RgbCaptureComponent->StartCaptureAsync(FrameInfo)) {
 			UE_LOG(LogTemp, Warning, TEXT("RGB capture readback could not start for frame %d"), FrameInfo.FrameIndex);
 		}

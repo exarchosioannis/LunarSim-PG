@@ -10,6 +10,8 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Capture/CapturePoseSourceComponent.h"
 
+DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(geometry_msgs::msg::PoseStamped);
+
 //Constructor
 ARoverRobot::ARoverRobot()
 {
@@ -25,12 +27,8 @@ ARoverRobot::ARoverRobot()
 void ARoverRobot::BeginPlay()
 {
 	Super::BeginPlay();
-	//ROS Setup
-	ROSNode = UTempoROSNode::Create(TEXT("rover_robot"), this);
-	ROSNode->AddSubscription<FTwist>(
-		TEXT("/cmd_vel"),
-		TROSSubscriptionDelegate<FTwist>::CreateUObject(this, &ARoverRobot::OnCmdVel)
-	);
+
+	SetupRos();
 
 	LastCmdTime = GetWorld()->GetTimeSeconds();
 
@@ -57,6 +55,29 @@ void ARoverRobot::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 	PlayerInputComponent->BindAxis("TurnCamera", this, &ARoverRobot::LookYaw);
 	PlayerInputComponent->BindAxis("LookUpCamera", this, &ARoverRobot::LookPitch);
+}
+
+void ARoverRobot::SetupRos()
+{
+	ROSNode = UTempoROSNode::Create(TEXT("rover_robot"), this);
+
+	if (!ROSNode) {
+		return;
+	}
+
+	FROSQOSProfile DefaultQOS;
+	DefaultQOS.CustomQueueSize(10).Reliable();
+
+	ROSNode->AddSubscription<FTwist>(
+		*CmdVelTopic,
+		TROSSubscriptionDelegate<FTwist>::CreateUObject(this, &ARoverRobot::OnCmdVel)
+	);
+
+	ROSNode->AddPublisher<geometry_msgs::msg::PoseStamped>(
+		*GroundTruthPoseTopic,
+		DefaultQOS,
+		false
+	);
 }
 
 //Rover Setup
@@ -103,6 +124,83 @@ void ARoverRobot::OnCmdVel(const FTwist& Msg)
 {
 	CurrentTwist = Msg;
 	LastCmdTime = GetWorld()->GetTimeSeconds();
+}
+
+builtin_interfaces::msg::Time ARoverRobot::ToRosTime(double Seconds) const
+{
+	builtin_interfaces::msg::Time T;
+
+	if (Seconds < 0.0) {
+		Seconds = 0.0;
+	}
+
+	const int64 Sec = (int64)Seconds;
+	const double Frac = Seconds - (double)Sec;
+
+	T.sec = (int32)Sec;
+	T.nanosec = (uint32)FMath::Clamp<int64>(
+		(int64)(Frac * 1000000000.0),
+		0,
+		999999999
+	);
+
+	return T;
+}
+
+FVector ARoverRobot::UnrealLocationToRosMeters(const FVector& UnrealLocation) const
+{
+	return FVector(
+		UnrealLocation.X / 100.0,
+		-UnrealLocation.Y / 100.0,
+		UnrealLocation.Z / 100.0
+	);
+}
+
+FQuat ARoverRobot::UnrealYawToRosQuat(const FRotator& UnrealRotation) const
+{
+	const double RosYawRad = FMath::DegreesToRadians(-UnrealRotation.Yaw);
+
+	const double HalfYaw = RosYawRad * 0.5;
+	const double SinHalfYaw = FMath::Sin(HalfYaw);
+	const double CosHalfYaw = FMath::Cos(HalfYaw);
+
+	return FQuat(
+		0.0,
+		0.0,
+		SinHalfYaw,
+		CosHalfYaw
+	);
+}
+
+void ARoverRobot::PublishGroundTruthPose(const FCaptureFrameInfo& FrameInfo)
+{
+	if (!ROSNode) {
+		return;
+	}
+
+	if (FrameInfo.FrameIndex <= 0) {
+		return;
+	}
+
+	const FVector RosLocation = UnrealLocationToRosMeters(GetActorLocation());
+	const FQuat RosQuat = UnrealYawToRosQuat(GetActorRotation());
+
+	ReusablePoseMsg.header.stamp = ToRosTime(FrameInfo.StampSeconds);
+	ReusablePoseMsg.header.frame_id = TCHAR_TO_UTF8(*GroundTruthPoseFrameId);
+
+	ReusablePoseMsg.pose.position.x = RosLocation.X;
+	ReusablePoseMsg.pose.position.y = RosLocation.Y;
+	ReusablePoseMsg.pose.position.z = RosLocation.Z;
+
+	ReusablePoseMsg.pose.orientation.x = RosQuat.X;
+	ReusablePoseMsg.pose.orientation.y = RosQuat.Y;
+	ReusablePoseMsg.pose.orientation.z = RosQuat.Z;
+	ReusablePoseMsg.pose.orientation.w = RosQuat.W;
+
+	ROSNode->Publish<geometry_msgs::msg::PoseStamped>(
+		*GroundTruthPoseTopic,
+		ReusablePoseMsg
+	);
 }
 
 //movement Update

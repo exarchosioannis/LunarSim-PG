@@ -44,7 +44,7 @@ For example, for frame `25`:
 ```text
 ROS:
   /left_camera/frame_index = 25
-  /left_camera/rgb/image_raw/compressed
+  /left_camera/rgb/image_raw
   /left_camera/camera_info
 
 UnrealGT:
@@ -163,7 +163,7 @@ ROS publishes:
 
 ```text
 /sim_camera/frame_index
-/sim_camera/rgb/image_raw/compressed
+/sim_camera/rgb/image_raw
 /sim_camera/camera_info
 ```
 
@@ -425,3 +425,7 @@ FrameIndex 2
 ```
 
 So later we can safely combine ROS and UnrealGT data by using `frame_index`.
+
+
+Turn your current manifest pose rows into proper ROS navigation ground truth:
+manifest + /gt/odom + /tf + /gt/path + trajectory files.

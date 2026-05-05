@@ -1,5 +1,6 @@
 #include "Capture/CaptureManager.h"
 #include "Capture/CapturePoseSourceComponent.h"
+#include "Components/SceneComponent.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Misc/DateTime.h"
@@ -37,6 +38,12 @@ bool UCaptureManager::IsCaptureEnabled() const
 FCaptureFrameInfo UCaptureManager::NextFrame(double StampSeconds)
 {
 	FCaptureFramePoseData PoseData;
+	if (LeftCameraPoseSource) {
+		PoseData.LeftCameraPose.bValid = true;
+		PoseData.LeftCameraPose.Position = LeftCameraPoseSource->GetComponentLocation();
+		PoseData.LeftCameraPose.Rotation = LeftCameraPoseSource->GetComponentRotation();
+	}
+
 	return NextFrameWithPose(StampSeconds, PoseData);
 }
 
@@ -146,6 +153,11 @@ void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo, cons
 void UCaptureManager::SetRoverPoseSource(UCapturePoseSourceComponent* InRoverPoseSource)
 {
 	RoverPoseSource = InRoverPoseSource;
+}
+
+void UCaptureManager::SetLeftCameraPoseSource(USceneComponent* InLeftCameraPoseSource)
+{
+	LeftCameraPoseSource = InLeftCameraPoseSource;
 }
 
 UCapturePoseSourceComponent* UCaptureManager::FindPoseSourceByName(FName SourceName) const

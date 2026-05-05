@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "Capture/CaptureTypes.h"
@@ -7,6 +8,7 @@
 #include "CaptureManager.generated.h"
 
 class UCapturePoseSourceComponent;
+class USceneComponent;
 
 UCLASS()
 class SIMULATOR_API UCaptureManager : public UObject
@@ -41,6 +43,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Capture|Pose")
 	void SetRoverPoseSource(UCapturePoseSourceComponent* InRoverPoseSource);
 
+	UFUNCTION(BlueprintCallable, Category = "Capture|Pose")
+	void SetLeftCameraPoseSource(USceneComponent* InLeftCameraPoseSource);
+
 private:
 	void StartManifest();
 	void AppendManifestRow(const FCaptureFrameInfo& FrameInfo, const FCaptureFramePoseData& PoseData);
@@ -59,4 +64,7 @@ private:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Capture|Pose", meta = (AllowPrivateAccess = "true"))
 	UCapturePoseSourceComponent* RoverPoseSource = nullptr;
+
+	UPROPERTY()
+	USceneComponent* LeftCameraPoseSource = nullptr;
 };

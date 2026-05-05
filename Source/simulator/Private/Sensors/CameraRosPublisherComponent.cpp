@@ -58,7 +58,7 @@ void UCameraRosPublisherComponent::SetupRos()
        DefaultQOS.CustomQueueSize(10).Reliable();
 
        ROSNode->AddPublisher<sensor_msgs::msg::Image>(
-	       *(TopicBase + TEXT("/rgb/image_raw/compressed")),
+	       *(TopicBase + TEXT("/rgb/image_raw")),
 	       ImageQOS,
 	       false
        );
@@ -122,7 +122,7 @@ void UCameraRosPublisherComponent::PublishFrame(
 	ReusableFrameIndexMsg.data = FrameInfo.FrameIndex;
 
 	// Publish messages
-	ROSNode->Publish<sensor_msgs::msg::Image>(*(TopicBase + TEXT("/rgb/image_raw/compressed")), ReusableImgMsg);
+	ROSNode->Publish<sensor_msgs::msg::Image>(*(TopicBase + TEXT("/rgb/image_raw")), ReusableImgMsg);
 	ROSNode->Publish<std_msgs::msg::Int32>(*(TopicBase + TEXT("/frame_index")), ReusableFrameIndexMsg);
 	PublishCameraInfo(Stamp);
 }
@@ -154,7 +154,7 @@ void UCameraRosPublisherComponent::PublishCameraInfo(const builtin_interfaces::m
 		0.0, Fy, Cy, 0.0,
 		0.0, 0.0, 1.0, 0.0
 	};
-	ROSNode->Publish<sensor_msgs::msg::CameraInfo>(TEXT("sim_camera/camera_info"), ReusableCamInfoMsg);
+	ROSNode->Publish<sensor_msgs::msg::CameraInfo>(*(TopicBase + TEXT("/camera_info")), ReusableCamInfoMsg);
 }
 
 bool UCameraRosPublisherComponent::IsReady() const
