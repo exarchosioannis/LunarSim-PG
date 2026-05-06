@@ -75,10 +75,10 @@ void UCameraRosPublisherComponent::SetupRos()
 	       false
        );
 
-       ROSNode->AddSubscription<std_msgs::msg::Int32>(
-	       *(TopicBase + TEXT("/control")),
-	       TROSSubscriptionDelegate<std_msgs::msg::Int32>::CreateUObject(this, &UCameraRosPublisherComponent::OnCaptureControl)
-       );
+	       ROSNode->AddSubscription<std_msgs::msg::Int32>(
+		       TEXT("/control"),
+		       TROSSubscriptionDelegate<std_msgs::msg::Int32>::CreateUObject(this, &UCameraRosPublisherComponent::OnCaptureControl)
+	       );
 }
 
 builtin_interfaces::msg::Time UCameraRosPublisherComponent::ToRosTime(double Seconds) const
@@ -105,14 +105,14 @@ void UCameraRosPublisherComponent::PublishFrame(
 {
 	if (!ROSNode || !bInitialized) return;
 
-	// Convert pixel data to ROS message format
+	//Convert pixel data to ROS message format
 	const int32 W = Width;
 	const int32 H = Height; 
 	const int32 BytesPerPixel = 4;
 	
 	if (PixelData.Num() != W * H * BytesPerPixel) return;
 	
-	// Copy pixel data to reusable message
+	//Copy pixel data to reusable message
 	FMemory::Memcpy(ReusableImgMsg.data.data(), PixelData.GetData(), PixelData.Num());
 	
 	// Set message headers using FrameInfo
@@ -121,7 +121,7 @@ void UCameraRosPublisherComponent::PublishFrame(
 	ReusableImgMsg.header.stamp = Stamp;
 	ReusableFrameIndexMsg.data = FrameInfo.FrameIndex;
 
-	// Publish messages
+	//Publish messages
 	ROSNode->Publish<sensor_msgs::msg::Image>(*(TopicBase + TEXT("/rgb/image_raw")), ReusableImgMsg);
 	ROSNode->Publish<std_msgs::msg::Int32>(*(TopicBase + TEXT("/frame_index")), ReusableFrameIndexMsg);
 	PublishCameraInfo(Stamp);

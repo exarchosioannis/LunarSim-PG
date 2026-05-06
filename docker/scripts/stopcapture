@@ -1,2 +1,2 @@
 #!/bin/bash
-ros2 topic pub /left_camera/control std_msgs/msg/Int32 "{data: 0}" --once && echo "[OK] Capture stopped"
+ros2 topic pub /control std_msgs/msg/Int32 "{data: 0}" --once && echo "[OK] Capture stopped"

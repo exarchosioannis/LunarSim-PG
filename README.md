@@ -168,12 +168,13 @@ This keeps `RobotCamRig` simple. It coordinates the capture, but it does not dir
 
 ## ROS output
 
+
 ROS uses these main topics:
 
 ```text
 Subscribed:
   /cmd_vel
-  /left_camera/control
+  /control
 
 Published:
   /left_camera/rgb/image_raw
