@@ -40,6 +40,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Capture")
 	bool IsSessionValid(int32 SessionId) const;
 
+	UFUNCTION(BlueprintPure, Category = "Capture|Session")
+	FString GetCurrentSessionName() const;
+
+	UFUNCTION(BlueprintPure, Category = "Capture|Session")
+	FString GetCurrentSessionDirectory() const;
+
+	UFUNCTION(BlueprintPure, Category = "Capture|Session")
+	FString GetCurrentImagesDirectory() const;
+
+	UFUNCTION(BlueprintPure, Category = "Capture|Session")
+	FString GetManifestFilePath() const;
+
+	UFUNCTION(BlueprintPure, Category = "Capture|Session")
+	FString GetRoverGtTrajectoryFilePath() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Capture|Pose")
 	void SetRoverPoseSource(UCapturePoseSourceComponent* InRoverPoseSource);
 
@@ -49,6 +64,10 @@ public:
 private:
 	void StartManifest();
 	void AppendManifestRow(const FCaptureFrameInfo& FrameInfo, const FCaptureFramePoseData& PoseData);
+	void AppendRoverGtTrajectoryRow(const FCaptureFrameInfo& FrameInfo, const FCapturePose& RoverPose);
+
+	static FVector UnrealLocationToRosMeters(const FVector& UnrealLocation);
+	static FQuat UnrealYawToRosQuat(const FRotator& UnrealRotation);
 	
 	UCapturePoseSourceComponent* FindPoseSourceByName(FName SourceName) const;
 
@@ -61,6 +80,10 @@ private:
 	FCaptureConfig Config;
 
 	FString ManifestFilePath;
+	FString RoverGtTrajectoryFilePath;
+	FString CurrentSessionName;
+	FString CurrentSessionDirectory;
+	FString CurrentImagesDirectory;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Capture|Pose", meta = (AllowPrivateAccess = "true"))
 	UCapturePoseSourceComponent* RoverPoseSource = nullptr;

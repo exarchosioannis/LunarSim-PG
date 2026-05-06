@@ -16,8 +16,25 @@ void UCaptureManager::Initialize(const FCaptureConfig& InConfig)
 
 void UCaptureManager::StartCapture()
 {
+	if (bCaptureEnabled)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Capture is already running. StartCapture ignored."));
+		return;
+	}
+
 	CurrentSessionId++;
 	FrameIndex = 0;
+
+	const FString DateString = FDateTime::Now().ToString(TEXT("%Y-%m-%d_%H-%M-%S"));
+	CurrentSessionName = FString::Printf(TEXT("%s_session_%d"), *DateString, CurrentSessionId.load());
+	CurrentSessionDirectory = FPaths::ConvertRelativePathToFull(FPaths::Combine(
+		FPaths::ProjectSavedDir(),
+		TEXT("Datasets"),
+		CurrentSessionName));
+	CurrentImagesDirectory = FPaths::Combine(CurrentSessionDirectory, TEXT("Images"));
+	ManifestFilePath = FPaths::Combine(CurrentSessionDirectory, TEXT("manifest.csv"));
+	RoverGtTrajectoryFilePath = FPaths::Combine(CurrentSessionDirectory, TEXT("Navigation"), TEXT("rover_gt_trajectory_ros.csv"));
+
 	// The manifest is always created for every capture session.
 	// It is the main synchronization file between ROS, UnrealGT, and offline tools.
 	if (!RoverPoseSource) {
@@ -80,20 +97,50 @@ bool UCaptureManager::IsSessionValid(int32 SessionId) const
 	return SessionId == CurrentSessionId;
 }
 
+FString UCaptureManager::GetCurrentSessionName() const
+{
+	return CurrentSessionName;
+}
+
+FString UCaptureManager::GetCurrentSessionDirectory() const
+{
+	return CurrentSessionDirectory;
+}
+
+FString UCaptureManager::GetCurrentImagesDirectory() const
+{
+	return CurrentImagesDirectory;
+}
+
+FString UCaptureManager::GetManifestFilePath() const
+{
+	return ManifestFilePath;
+}
+
+FString UCaptureManager::GetRoverGtTrajectoryFilePath() const
+{
+	return RoverGtTrajectoryFilePath;
+}
+
 void UCaptureManager::StartManifest()
 {
-	//Create the file if it doesn't exist.
-	FString ManifestDir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("CaptureManifests"));
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
-	if (!PlatformFile.DirectoryExists(*ManifestDir))
+	if (!PlatformFile.DirectoryExists(*CurrentSessionDirectory))
 	{
-		PlatformFile.CreateDirectoryTree(*ManifestDir);
+		PlatformFile.CreateDirectoryTree(*CurrentSessionDirectory);
 	}
-	FString DateString = FDateTime::Now().ToString(TEXT("%Y-%m-%d_%H-%M-%S"));
+	if (!PlatformFile.DirectoryExists(*CurrentImagesDirectory))
+	{
+		PlatformFile.CreateDirectoryTree(*CurrentImagesDirectory);
+	}
 
-	ManifestFilePath = FPaths::Combine(ManifestDir, FString::Printf(TEXT("%s_session_%d.csv"), *DateString, CurrentSessionId.load()));
+	const FString NavigationDirectory = FPaths::GetPath(RoverGtTrajectoryFilePath);
+	if (!PlatformFile.DirectoryExists(*NavigationDirectory))
+	{
+		PlatformFile.CreateDirectoryTree(*NavigationDirectory);
+	}
 	
-	//Write the csv header
+	// Write the csv header
 	FString Header = TEXT(
 		"session_id,frame_index,stamp_seconds,"
 
@@ -107,6 +154,19 @@ void UCaptureManager::StartManifest()
 	);
 
 	FFileHelper::SaveStringToFile(Header, *ManifestFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
+
+	const FString RoverTrajectoryHeader = TEXT(
+		"timestamp_sec,frame_index,frame_id,child_frame_id,"
+		"x_m,y_m,z_m,qx,qy,qz,qw\n"
+	);
+
+	FFileHelper::SaveStringToFile(
+		RoverTrajectoryHeader,
+		*RoverGtTrajectoryFilePath,
+		FFileHelper::EEncodingOptions::AutoDetect,
+		&IFileManager::Get(),
+		FILEWRITE_None
+	);
 }
 
 void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo, const FCaptureFramePoseData& PoseData)
@@ -149,6 +209,62 @@ void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo, cons
 	FFileHelper::SaveStringToFile(
 		Row,
 		*ManifestFilePath,
+		FFileHelper::EEncodingOptions::AutoDetect,
+		&IFileManager::Get(),
+		FILEWRITE_Append
+	);
+
+	AppendRoverGtTrajectoryRow(FrameInfo, RoverPose);
+}
+
+FVector UCaptureManager::UnrealLocationToRosMeters(const FVector& UnrealLocation)
+{
+	return FVector(
+		UnrealLocation.X / 100.0,
+		-UnrealLocation.Y / 100.0,
+		UnrealLocation.Z / 100.0
+	);
+}
+
+FQuat UCaptureManager::UnrealYawToRosQuat(const FRotator& UnrealRotation)
+{
+	const double RosYawRad = FMath::DegreesToRadians(-UnrealRotation.Yaw);
+	const double HalfYaw = RosYawRad * 0.5;
+
+	return FQuat(
+		0.0,
+		0.0,
+		FMath::Sin(HalfYaw),
+		FMath::Cos(HalfYaw)
+	);
+}
+
+void UCaptureManager::AppendRoverGtTrajectoryRow(const FCaptureFrameInfo& FrameInfo, const FCapturePose& RoverPose)
+{
+	if (!RoverPose.bValid || RoverGtTrajectoryFilePath.IsEmpty())
+	{
+		return;
+	}
+
+	const FVector RosLocation = UnrealLocationToRosMeters(RoverPose.Position);
+	const FQuat RosQuat = UnrealYawToRosQuat(RoverPose.Rotation);
+
+	const FString Row = FString::Printf(
+		TEXT("%.9f,%d,map,rover_base,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f\n"),
+		FrameInfo.StampSeconds,
+		FrameInfo.FrameIndex,
+		RosLocation.X,
+		RosLocation.Y,
+		RosLocation.Z,
+		RosQuat.X,
+		RosQuat.Y,
+		RosQuat.Z,
+		RosQuat.W
+	);
+
+	FFileHelper::SaveStringToFile(
+		Row,
+		*RoverGtTrajectoryFilePath,
 		FFileHelper::EEncodingOptions::AutoDetect,
 		&IFileManager::Get(),
 		FILEWRITE_Append

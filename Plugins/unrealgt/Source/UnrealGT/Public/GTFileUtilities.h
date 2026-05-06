@@ -5,7 +5,9 @@
 #include "Async/Async.h"
 #include "Async/AsyncWork.h"
 #include "CoreMinimal.h"
+#include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 
 class FGTSaveFileTask : public FNonAbandonableTask
 {
@@ -24,6 +26,11 @@ protected:
 
     void DoWork()
     {
+        const FString Directory = FPaths::GetPath(TotalFileName);
+        if (!Directory.IsEmpty())
+        {
+            IFileManager::Get().MakeDirectory(*Directory, true);
+        }
         FFileHelper::SaveArrayToFile(Data, *TotalFileName);
     }
 
@@ -34,7 +41,14 @@ protected:
 };
 
 /**
+ * File helpers for UnrealGT dataset output.
  *
+ * By default this keeps the original UnrealGT behaviour:
+ * Saved/Datasets/<MapName>/<SessionStartTime>/...
+ *
+ * When the simulator CaptureManager is running, GTGeneratorTrigger can set an
+ * output directory override so UnrealGT writes into:
+ * Saved/Datasets/<CaptureSessionName>/Images/...
  */
 class UNREALGT_API FGTFileUtilities
 {
@@ -44,6 +58,13 @@ public:
 
     static TArray<uint8> StringToCharArray(const FString& InString);
 
+    static void SetSessionOutputDirectoryOverride(const FString& InDirectory);
+    static void ClearSessionOutputDirectoryOverride();
+    static FString GetSessionOutputDirectory(UWorld* CurrentWorld);
+
     static void
     WriteFileToSessionDirectory(FString FileName, const TArray<uint8>& Data, UWorld* CurrentWorld);
+
+private:
+    static FString SessionOutputDirectoryOverride;
 };

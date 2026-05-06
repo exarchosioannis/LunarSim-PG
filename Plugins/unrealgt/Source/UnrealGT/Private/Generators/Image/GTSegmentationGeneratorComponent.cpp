@@ -44,7 +44,7 @@ void UGTSegmentationGeneratorComponent::GenerateData(const FDateTime& TimeStamp,
         }
         SceneCaptureComponent->SetupSegmentationBlendable(bShouldApplyCloseMorph);
         FGTFileUtilities::WriteFileToSessionDirectory(
-            FPaths::Combine(GetName(), TEXT("segmentation_info.json")),
+            FPaths::Combine(TEXT("SegmentationInfo"), TEXT("segmentation_info.json")),
             FGTFileUtilities::StringToCharArray(GenerateSegmentationInfoJSON()),
             GetWorld());
         WaitingToBeRegistered.Empty(WaitingToBeRegistered.Num());
@@ -59,7 +59,9 @@ void UGTSegmentationGeneratorComponent::GenerateData(
     int32 FrameIndex,
     double StampSeconds)
 {
-    if (!WaitingToBeRegistered.IsEmpty())
+    const bool bHadPendingRegistrations = !WaitingToBeRegistered.IsEmpty();
+
+    if (bHadPendingRegistrations)
     {
         for (auto p : WaitingToBeRegistered)
         {
@@ -71,12 +73,20 @@ void UGTSegmentationGeneratorComponent::GenerateData(
                 ColorEachComponentDifferentFilter);
         }
         SceneCaptureComponent->SetupSegmentationBlendable(bShouldApplyCloseMorph);
-        FGTFileUtilities::WriteFileToSessionDirectory(
-            FPaths::Combine(GetName(), TEXT("segmentation_info.json")),
-            FGTFileUtilities::StringToCharArray(GenerateSegmentationInfoJSON()),
-            GetWorld());
         WaitingToBeRegistered.Empty(WaitingToBeRegistered.Num());
     }
+
+    // BeginPlay can run before the simulator CaptureManager creates its session folder.
+    // Write the metadata again on the first synchronized frame so every dataset session
+    // contains its own SegmentationInfo/segmentation_info.json file.
+    if (FrameIndex == 1 || bHadPendingRegistrations)
+    {
+        FGTFileUtilities::WriteFileToSessionDirectory(
+            FPaths::Combine(TEXT("SegmentationInfo"), TEXT("segmentation_info.json")),
+            FGTFileUtilities::StringToCharArray(GenerateSegmentationInfoJSON()),
+            GetWorld());
+    }
+
     Super::GenerateData(TimeStamp, SessionId, MoveTemp(SessionValidator), FrameIndex, StampSeconds);
 }
 
@@ -151,10 +161,6 @@ void UGTSegmentationGeneratorComponent::BeginPlay()
         },
         FString(TEXT("")));
 
-    FGTFileUtilities::WriteFileToSessionDirectory(
-        FPaths::Combine(GetName(), TEXT("segmentation_info.json")),
-        FGTFileUtilities::StringToCharArray(GenerateSegmentationInfoJSON()),
-        GetWorld());
 }
 
 void UGTSegmentationGeneratorComponent::DrawDebug(FViewport* Viewport, FCanvas* Canvas)
