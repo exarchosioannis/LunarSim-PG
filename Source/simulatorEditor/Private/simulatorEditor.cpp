@@ -14,9 +14,10 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SNumericEntryBox.h"
+#include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SComboBox.h"
 #include "Widgets/Layout/SGridPanel.h"
 #include "Widgets/Layout/SExpandableArea.h"
-#include "Widgets/Input/SButton.h"
 #include "Styling/CoreStyle.h"
 
 #define LOCTEXT_NAMESPACE "FsimulatorEditorModule"
@@ -25,6 +26,8 @@ const FName FsimulatorEditorModule::SimulatorConfigTabName(TEXT("SimulatorConfig
 
 void FsimulatorEditorModule::StartupModule()
 {
+	InitCaptureModeOptions();
+
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(
 		SimulatorConfigTabName,
 		FOnSpawnTab::CreateRaw(this, &FsimulatorEditorModule::OnSpawnSimulatorConfigTab)
@@ -38,7 +41,6 @@ void FsimulatorEditorModule::StartupModule()
 			FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FsimulatorEditorModule::RegisterMenus)
 		);
 	}
-	
 }
 
 void FsimulatorEditorModule::ShutdownModule()
@@ -87,6 +89,9 @@ TSharedRef<SDockTab> FsimulatorEditorModule::OnSpawnSimulatorConfigTab(const FSp
 
 TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 {
+	InitCaptureModeOptions();
+	SelectedCaptureModeOption = FindCaptureModeOption(CaptureMode);
+
 	return SNew(SBox)
 		.Padding(12.0f)
 		[
@@ -109,48 +114,10 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 					.VAlign(VAlign_Center)
 					[
 						SNew(STextBlock)
-						.Text(LOCTEXT("EnableGtLabel", "Enable GT"))
-					]
-
-					+ SGridPanel::Slot(1, 0)
-					.Padding(4.f, 6.f)
-					.HAlign(HAlign_Right)
-					.VAlign(VAlign_Center)
-					[
-						SNew(SCheckBox)
-						.IsChecked_Raw(this, &FsimulatorEditorModule::GetEnableGtCheckState)
-						.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnEnableGtChanged)
-					]
-
-					+ SGridPanel::Slot(0, 1)
-					.Padding(4.f, 6.f)
-					.HAlign(HAlign_Left)
-					.VAlign(VAlign_Center)
-					[
-						SNew(STextBlock)
-						.Text(LOCTEXT("EnableRosRgbLabel", "Enable ROS RGB"))
-					]
-
-					+ SGridPanel::Slot(1, 1)
-					.Padding(4.f, 6.f)
-					.HAlign(HAlign_Right)
-					.VAlign(VAlign_Center)
-					[
-						SNew(SCheckBox)
-						.IsChecked_Raw(this, &FsimulatorEditorModule::GetEnableRosRgbCheckState)
-						.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnEnableRosRgbChanged)
-					]
-
-					+ SGridPanel::Slot(0, 2)
-					.Padding(4.f, 6.f)
-					.HAlign(HAlign_Left)
-					.VAlign(VAlign_Center)
-					[
-						SNew(STextBlock)
 						.Text(LOCTEXT("PublishHzLabel", "Publish Hz"))
 					]
 
-					+ SGridPanel::Slot(1, 2)
+					+ SGridPanel::Slot(1, 0)
 					.Padding(4.f, 6.f)
 					.HAlign(HAlign_Right)
 					.VAlign(VAlign_Center)
@@ -170,6 +137,54 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 							.MaxSliderValue(24)
 							.AllowSpin(true)
 						]
+					]
+
+					+ SGridPanel::Slot(0, 1)
+					.Padding(4.f, 6.f)
+					.HAlign(HAlign_Left)
+					.VAlign(VAlign_Center)
+					[
+						SNew(STextBlock)
+						.Text(LOCTEXT("CaptureModeLabel", "Capture Mode"))
+					]
+
+					+ SGridPanel::Slot(1, 1)
+					.Padding(4.f, 6.f)
+					.HAlign(HAlign_Right)
+					.VAlign(VAlign_Center)
+					[
+						SNew(SBox)
+						.WidthOverride(240.f)
+						[
+							SNew(SComboBox<TSharedPtr<ECaptureMode>>)
+							.OptionsSource(&CaptureModeOptions)
+							.InitiallySelectedItem(SelectedCaptureModeOption)
+							.OnGenerateWidget_Raw(this, &FsimulatorEditorModule::MakeCaptureModeComboWidget)
+							.OnSelectionChanged_Raw(this, &FsimulatorEditorModule::OnCaptureModeSelectionChanged)
+							[
+								SNew(STextBlock)
+								.Text_Raw(this, &FsimulatorEditorModule::GetCaptureModeText)
+							]
+						]
+					]
+
+					+ SGridPanel::Slot(0, 2)
+					.Padding(4.f, 6.f)
+					.HAlign(HAlign_Left)
+					.VAlign(VAlign_Center)
+					[
+						SNew(STextBlock)
+						.Text(LOCTEXT("EnableRosRoverGtPoseLabel", "/rover/gt/pose"))
+					]
+
+					+ SGridPanel::Slot(1, 2)
+					.Padding(4.f, 6.f)
+					.HAlign(HAlign_Right)
+					.VAlign(VAlign_Center)
+					[
+						SNew(SCheckBox)
+						.IsChecked_Raw(this, &FsimulatorEditorModule::GetEnableRosRoverGtPoseCheckState)
+						.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnEnableRosRoverGtPoseChanged)
 					]
 				]
 			]
@@ -194,29 +209,80 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 		];
 }
 
-ECheckBoxState FsimulatorEditorModule::GetEnableGtCheckState() const
+void FsimulatorEditorModule::InitCaptureModeOptions()
 {
-	return bEnableGt ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+	if (CaptureModeOptions.Num() > 0) return;
+
+	CaptureModeOptions.Add(MakeShared<ECaptureMode>(ECaptureMode::MonoRos));
+	CaptureModeOptions.Add(MakeShared<ECaptureMode>(ECaptureMode::GroundTruth));
+	CaptureModeOptions.Add(MakeShared<ECaptureMode>(ECaptureMode::StereoRos));
+	CaptureModeOptions.Add(MakeShared<ECaptureMode>(ECaptureMode::MonoRosGroundTruth));
+	CaptureModeOptions.Add(MakeShared<ECaptureMode>(ECaptureMode::StereoRosGroundTruth));
 }
 
-ECheckBoxState FsimulatorEditorModule::GetEnableRosRgbCheckState() const
+TSharedPtr<ECaptureMode> FsimulatorEditorModule::FindCaptureModeOption(ECaptureMode InMode) const
 {
-	return bEnableRosRgb ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+	for (const TSharedPtr<ECaptureMode>& Option : CaptureModeOptions)
+	{
+		if (Option.IsValid() && *Option == InMode)
+		{
+			return Option;
+		}
+	}
+	return nullptr;
 }
 
-void FsimulatorEditorModule::OnEnableGtChanged(ECheckBoxState NewState)
+FString FsimulatorEditorModule::CaptureModeToString(ECaptureMode InMode) const
 {
-	bEnableGt = (NewState == ECheckBoxState::Checked);
+	switch (InMode)
+	{
+	case ECaptureMode::MonoRos:
+		return TEXT("Mono ROS");
+	case ECaptureMode::GroundTruth:
+		return TEXT("Ground Truth");
+	case ECaptureMode::StereoRos:
+		return TEXT("Stereo ROS");
+	case ECaptureMode::MonoRosGroundTruth:
+		return TEXT("Mono ROS + Ground Truth");
+	case ECaptureMode::StereoRosGroundTruth:
+		return TEXT("Stereo ROS + Ground Truth");
+	default:
+		return TEXT("Unknown");
+	}
 }
 
-void FsimulatorEditorModule::OnEnableRosRgbChanged(ECheckBoxState NewState)
+FText FsimulatorEditorModule::GetCaptureModeText() const
 {
-	bEnableRosRgb = (NewState == ECheckBoxState::Checked);
+	return FText::FromString(CaptureModeToString(CaptureMode));
+}
+
+TSharedRef<SWidget> FsimulatorEditorModule::MakeCaptureModeComboWidget(TSharedPtr<ECaptureMode> InOption) const
+{
+	const ECaptureMode Mode = InOption.IsValid() ? *InOption : ECaptureMode::MonoRosGroundTruth;
+	return SNew(STextBlock).Text(FText::FromString(CaptureModeToString(Mode)));
+}
+
+void FsimulatorEditorModule::OnCaptureModeSelectionChanged(TSharedPtr<ECaptureMode> NewSelection, ESelectInfo::Type SelectInfo)
+{
+	if (!NewSelection.IsValid()) return;
+
+	SelectedCaptureModeOption = NewSelection;
+	CaptureMode = *NewSelection;
+}
+
+ECheckBoxState FsimulatorEditorModule::GetEnableRosRoverGtPoseCheckState() const
+{
+	return bEnableRosRoverGtPose ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+}
+
+void FsimulatorEditorModule::OnEnableRosRoverGtPoseChanged(ECheckBoxState NewState)
+{
+	bEnableRosRoverGtPose = (NewState == ECheckBoxState::Checked);
 }
 
 void FsimulatorEditorModule::OnPublishHzChanged(int32 NewValue)
 {
-	PublishHz = NewValue;
+	PublishHz = FMath::Clamp(NewValue, 1, 24);
 }
 
 void FsimulatorEditorModule::OnApplyClicked()
@@ -232,9 +298,9 @@ void FsimulatorEditorModule::OnApplyClicked()
 		if (!RobotCamRig) continue;
 
 		FCaptureConfig NewConfig;
-		NewConfig.bEnableGt = bEnableGt;
-		NewConfig.bEnableRosRgb = bEnableRosRgb;
-		NewConfig.PublishHz = PublishHz;
+		NewConfig.PublishHz = FMath::Clamp(PublishHz, 1, 24);
+		NewConfig.CaptureMode = CaptureMode;
+		NewConfig.bEnableRosRoverGtPose = bEnableRosRoverGtPose;
 
 		RobotCamRig->Modify();
 		RobotCamRig->SetCaptureConfig(NewConfig);
@@ -244,8 +310,16 @@ void FsimulatorEditorModule::OnApplyClicked()
 		GEditor->SelectNone(false, true, false);
 		GEditor->SelectActor(RobotCamRig, true, true, true);
 
-		break;
+		UE_LOG(LogTemp, Display, TEXT("Simulator config applied to %s: PublishHz=%d, CaptureMode=%s, RosRoverGtPose=%s"),
+			*RobotCamRig->GetName(),
+			NewConfig.PublishHz,
+			*CaptureModeToString(NewConfig.CaptureMode),
+			NewConfig.bEnableRosRoverGtPose ? TEXT("true") : TEXT("false"));
+
+		return;
 	}
+
+	UE_LOG(LogTemp, Warning, TEXT("Simulator config was not applied because no RobotCamRig was found in the editor world."));
 }
 
 void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
@@ -262,12 +336,15 @@ void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
 
 		const FCaptureConfig CurrentConfig = RobotCamRig->GetCaptureConfig();
 
-		bEnableGt = CurrentConfig.bEnableGt;
-		bEnableRosRgb = CurrentConfig.bEnableRosRgb;
-		PublishHz = CurrentConfig.PublishHz;
+		PublishHz = FMath::Clamp(CurrentConfig.PublishHz, 1, 24);
+		CaptureMode = CurrentConfig.CaptureMode;
+		bEnableRosRoverGtPose = CurrentConfig.bEnableRosRoverGtPose;
+		SelectedCaptureModeOption = FindCaptureModeOption(CaptureMode);
 
-		break;
+		return;
 	}
+
+	UE_LOG(LogTemp, Warning, TEXT("Simulator config window opened, but no RobotCamRig was found in the editor world. Showing default settings."));
 }
 
 #undef LOCTEXT_NAMESPACE

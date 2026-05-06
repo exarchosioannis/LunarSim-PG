@@ -96,7 +96,7 @@ void ARobotCamRig::Tick(float DeltaSeconds)
 void ARobotCamRig::UpdatePublishTimer(float DeltaSeconds)
 {
 	PublishAccumulator += DeltaSeconds;
-	const float Hz = CaptureManager ? FMath::Max(1.0f, CaptureManager->GetConfig().PublishHz) : 10.0f;
+	const float Hz = CaptureManager ? FMath::Clamp((float)CaptureManager->GetConfig().PublishHz, 1.0f, 24.0f) : 10.0f;
 	const float Period = 1.0f / Hz;
 	if (PublishAccumulator >= Period) {
 		PublishAccumulator -= Period;
@@ -110,9 +110,11 @@ void ARobotCamRig::PublishRgb()
 	if (!CaptureManager || !RgbCaptureComponent) return;
 	
 	const FCaptureConfig& Config = CaptureManager->GetConfig();
-	if (!Config.bEnableGt && !Config.bEnableRosRgb) return;
+	if (!Config.HasAnyCaptureOutput()) return;
 	
-	if (Config.bEnableRosRgb && RgbCaptureComponent->IsCaptureInProgress()) return;
+	// The current implementation has only the left ROS camera.
+	// Stereo modes are kept in the config now, but the right camera output will be added later.
+	if (Config.IsLeftRosCameraEnabled() && RgbCaptureComponent->IsCaptureInProgress()) return;
 	
 	StartRgbCaptureAndPublish();
 }
@@ -122,23 +124,23 @@ void ARobotCamRig::StartRgbCaptureAndPublish()
 	if (!CaptureManager || !RgbCaptureComponent || !GetWorld()) return;
 
 	const FCaptureConfig& Config = CaptureManager->GetConfig();
-	if (!Config.bEnableGt && !Config.bEnableRosRgb) return;
+	if (!Config.HasAnyCaptureOutput()) return;
 
 	const double CaptureTimeSeconds = GetWorld()->GetTimeSeconds();
 	const FCaptureFrameInfo FrameInfo = CaptureManager->NextFrame(CaptureTimeSeconds);
 
-	if (RoverRobot) {
+	if (Config.bEnableRosRoverGtPose && RoverRobot) {
 		RoverRobot->PublishGroundTruthPose(FrameInfo);
 	}
 	
 	//GT capture only if enabled in config
-	if (Config.bEnableGt && GroundTruthCamera) {
+	if (Config.IsGroundTruthEnabled() && GroundTruthCamera) {
 		if (Camera) GroundTruthCamera->SetActorTransform(Camera->GetComponentTransform());
 		GroundTruthCamera->CaptureGroundTruthNow(FrameInfo.FrameIndex, FrameInfo.StampSeconds, FrameInfo.SessionId, CaptureManager);
 	}
 	
 	//ROS RGB capture only if enabled in config
-	if (Config.bEnableRosRgb) {
+	if (Config.IsLeftRosCameraEnabled()) {
 		//Start async RGB capture
 		if (!RgbCaptureComponent->StartCaptureAsync(FrameInfo)) {
 			UE_LOG(LogTemp, Warning, TEXT("RGB capture readback could not start for frame %d"), FrameInfo.FrameIndex);
@@ -155,7 +157,7 @@ void ARobotCamRig::PollRgbCaptureAndPublish()
 	
 	if (RgbCaptureComponent->PollReadback(PixelData, FrameInfo)) {
 		// Early return if ROS RGB capture is disabled or capture is stopped or session is invalid
-		if (!CaptureManager || !CaptureManager->GetConfig().bEnableRosRgb || !CaptureManager->IsSessionValid(FrameInfo.SessionId)) {
+		if (!CaptureManager || !CaptureManager->GetConfig().IsLeftRosCameraEnabled() || !CaptureManager->IsSessionValid(FrameInfo.SessionId)) {
 			return;
 		}
 		

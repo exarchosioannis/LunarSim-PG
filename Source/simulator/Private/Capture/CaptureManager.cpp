@@ -18,6 +18,8 @@ void UCaptureManager::StartCapture()
 {
 	CurrentSessionId++;
 	FrameIndex = 0;
+	// The manifest is always created for every capture session.
+	// It is the main synchronization file between ROS, UnrealGT, and offline tools.
 	if (!RoverPoseSource) {
 		RoverPoseSource = FindPoseSourceByName(TEXT("rover_base"));
 	}
@@ -60,6 +62,9 @@ FCaptureFrameInfo UCaptureManager::NextFrameWithPose(double StampSeconds, const 
 	FrameInfo.StampSeconds = StampSeconds;
 	FrameInfo.SessionId = CurrentSessionId;
 
+	// Always write one manifest row for every frame, regardless of capture mode.
+	// Mono/GT modes currently store rover + left/reference camera pose.
+	// Stereo modes can extend this later with right camera pose columns.
 	AppendManifestRow(FrameInfo, CompletePoseData);
 
 	return FrameInfo;
