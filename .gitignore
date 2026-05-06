@@ -58,3 +58,6 @@ Thumbs.db
 bags/
 # Unreal Starter Content
 Content/StarterContent/
+
+# Local backup
+*.bak
