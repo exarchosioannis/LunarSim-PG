@@ -8,6 +8,7 @@ The main outputs are:
    - RGB image
    - camera info
    - frame index
+   - rover ground-truth pose
 
 2. **UnrealGT dataset**
    - RGB ground truth image
@@ -22,7 +23,7 @@ The main outputs are:
    - rover pose
    - camera pose
 
-The goal is simple: every ROS frame must match the correct UnrealGT files and the correct manifest row.
+The goal is simple: every ROS frame must match the correct UnrealGT files, the correct rover ground-truth pose, and the correct manifest row.
 
 ---
 
@@ -46,6 +47,7 @@ ROS:
   /left_camera/frame_index = 25
   /left_camera/rgb/image_raw
   /left_camera/camera_info
+  /rover/gt/pose
 
 UnrealGT:
   RGB/25.png
@@ -101,6 +103,7 @@ RobotCamRig asks CaptureManager for one frame
 CaptureManager returns FCaptureFrameInfo
 RobotCamRig passes the same frame info to UnrealGT
 RobotCamRig passes the same frame info to RGB capture
+RobotCamRig passes the same frame info to rover ground-truth pose publishing
 RobotCamRig passes the same frame info to ROS publishing
 Manifest stores the same frame info
 ```
@@ -126,6 +129,7 @@ RobotCamRig
   - asks CaptureManager for the next frame
   - triggers UnrealGT capture
   - starts and polls RGB capture
+  - asks RoverRobot to publish the synchronized ground-truth pose
   - asks the ROS publisher component to publish
 
 CaptureManager
@@ -140,13 +144,18 @@ RgbCameraCaptureComponent
   - stores the pending FCaptureFrameInfo
   - returns pixels together with the same FCaptureFrameInfo
 
+RoverRobot
+  - subscribes to /cmd_vel
+  - moves the rover
+  - publishes /rover/gt/pose using the same FCaptureFrameInfo timestamp
+
 CameraRosPublisherComponent
   - owns the ROS node
   - owns ROS publishers and subscriber
   - builds and reuses ROS messages
   - publishes RGB image, camera_info and frame_index
   - uses FrameInfo.StampSeconds for ROS timestamps
-  - uses FrameInfo.FrameIndex for /sim_camera/frame_index
+  - uses FrameInfo.FrameIndex for /left_camera/frame_index
 
 GTCamera
   - bridge to UnrealGT / Blueprint ground-truth generation
@@ -159,15 +168,29 @@ This keeps `RobotCamRig` simple. It coordinates the capture, but it does not dir
 
 ## ROS output
 
-ROS publishes:
+ROS uses these main topics:
 
 ```text
-/sim_camera/frame_index
-/sim_camera/rgb/image_raw
-/sim_camera/camera_info
+Subscribed:
+  /cmd_vel
+  /left_camera/control
+
+Published:
+  /left_camera/rgb/image_raw
+  /left_camera/camera_info
+  /left_camera/frame_index
+  /rover/gt/pose
 ```
 
-The ROS image and camera info use the same timestamp from `CaptureManager`.
+The camera image may also appear with automatically generated image transport topics, for example:
+
+```text
+/left_camera/rgb/image_raw/compressed
+/left_camera/rgb/image_raw/compressedDepth
+/left_camera/rgb/image_raw/theora
+```
+
+The ROS image, camera info and rover ground-truth pose use the same timestamp from `CaptureManager`.
 
 So for each frame:
 
@@ -175,9 +198,18 @@ So for each frame:
 frame_index = k
 image.header.stamp = stamp_seconds for k
 camera_info.header.stamp = stamp_seconds for k
+rover_gt_pose.header.stamp = stamp_seconds for k
 ```
 
 The `frame_index` topic is used to match ROS messages with UnrealGT files and the manifest.
+
+The rover pose is published as:
+
+```text
+topic: /rover/gt/pose
+type: geometry_msgs/msg/PoseStamped
+frame_id: map
+```
 
 ---
 
@@ -217,9 +249,10 @@ all correspond to:
 
 ```text
 manifest row with frame_index = 25
-ROS /sim_camera/frame_index = 25
+ROS /left_camera/frame_index = 25
 ROS image timestamp = manifest stamp_seconds for frame 25
 ROS camera_info timestamp = manifest stamp_seconds for frame 25
+ROS /rover/gt/pose timestamp = manifest stamp_seconds for frame 25
 ```
 
 ---
@@ -289,7 +322,45 @@ rover position in Unreal centimeters
 rover rotation in Unreal degrees
 ```
 
+The rover also publishes a synchronized ROS pose:
+
+```text
+/rover/gt/pose
+```
+
+This pose uses the same timestamp as the camera image and camera info.
+
 The rover trajectory is the sequence of these rows ordered by `frame_index`.
+
+---
+
+## Coordinate note
+
+Unreal and ROS use different coordinate conventions.
+
+The manifest currently stores the rover and camera pose in Unreal coordinates:
+
+```text
+position: Unreal centimeters
+rotation: Unreal degrees
+```
+
+The `/rover/gt/pose` ROS topic stores the rover pose in ROS-style values:
+
+```text
+position: meters
+orientation: quaternion
+```
+
+The current rover position conversion is:
+
+```text
+ros_x = unreal_x / 100.0
+ros_y = -unreal_y / 100.0
+ros_z = unreal_z / 100.0
+```
+
+So the manifest and ROS pose represent the same physical rover pose, but not with the same numeric values.
 
 ---
 
@@ -321,7 +392,7 @@ So frame `k` always refers to the same capture moment.
 The synchronization rule is:
 
 ```text
-UnrealGT file name k  <->  manifest row k  <->  ROS frame_index k
+UnrealGT file name k  <->  manifest row k  <->  ROS frame_index k  <->  ROS rover gt pose timestamp for k
 ```
 
 ---
@@ -331,29 +402,31 @@ UnrealGT file name k  <->  manifest row k  <->  ROS frame_index k
 We tested one capture and got:
 
 ```text
-ROS RGB images:         243
-ROS camera_info:        243
-ROS frame_index:        243
+ROS camera_info:        136
+ROS frame_index:        136
+ROS RGB compressed:     136
+ROS rover gt pose:      136
 
-UnrealGT RGB:           243
-UnrealGT Depth:         243
-UnrealGT Segmentation:  243
-UnrealGT BoundingBoxes: 243
+UnrealGT RGB:           136
+UnrealGT Depth:         136
+UnrealGT Segmentation:  136
+UnrealGT BoundingBoxes: 136
 
-Manifest frames:        243
+Manifest lines:         137
+Manifest frames:        136
 ```
 
 The frame counts matched across ROS, UnrealGT and the manifest.
 
-We also checked the ROS timestamps against the manifest timestamps:
+We also checked the ROS timestamps:
 
 ```text
-Max |RGB - manifest|:        0.000000001000 seconds
-Max |CameraInfo - manifest|: 0.000000001000 seconds
-Max |RGB - CameraInfo|:      0.000000000000 seconds
+Max |RGB compressed - CameraInfo|: 0 ns
+Max |RGB compressed - RoverPose|:  0 ns
+Max |CameraInfo - RoverPose|:      0 ns
 ```
 
-So the ROS RGB image and ROS camera_info messages use the same timestamp as the manifest for each frame.
+So the ROS RGB image, ROS camera_info and ROS rover ground-truth pose messages use the same timestamp for each frame.
 
 ---
 
@@ -408,6 +481,8 @@ The synchronization works like this:
 FrameIndex 1
   ROS image
   ROS camera info
+  ROS frame index
+  ROS rover ground-truth pose
   UnrealGT RGB/1.png
   UnrealGT Depth/1.png
   UnrealGT Segmentation/1.png
@@ -417,6 +492,8 @@ FrameIndex 1
 FrameIndex 2
   ROS image
   ROS camera info
+  ROS frame index
+  ROS rover ground-truth pose
   UnrealGT RGB/2.png
   UnrealGT Depth/2.png
   UnrealGT Segmentation/2.png
@@ -427,5 +504,6 @@ FrameIndex 2
 So later we can safely combine ROS and UnrealGT data by using `frame_index`.
 
 
+NOTE IN THE END: (DONT REMOVE IT)
 Turn your current manifest pose rows into proper ROS navigation ground truth:
 manifest + /gt/odom + /tf + /gt/path + trajectory files.
