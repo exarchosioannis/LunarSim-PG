@@ -28,4 +28,7 @@ struct SIMULATOR_API FCaptureFramePoseData
 
 	UPROPERTY(BlueprintReadWrite, Category = "Capture|Pose")
 	FCapturePose LeftCameraPose;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Capture|Pose")
+	FCapturePose RightCameraPose;
 };

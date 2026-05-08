@@ -31,6 +31,7 @@ private:
 	ECheckBoxState GetEnableRosRoverGtPoseCheckState() const;
 	void OnEnableRosRoverGtPoseChanged(ECheckBoxState NewState);
 	void OnPublishHzChanged(int32 NewValue);
+	void OnStereoBaselineCmChanged(float NewValue);
 
 	void OnApplyClicked();
 	void LoadConfigFromRobotCamRig();
@@ -44,4 +45,5 @@ private:
 	ECaptureMode CaptureMode = ECaptureMode::MonoRosGroundTruth;
 	bool bEnableRosRoverGtPose = true;
 	int32 PublishHz = 6;
+	float StereoBaselineCm = 20.0f;
 };

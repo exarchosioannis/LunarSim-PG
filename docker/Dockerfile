@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-rmw-cyclonedds-cpp \
     ros-humble-rviz2 \
     ros-humble-rqt \
+    ros-humble-rqt-image-view \
     ros-humble-tf2-tools \
     ros-humble-ros2bag \
     ros-humble-rosbag2-storage-default-plugins \

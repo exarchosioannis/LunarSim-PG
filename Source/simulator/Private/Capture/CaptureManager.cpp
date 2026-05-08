@@ -33,7 +33,10 @@ void UCaptureManager::StartCapture()
 		CurrentSessionName));
 	CurrentImagesDirectory = FPaths::Combine(CurrentSessionDirectory, TEXT("Images"));
 	ManifestFilePath = FPaths::Combine(CurrentSessionDirectory, TEXT("manifest.csv"));
-	RoverGtTrajectoryFilePath = FPaths::Combine(CurrentSessionDirectory, TEXT("Navigation"), TEXT("rover_gt_trajectory_ros.csv"));
+	const FString NavigationDirectory = FPaths::Combine(CurrentSessionDirectory, TEXT("Navigation"));
+	RoverGtTrajectoryFilePath = FPaths::Combine(NavigationDirectory, TEXT("rover_gt_trajectory_ros.csv"));
+	LeftCameraGtTrajectoryFilePath = FPaths::Combine(NavigationDirectory, TEXT("left_camera_gt_trajectory_ros.csv"));
+	RightCameraGtTrajectoryFilePath = FPaths::Combine(NavigationDirectory, TEXT("right_camera_gt_trajectory_ros.csv"));
 
 	// The manifest is always created for every capture session.
 	// It is the main synchronization file between ROS, UnrealGT, and offline tools.
@@ -63,6 +66,12 @@ FCaptureFrameInfo UCaptureManager::NextFrame(double StampSeconds)
 		PoseData.LeftCameraPose.Rotation = LeftCameraPoseSource->GetComponentRotation();
 	}
 
+	if (RightCameraPoseSource) {
+		PoseData.RightCameraPose.bValid = true;
+		PoseData.RightCameraPose.Position = RightCameraPoseSource->GetComponentLocation();
+		PoseData.RightCameraPose.Rotation = RightCameraPoseSource->GetComponentRotation();
+	}
+
 	return NextFrameWithPose(StampSeconds, PoseData);
 }
 
@@ -80,9 +89,20 @@ FCaptureFrameInfo UCaptureManager::NextFrameWithPose(double StampSeconds, const 
 	FrameInfo.SessionId = CurrentSessionId;
 
 	// Always write one manifest row for every frame, regardless of capture mode.
-	// Mono/GT modes currently store rover + left/reference camera pose.
-	// Stereo modes can extend this later with right camera pose columns.
+	// The manifest only describes synchronization and which outputs exist for this frame.
 	AppendManifestRow(FrameInfo, CompletePoseData);
+
+	// Pose data lives in trajectory files, in ROS coordinates, with matching column names.
+	// Rover trajectory is always written when rover pose is available.
+	// Left camera trajectory is written when left/reference imagery exists: left ROS or UnrealGT.
+	// Right camera trajectory is written only for stereo ROS modes.
+	AppendTrajectoryRow(RoverGtTrajectoryFilePath, FrameInfo, CompletePoseData.RoverBasePose, TEXT("map"), TEXT("rover_base"));
+	if (Config.IsLeftRosCameraEnabled() || Config.IsGroundTruthEnabled()) {
+		AppendTrajectoryRow(LeftCameraGtTrajectoryFilePath, FrameInfo, CompletePoseData.LeftCameraPose, TEXT("map"), TEXT("left_camera"));
+	}
+	if (Config.IsRightRosCameraEnabled()) {
+		AppendTrajectoryRow(RightCameraGtTrajectoryFilePath, FrameInfo, CompletePoseData.RightCameraPose, TEXT("map"), TEXT("right_camera"));
+	}
 
 	return FrameInfo;
 }
@@ -122,6 +142,16 @@ FString UCaptureManager::GetRoverGtTrajectoryFilePath() const
 	return RoverGtTrajectoryFilePath;
 }
 
+FString UCaptureManager::GetLeftCameraGtTrajectoryFilePath() const
+{
+	return LeftCameraGtTrajectoryFilePath;
+}
+
+FString UCaptureManager::GetRightCameraGtTrajectoryFilePath() const
+{
+	return RightCameraGtTrajectoryFilePath;
+}
+
 void UCaptureManager::StartManifest()
 {
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
@@ -135,75 +165,44 @@ void UCaptureManager::StartManifest()
 	}
 
 	const FString NavigationDirectory = FPaths::GetPath(RoverGtTrajectoryFilePath);
-	if (!PlatformFile.DirectoryExists(*NavigationDirectory))
-	{
+	if (!PlatformFile.DirectoryExists(*NavigationDirectory)) {
 		PlatformFile.CreateDirectoryTree(*NavigationDirectory);
 	}
 	
-	// Write the csv header
-	FString Header = TEXT(
-		"session_id,frame_index,stamp_seconds,"
-
-		"rover_valid,"
-		"rover_x_ue_cm,rover_y_ue_cm,rover_z_ue_cm,"
-		"rover_roll_ue_deg,rover_pitch_ue_deg,rover_yaw_ue_deg,"
-
-		"left_camera_valid,"
-		"left_camera_x_ue_cm,left_camera_y_ue_cm,left_camera_z_ue_cm,"
-		"left_camera_roll_ue_deg,left_camera_pitch_ue_deg,left_camera_yaw_ue_deg\n"
+	// Manifest = synchronization index only. Pose values are stored in the ROS-style trajectory files.
+	const FString Header = TEXT(
+		"session_id,frame_index,timestamp_sec,"
+		"has_rover_gt,has_left_camera,has_right_camera,has_gt_camera\n"
 	);
 
 	FFileHelper::SaveStringToFile(Header, *ManifestFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
 
-	const FString RoverTrajectoryHeader = TEXT(
+	const FString TrajectoryHeader = TEXT(
 		"timestamp_sec,frame_index,frame_id,child_frame_id,"
 		"x_m,y_m,z_m,qx,qy,qz,qw\n"
 	);
 
-	FFileHelper::SaveStringToFile(
-		RoverTrajectoryHeader,
-		*RoverGtTrajectoryFilePath,
-		FFileHelper::EEncodingOptions::AutoDetect,
-		&IFileManager::Get(),
-		FILEWRITE_None
-	);
+	FFileHelper::SaveStringToFile(TrajectoryHeader, *RoverGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
+	FFileHelper::SaveStringToFile(TrajectoryHeader, *LeftCameraGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
+	FFileHelper::SaveStringToFile(TrajectoryHeader, *RightCameraGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
 }
 
 void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo, const FCaptureFramePoseData& PoseData)
 {
-	const FCapturePose& RoverPose = PoseData.RoverBasePose;
-	const FCapturePose& LeftCameraPose = PoseData.LeftCameraPose;
+	const int32 HasRoverGt = PoseData.RoverBasePose.bValid ? 1 : 0;
+	const int32 HasLeftCamera = ((Config.IsLeftRosCameraEnabled() || Config.IsGroundTruthEnabled()) && PoseData.LeftCameraPose.bValid) ? 1 : 0;
+	const int32 HasRightCamera = (Config.IsRightRosCameraEnabled() && PoseData.RightCameraPose.bValid) ? 1 : 0;
+	const int32 HasGtCamera = Config.IsGroundTruthEnabled() ? 1 : 0;
 
-	const FVector& RoverLocation = RoverPose.Position;
-	const FRotator& RoverRotation = RoverPose.Rotation;
-
-	const FVector& LeftCameraLocation = LeftCameraPose.Position;
-	const FRotator& LeftCameraRotation = LeftCameraPose.Rotation;
-
-	FString Row = FString::Printf(
-		TEXT("%d,%d,%.9f,"
-			"%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,"
-			"%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n"),
-
+	const FString Row = FString::Printf(
+		TEXT("%d,%d,%.9f,%d,%d,%d,%d\n"),
 		FrameInfo.SessionId,
 		FrameInfo.FrameIndex,
 		FrameInfo.StampSeconds,
-
-		RoverPose.bValid ? 1 : 0,
-		RoverLocation.X,
-		RoverLocation.Y,
-		RoverLocation.Z,
-		RoverRotation.Roll,
-		RoverRotation.Pitch,
-		RoverRotation.Yaw,
-
-		LeftCameraPose.bValid ? 1 : 0,
-		LeftCameraLocation.X,
-		LeftCameraLocation.Y,
-		LeftCameraLocation.Z,
-		LeftCameraRotation.Roll,
-		LeftCameraRotation.Pitch,
-		LeftCameraRotation.Yaw
+		HasRoverGt,
+		HasLeftCamera,
+		HasRightCamera,
+		HasGtCamera
 	);
 
 	FFileHelper::SaveStringToFile(
@@ -213,8 +212,6 @@ void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo, cons
 		&IFileManager::Get(),
 		FILEWRITE_Append
 	);
-
-	AppendRoverGtTrajectoryRow(FrameInfo, RoverPose);
 }
 
 FVector UCaptureManager::UnrealLocationToRosMeters(const FVector& UnrealLocation)
@@ -226,8 +223,11 @@ FVector UCaptureManager::UnrealLocationToRosMeters(const FVector& UnrealLocation
 	);
 }
 
-FQuat UCaptureManager::UnrealYawToRosQuat(const FRotator& UnrealRotation)
+FQuat UCaptureManager::UnrealRotationToRosQuat(const FRotator& UnrealRotation)
 {
+	// THAT IS WRONGGGG, WE HAVE TO CHECK ITTTT
+	// Current simulator convention: ROS x = UE x, ROS y = -UE y, ROS z = UE z.
+	// For the rover this keeps the previous yaw convention: ros_yaw = -unreal_yaw.
 	const double RosYawRad = FMath::DegreesToRadians(-UnrealRotation.Yaw);
 	const double HalfYaw = RosYawRad * 0.5;
 
@@ -239,20 +239,27 @@ FQuat UCaptureManager::UnrealYawToRosQuat(const FRotator& UnrealRotation)
 	);
 }
 
-void UCaptureManager::AppendRoverGtTrajectoryRow(const FCaptureFrameInfo& FrameInfo, const FCapturePose& RoverPose)
+void UCaptureManager::AppendTrajectoryRow(
+	const FString& FilePath,
+	const FCaptureFrameInfo& FrameInfo,
+	const FCapturePose& Pose,
+	const FString& FrameId,
+	const FString& ChildFrameId)
 {
-	if (!RoverPose.bValid || RoverGtTrajectoryFilePath.IsEmpty())
+	if (!Pose.bValid || FilePath.IsEmpty())
 	{
 		return;
 	}
 
-	const FVector RosLocation = UnrealLocationToRosMeters(RoverPose.Position);
-	const FQuat RosQuat = UnrealYawToRosQuat(RoverPose.Rotation);
+	const FVector RosLocation = UnrealLocationToRosMeters(Pose.Position);
+	const FQuat RosQuat = UnrealRotationToRosQuat(Pose.Rotation);
 
 	const FString Row = FString::Printf(
-		TEXT("%.9f,%d,map,rover_base,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f\n"),
+		TEXT("%.9f,%d,%s,%s,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f\n"),
 		FrameInfo.StampSeconds,
 		FrameInfo.FrameIndex,
+		*FrameId,
+		*ChildFrameId,
 		RosLocation.X,
 		RosLocation.Y,
 		RosLocation.Z,
@@ -264,7 +271,7 @@ void UCaptureManager::AppendRoverGtTrajectoryRow(const FCaptureFrameInfo& FrameI
 
 	FFileHelper::SaveStringToFile(
 		Row,
-		*RoverGtTrajectoryFilePath,
+		*FilePath,
 		FFileHelper::EEncodingOptions::AutoDetect,
 		&IFileManager::Get(),
 		FILEWRITE_Append
@@ -279,6 +286,11 @@ void UCaptureManager::SetRoverPoseSource(UCapturePoseSourceComponent* InRoverPos
 void UCaptureManager::SetLeftCameraPoseSource(USceneComponent* InLeftCameraPoseSource)
 {
 	LeftCameraPoseSource = InLeftCameraPoseSource;
+}
+
+void UCaptureManager::SetRightCameraPoseSource(USceneComponent* InRightCameraPoseSource)
+{
+	RightCameraPoseSource = InRightCameraPoseSource;
 }
 
 UCapturePoseSourceComponent* UCaptureManager::FindPoseSourceByName(FName SourceName) const

@@ -26,8 +26,13 @@ public:
 	       int32 InHeight,
 	       const FString& InFrameId,
 	       const FString& InTopicBase,
-	       UCameraComponent* InCamera
+	       UCameraComponent* InCamera,
+	       bool bInSubscribeToControl = true,
+	       bool bInIsRightStereoCamera = false,
+	       double InStereoBaselineMeters = 0.0
        );
+
+       void SetStereoCalibration(bool bInIsRightStereoCamera, double InStereoBaselineMeters);
 
 	void TickRos(float DeltaTime);
 
@@ -70,5 +75,8 @@ private:
 	sensor_msgs::msg::CameraInfo ReusableCamInfoMsg;
 	std_msgs::msg::Int32 ReusableFrameIndexMsg;
 
+	bool bSubscribeToControl = true;
+	bool bIsRightStereoCamera = false;
+	double StereoBaselineMeters = 0.0;
 	bool bInitialized = false;
 };

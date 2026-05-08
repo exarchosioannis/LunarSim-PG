@@ -186,6 +186,37 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 						.IsChecked_Raw(this, &FsimulatorEditorModule::GetEnableRosRoverGtPoseCheckState)
 						.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnEnableRosRoverGtPoseChanged)
 					]
+
+					+ SGridPanel::Slot(0, 3)
+					.Padding(4.f, 6.f)
+					.HAlign(HAlign_Left)
+					.VAlign(VAlign_Center)
+					[
+						SNew(STextBlock)
+						.Text(LOCTEXT("StereoBaselineCmLabel", "Stereo Baseline Cm"))
+					]
+
+					+ SGridPanel::Slot(1, 3)
+					.Padding(4.f, 6.f)
+					.HAlign(HAlign_Right)
+					.VAlign(VAlign_Center)
+					[
+						SNew(SBox)
+						.WidthOverride(120.f)
+						[
+							SNew(SNumericEntryBox<float>)
+							.Value_Lambda([this]() -> TOptional<float>
+							{
+								return StereoBaselineCm;
+							})
+							.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnStereoBaselineCmChanged)
+							.MinValue(1.0f)
+							.MaxValue(200.0f)
+							.MinSliderValue(1.0f)
+							.MaxSliderValue(100.0f)
+							.AllowSpin(true)
+						]
+					]
 				]
 			]
 
@@ -285,6 +316,11 @@ void FsimulatorEditorModule::OnPublishHzChanged(int32 NewValue)
 	PublishHz = FMath::Clamp(NewValue, 1, 24);
 }
 
+void FsimulatorEditorModule::OnStereoBaselineCmChanged(float NewValue)
+{
+	StereoBaselineCm = FMath::Clamp(NewValue, 1.0f, 200.0f);
+}
+
 void FsimulatorEditorModule::OnApplyClicked()
 {
 	if (!GEditor) return;
@@ -304,17 +340,19 @@ void FsimulatorEditorModule::OnApplyClicked()
 
 		RobotCamRig->Modify();
 		RobotCamRig->SetCaptureConfig(NewConfig);
+		RobotCamRig->SetStereoBaselineCm(StereoBaselineCm);
 		RobotCamRig->PostEditChange();
 		RobotCamRig->MarkPackageDirty();
 
 		GEditor->SelectNone(false, true, false);
 		GEditor->SelectActor(RobotCamRig, true, true, true);
 
-		UE_LOG(LogTemp, Display, TEXT("Simulator config applied to %s: PublishHz=%d, CaptureMode=%s, RosRoverGtPose=%s"),
+		UE_LOG(LogTemp, Display, TEXT("Simulator config applied to %s: PublishHz=%d, CaptureMode=%s, RosRoverGtPose=%s, StereoBaselineCm=%.2f"),
 			*RobotCamRig->GetName(),
 			NewConfig.PublishHz,
 			*CaptureModeToString(NewConfig.CaptureMode),
-			NewConfig.bEnableRosRoverGtPose ? TEXT("true") : TEXT("false"));
+			NewConfig.bEnableRosRoverGtPose ? TEXT("true") : TEXT("false"),
+			StereoBaselineCm);
 
 		return;
 	}
@@ -339,6 +377,7 @@ void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
 		PublishHz = FMath::Clamp(CurrentConfig.PublishHz, 1, 24);
 		CaptureMode = CurrentConfig.CaptureMode;
 		bEnableRosRoverGtPose = CurrentConfig.bEnableRosRoverGtPose;
+		StereoBaselineCm = FMath::Clamp(RobotCamRig->GetStereoBaselineCm(), 1.0f, 200.0f);
 		SelectedCaptureModeOption = FindCaptureModeOption(CaptureMode);
 
 		return;

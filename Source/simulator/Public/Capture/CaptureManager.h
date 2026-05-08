@@ -55,19 +55,28 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Capture|Session")
 	FString GetRoverGtTrajectoryFilePath() const;
 
+	UFUNCTION(BlueprintPure, Category = "Capture|Session")
+	FString GetLeftCameraGtTrajectoryFilePath() const;
+
+	UFUNCTION(BlueprintPure, Category = "Capture|Session")
+	FString GetRightCameraGtTrajectoryFilePath() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Capture|Pose")
 	void SetRoverPoseSource(UCapturePoseSourceComponent* InRoverPoseSource);
 
 	UFUNCTION(BlueprintCallable, Category = "Capture|Pose")
 	void SetLeftCameraPoseSource(USceneComponent* InLeftCameraPoseSource);
 
+	UFUNCTION(BlueprintCallable, Category = "Capture|Pose")
+	void SetRightCameraPoseSource(USceneComponent* InRightCameraPoseSource);
+
 private:
 	void StartManifest();
 	void AppendManifestRow(const FCaptureFrameInfo& FrameInfo, const FCaptureFramePoseData& PoseData);
-	void AppendRoverGtTrajectoryRow(const FCaptureFrameInfo& FrameInfo, const FCapturePose& RoverPose);
+	void AppendTrajectoryRow(const FString& FilePath, const FCaptureFrameInfo& FrameInfo, const FCapturePose& Pose, const FString& FrameId, const FString& ChildFrameId);
 
 	static FVector UnrealLocationToRosMeters(const FVector& UnrealLocation);
-	static FQuat UnrealYawToRosQuat(const FRotator& UnrealRotation);
+	static FQuat UnrealRotationToRosQuat(const FRotator& UnrealRotation);
 	
 	UCapturePoseSourceComponent* FindPoseSourceByName(FName SourceName) const;
 
@@ -81,6 +90,8 @@ private:
 
 	FString ManifestFilePath;
 	FString RoverGtTrajectoryFilePath;
+	FString LeftCameraGtTrajectoryFilePath;
+	FString RightCameraGtTrajectoryFilePath;
 	FString CurrentSessionName;
 	FString CurrentSessionDirectory;
 	FString CurrentImagesDirectory;
@@ -90,4 +101,7 @@ private:
 
 	UPROPERTY()
 	USceneComponent* LeftCameraPoseSource = nullptr;
+
+	UPROPERTY()
+	USceneComponent* RightCameraPoseSource = nullptr;
 };

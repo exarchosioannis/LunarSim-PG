@@ -17,7 +17,10 @@ void UCameraRosPublisherComponent::Initialize(
 	int32 InHeight,
 	const FString& InFrameId,
 	const FString& InTopicBase,
-	UCameraComponent* InCamera)
+	UCameraComponent* InCamera,
+	bool bInSubscribeToControl,
+	bool bInIsRightStereoCamera,
+	double InStereoBaselineMeters)
 {
 	Width = InWidth;
 	Height = InHeight;
@@ -25,11 +28,20 @@ void UCameraRosPublisherComponent::Initialize(
 	TopicBase = InTopicBase;
 	CameraName = InFrameId;
 	Camera = InCamera;
+	bSubscribeToControl = bInSubscribeToControl;
+	SetStereoCalibration(bInIsRightStereoCamera, InStereoBaselineMeters);
 
 	SetupReusableMessages();
 	SetupRos();
 
 	bInitialized = true;
+}
+
+
+void UCameraRosPublisherComponent::SetStereoCalibration(bool bInIsRightStereoCamera, double InStereoBaselineMeters)
+{
+	bIsRightStereoCamera = bInIsRightStereoCamera;
+	StereoBaselineMeters = FMath::Max(0.0, InStereoBaselineMeters);
 }
 
 void UCameraRosPublisherComponent::SetupReusableMessages()
@@ -75,10 +87,13 @@ void UCameraRosPublisherComponent::SetupRos()
 	       false
        );
 
+       if (bSubscribeToControl)
+       {
 	       ROSNode->AddSubscription<std_msgs::msg::Int32>(
 		       TEXT("/control"),
 		       TROSSubscriptionDelegate<std_msgs::msg::Int32>::CreateUObject(this, &UCameraRosPublisherComponent::OnCaptureControl)
 	       );
+       }
 }
 
 builtin_interfaces::msg::Time UCameraRosPublisherComponent::ToRosTime(double Seconds) const
@@ -149,8 +164,12 @@ void UCameraRosPublisherComponent::PublishCameraInfo(const builtin_interfaces::m
 		0.0, 1.0, 0.0,
 		0.0, 0.0, 1.0
 	};
+	// For ROS stereo tools, the right camera projection matrix must contain
+	// the stereo baseline in P[3]. Left camera keeps Tx = 0.
+	const double Tx = bIsRightStereoCamera ? (-Fx * StereoBaselineMeters) : 0.0;
+
 	ReusableCamInfoMsg.p = {
-		Fx, 0.0, Cx, 0.0,
+		Fx, 0.0, Cx, Tx,
 		0.0, Fy, Cy, 0.0,
 		0.0, 0.0, 1.0, 0.0
 	};
