@@ -16,61 +16,25 @@ class SIMULATOR_API UCaptureManager : public UObject
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "Capture")
 	void Initialize(const FCaptureConfig& InConfig);
 
-	UFUNCTION(BlueprintCallable, Category = "Capture")
 	void StartCapture();
-
-	UFUNCTION(BlueprintCallable, Category = "Capture")
 	void StopCapture();
-
-	UFUNCTION(BlueprintPure, Category = "Capture")
 	bool IsCaptureEnabled() const;
 
-	UFUNCTION(BlueprintCallable, Category = "Capture")
 	FCaptureFrameInfo NextFrame(double StampSeconds);
-
-	UFUNCTION(BlueprintCallable, Category = "Capture")
-	FCaptureFrameInfo NextFrameWithPose(double StampSeconds, const FCaptureFramePoseData& PoseData);
-
-	UFUNCTION(BlueprintPure, Category = "Capture")
 	const FCaptureConfig& GetConfig() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture")
 	bool IsSessionValid(int32 SessionId) const;
 
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetCurrentSessionName() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetCurrentSessionDirectory() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
+	//unrealgt uses this.
 	FString GetCurrentImagesDirectory() const;
 
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetManifestFilePath() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetRoverGtTrajectoryFilePath() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetLeftCameraGtTrajectoryFilePath() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetRightCameraGtTrajectoryFilePath() const;
-
-	UFUNCTION(BlueprintCallable, Category = "Capture|Pose")
-	void SetRoverPoseSource(UCapturePoseSourceComponent* InRoverPoseSource);
-
-	UFUNCTION(BlueprintCallable, Category = "Capture|Pose")
+	void SetRoverPoseSource(UCapturePoseSourceComponent* InRoverPoseSource); //Could be usefull in the future ?? 
 	void SetLeftCameraPoseSource(USceneComponent* InLeftCameraPoseSource);
-
-	UFUNCTION(BlueprintCallable, Category = "Capture|Pose")
 	void SetRightCameraPoseSource(USceneComponent* InRightCameraPoseSource);
 
 private:
+	// Manifest is a log of all frames with timestamps
 	void StartManifest();
 	void AppendManifestRow(const FCaptureFrameInfo& FrameInfo, const FCaptureFramePoseData& PoseData);
 	void AppendTrajectoryRow(const FString& FilePath, const FCaptureFrameInfo& FrameInfo, const FCapturePose& Pose, const FString& FrameId, const FString& ChildFrameId);
