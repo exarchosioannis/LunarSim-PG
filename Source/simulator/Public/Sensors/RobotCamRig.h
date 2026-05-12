@@ -13,7 +13,9 @@ class UCameraComponent;
 class USceneCaptureComponent2D;
 class UChildActorComponent;
 class AGTCamera;
-class ARoverRobot;
+class AActor;
+class UCapturePoseSourceComponent;
+class URoverGroundTruthPublisherComponent;
 
 UCLASS()
 class SIMULATOR_API ARobotCamRig : public AActor
@@ -88,9 +90,18 @@ private:
 
 	bool bWarnedMissingGroundTruthCamera = false;
 	
-	// Rover
+	// Rover / Robot ground truth
+	// Assign the current rover actor here. It can be BP_RoverVehicle, the old RoverRobot,
+	// or the future final rover. RobotCamRig only needs a generic actor with the
+	// RoverGroundTruthPublisherComponent attached.
 	UPROPERTY(EditAnywhere, Category = "Robot")
-	ARoverRobot* RoverRobot = nullptr;
+	AActor* RoverActor = nullptr;
+
+	UPROPERTY()
+	URoverGroundTruthPublisherComponent* RoverGroundTruthPublisher = nullptr;
+
+	UPROPERTY()
+	UCapturePoseSourceComponent* RoverPoseSource = nullptr;
 
 	// Capture Management
 	UPROPERTY()
@@ -145,6 +156,7 @@ private:
 	// Command helper
 	void OnCaptureControl(int32 ControlValue);
 
-	// Ground truth helper
+	// Ground truth helpers
 	void ResolveGroundTruthCameraChild();
+	void ResolveRoverGroundTruthComponents();
 };

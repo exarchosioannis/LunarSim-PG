@@ -9,7 +9,9 @@
 #include "Sensors/GTCamera.h"
 #include "Sensors/RgbCameraCaptureComponent.h"
 #include "Sensors/CameraRosPublisherComponent.h"
-#include "Robots/RoverRobot.h"
+#include "Robots/RoverGroundTruthPublisherComponent.h"
+#include "Capture/CapturePoseSourceComponent.h"
+#include "EngineUtils.h"
 
 ARobotCamRig::ARobotCamRig()
 {
@@ -141,6 +143,11 @@ void ARobotCamRig::BeginPlay()
 		CaptureManager->SetLeftCameraPoseSource(Camera);
 		CaptureManager->SetRightCameraPoseSource(RightCamera);
 	}
+
+	ResolveRoverGroundTruthComponents();
+	if (CaptureManager && RoverPoseSource) {
+		CaptureManager->SetRoverPoseSource(RoverPoseSource);
+	}
 }
 
 void ARobotCamRig::ApplyStereoBaseline()
@@ -217,6 +224,48 @@ void ARobotCamRig::ResolveGroundTruthCameraChild()
 	}
 }
 
+
+void ARobotCamRig::ResolveRoverGroundTruthComponents()
+{
+	RoverGroundTruthPublisher = nullptr;
+	RoverPoseSource = nullptr;
+
+	if (RoverActor) {
+		RoverGroundTruthPublisher = RoverActor->FindComponentByClass<URoverGroundTruthPublisherComponent>();
+		RoverPoseSource = RoverActor->FindComponentByClass<UCapturePoseSourceComponent>();
+	}
+
+	// If RoverActor is not assigned, auto-find the first reusable GT publisher.
+	// Explicit assignment is still preferred when more than one robot exists.
+	if (!RoverGroundTruthPublisher) {
+		UWorld* World = GetWorld();
+		if (World) {
+			for (TActorIterator<AActor> ActorIt(World); ActorIt; ++ActorIt) {
+				AActor* Actor = *ActorIt;
+				if (!Actor) continue;
+
+				URoverGroundTruthPublisherComponent* Candidate = Actor->FindComponentByClass<URoverGroundTruthPublisherComponent>();
+				if (Candidate) {
+					RoverActor = Actor;
+					RoverGroundTruthPublisher = Candidate;
+					RoverPoseSource = Candidate;
+					break;
+				}
+			}
+		}
+	}
+
+	// Fallback: if the actor has only the old CapturePoseSourceComponent, CaptureManager can still
+	// write synchronized CSV trajectory rows, even though ROS /gt topics need the new publisher.
+	if (!RoverPoseSource && RoverActor) {
+		RoverPoseSource = RoverActor->FindComponentByClass<UCapturePoseSourceComponent>();
+	}
+
+	if (RoverActor && !RoverGroundTruthPublisher) {
+		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: RoverActor '%s' has no RoverGroundTruthPublisherComponent. CSV pose may work if it has CapturePoseSourceComponent, but /rover/gt/pose, /gt/odom, /tf and /gt/path will not publish."), *RoverActor->GetName());
+	}
+}
+
 void ARobotCamRig::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -227,6 +276,10 @@ void ARobotCamRig::Tick(float DeltaSeconds)
 
 	if (RightRosPublisherComponent) {
 		RightRosPublisherComponent->TickRos(DeltaSeconds);
+	}
+
+	if (RoverGroundTruthPublisher) {
+		RoverGroundTruthPublisher->TickRos(DeltaSeconds);
 	}
 	
 	PollRgbCaptureAndPublish();
@@ -270,8 +323,8 @@ void ARobotCamRig::StartRgbCaptureAndPublish()
 	const double CaptureTimeSeconds = GetWorld()->GetTimeSeconds();
 	const FCaptureFrameInfo FrameInfo = CaptureManager->NextFrame(CaptureTimeSeconds);
 
-	if (Config.bEnableRosRoverGtPose && RoverRobot) {
-		RoverRobot->PublishGroundTruthPose(FrameInfo);
+	if (Config.bEnableRosRoverGtPose && RoverGroundTruthPublisher) {
+		RoverGroundTruthPublisher->PublishGroundTruth(FrameInfo);
 	}
 	
 	if (Config.IsGroundTruthEnabled()) {
@@ -339,6 +392,9 @@ void ARobotCamRig::PollOneRgbCaptureAndPublish(
 void ARobotCamRig::OnCaptureControl(int32 ControlValue)
 {
 	if (ControlValue == 1) {
+		if (RoverGroundTruthPublisher) {
+			RoverGroundTruthPublisher->ResetPath();
+		}
 		if (CaptureManager) CaptureManager->StartCapture();
 		PublishAccumulator = 0.0f;
 		bWarnedMissingGroundTruthCamera = false;

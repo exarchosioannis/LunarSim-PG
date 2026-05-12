@@ -11,6 +11,6 @@ teleop_twist_joy:
     axis_angular:
       yaw: 0
     scale_angular:
-      yaw: 0.01
+      yaw: 1.0
 
     publish_stamped_twist: false
