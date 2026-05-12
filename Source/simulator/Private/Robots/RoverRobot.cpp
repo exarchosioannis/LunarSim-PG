@@ -147,21 +147,29 @@ builtin_interfaces::msg::Time ARoverRobot::ToRosTime(double Seconds) const
 	return T;
 }
 
-// The /rover/gt/pose topic publishes Unreal world pose converted to meters, without axis flipping.
 FVector ARoverRobot::UnrealLocationToRosMeters(const FVector& UnrealLocation) const
 {
 	return FVector(
 		UnrealLocation.X / 100.0,
-		UnrealLocation.Y / 100.0,
+		-UnrealLocation.Y / 100.0,
 		UnrealLocation.Z / 100.0
 	);
 }
 
-// The /rover/gt/pose topic publishes Unreal world orientation as a quaternion, without yaw or axis flipping.
-FQuat ARoverRobot::UnrealRotationToRosQuat(const FRotator& UnrealRotation) const
+FQuat ARoverRobot::UnrealYawToRosQuat(const FRotator& UnrealRotation) const
 {
-	const FQuat Q = UnrealRotation.Quaternion();
-	return FQuat(Q.X, Q.Y, Q.Z, Q.W);
+	const double RosYawRad = FMath::DegreesToRadians(-UnrealRotation.Yaw);
+
+	const double HalfYaw = RosYawRad * 0.5;
+	const double SinHalfYaw = FMath::Sin(HalfYaw);
+	const double CosHalfYaw = FMath::Cos(HalfYaw);
+
+	return FQuat(
+		0.0,
+		0.0,
+		SinHalfYaw,
+		CosHalfYaw
+	);
 }
 
 void ARoverRobot::PublishGroundTruthPose(const FCaptureFrameInfo& FrameInfo)
@@ -175,7 +183,7 @@ void ARoverRobot::PublishGroundTruthPose(const FCaptureFrameInfo& FrameInfo)
 	}
 
 	const FVector RosLocation = UnrealLocationToRosMeters(GetActorLocation());
-	const FQuat RosQuat = UnrealRotationToRosQuat(GetActorRotation());
+	const FQuat RosQuat = UnrealYawToRosQuat(GetActorRotation());
 
 	ReusablePoseMsg.header.stamp = ToRosTime(FrameInfo.StampSeconds);
 	ReusablePoseMsg.header.frame_id = TCHAR_TO_UTF8(*GroundTruthPoseFrameId);

@@ -6,11 +6,11 @@
 UENUM(BlueprintType)
 enum class ECaptureMode : uint8
 {
-	MonoRos UMETA(DisplayName = "Mono ROS"),
-	GroundTruth UMETA(DisplayName = "Ground Truth"),
-	StereoRos UMETA(DisplayName = "Stereo ROS"),
-	MonoRosGroundTruth UMETA(DisplayName = "Mono ROS + Ground Truth"),
-	StereoRosGroundTruth UMETA(DisplayName = "Stereo ROS + Ground Truth")
+	MonoRos               UMETA(DisplayName = "Mono ROS"),
+	GroundTruth           UMETA(DisplayName = "Ground Truth"),
+	StereoRos             UMETA(DisplayName = "Stereo ROS"),
+	MonoRosGroundTruth    UMETA(DisplayName = "Mono ROS + Ground Truth"),
+	StereoRosGroundTruth  UMETA(DisplayName = "Stereo ROS + Ground Truth")
 };
 
 USTRUCT(BlueprintType)
@@ -27,20 +27,29 @@ struct SIMULATOR_API FCaptureConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ROS Ground Truth")
 	bool bEnableRosRoverGtPose = true;
 
-	bool IsLeftRosCameraEnabled() const {
-		return CaptureMode == ECaptureMode::MonoRos || CaptureMode == ECaptureMode::StereoRos ||
-			CaptureMode == ECaptureMode::MonoRosGroundTruth || CaptureMode == ECaptureMode::StereoRosGroundTruth;
+	bool IsLeftRosCameraEnabled() const
+	{
+		return CaptureMode == ECaptureMode::MonoRos ||
+			CaptureMode == ECaptureMode::StereoRos ||
+			CaptureMode == ECaptureMode::MonoRosGroundTruth ||
+			CaptureMode == ECaptureMode::StereoRosGroundTruth;
 	}
 
-	bool IsRightRosCameraEnabled() const {
-		return CaptureMode == ECaptureMode::StereoRos || CaptureMode == ECaptureMode::StereoRosGroundTruth;
+	bool IsRightRosCameraEnabled() const
+	{
+		return CaptureMode == ECaptureMode::StereoRos ||
+			CaptureMode == ECaptureMode::StereoRosGroundTruth;
 	}
 
-	bool IsGroundTruthEnabled() const {
-		return CaptureMode == ECaptureMode::GroundTruth || CaptureMode == ECaptureMode::MonoRosGroundTruth || CaptureMode == ECaptureMode::StereoRosGroundTruth;
+	bool IsGroundTruthEnabled() const
+	{
+		return CaptureMode == ECaptureMode::GroundTruth ||
+			CaptureMode == ECaptureMode::MonoRosGroundTruth ||
+			CaptureMode == ECaptureMode::StereoRosGroundTruth;
 	}
 
-	bool HasAnyCaptureOutput() const {
+	bool HasAnyCaptureOutput() const
+	{
 		return IsLeftRosCameraEnabled() || IsRightRosCameraEnabled() || IsGroundTruthEnabled() || bEnableRosRoverGtPose;
 	}
 };

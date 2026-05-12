@@ -114,7 +114,7 @@ private:
 	// ROS ground-truth pose helpers
 	builtin_interfaces::msg::Time ToRosTime(double StampSeconds) const;
 	FVector UnrealLocationToRosMeters(const FVector& UnrealLocation) const;
-	FQuat UnrealRotationToRosQuat(const FRotator& UnrealRotation) const;
+	FQuat UnrealYawToRosQuat(const FRotator& UnrealRotation) const;
 
 	// Camera input
 	void LookYaw(float Value);
