@@ -1,4 +1,5 @@
 #include "Robots/RoverGroundTruthPublisherComponent.h"
+#include "Utils/UnrealToRosConversion.h"
 
 #include "GameFramework/Actor.h"
 #include "Engine/World.h"
@@ -99,27 +100,12 @@ builtin_interfaces::msg::Time URoverGroundTruthPublisherComponent::ToRosTime(dou
 
 FVector URoverGroundTruthPublisherComponent::UnrealLocationToRosMeters(const FVector& UnrealLocation) const
 {
-	return FVector(
-		UnrealLocation.X / 100.0,
-		-UnrealLocation.Y / 100.0,
-		UnrealLocation.Z / 100.0
-	);
+	return UnrealToRosConversion::PositionCmToRosMeters(UnrealLocation);
 }
 
 FQuat URoverGroundTruthPublisherComponent::UnrealRotationToRosQuat(const FRotator& UnrealRotation) const
 {
-	// Keep the same convention currently used by CaptureManager and the old ARoverRobot:
-	// ROS x = UE x, ROS y = -UE y, ROS z = UE z, ros_yaw = -unreal_yaw.
-	// This keeps the new component synchronized and numerically consistent with the existing CSV trajectory output.
-	const double RosYawRad = FMath::DegreesToRadians(-UnrealRotation.Yaw);
-	const double HalfYaw = RosYawRad * 0.5;
-
-	return FQuat(
-		0.0,
-		0.0,
-		FMath::Sin(HalfYaw),
-		FMath::Cos(HalfYaw)
-	);
+	return UnrealToRosConversion::RotationToRosQuat(UnrealRotation);
 }
 
 void URoverGroundTruthPublisherComponent::PublishGroundTruth(const FCaptureFrameInfo& FrameInfo)

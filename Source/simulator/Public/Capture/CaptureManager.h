@@ -74,9 +74,6 @@ private:
 	void StartManifest();
 	void AppendManifestRow(const FCaptureFrameInfo& FrameInfo, const FCaptureFramePoseData& PoseData);
 	void AppendTrajectoryRow(const FString& FilePath, const FCaptureFrameInfo& FrameInfo, const FCapturePose& Pose, const FString& FrameId, const FString& ChildFrameId);
-
-	static FVector UnrealLocationToRosMeters(const FVector& UnrealLocation);
-	static FQuat UnrealRotationToRosQuat(const FRotator& UnrealRotation);
 	
 	UCapturePoseSourceComponent* FindPoseSourceByName(FName SourceName) const;
 

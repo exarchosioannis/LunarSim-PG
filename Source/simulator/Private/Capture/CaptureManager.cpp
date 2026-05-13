@@ -1,5 +1,6 @@
 #include "Capture/CaptureManager.h"
 #include "Capture/CapturePoseSourceComponent.h"
+#include "Utils/UnrealToRosConversion.h"
 #include "Components/SceneComponent.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -214,45 +215,13 @@ void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo, cons
 	);
 }
 
-FVector UCaptureManager::UnrealLocationToRosMeters(const FVector& UnrealLocation)
-{
-	return FVector(
-		UnrealLocation.X / 100.0,
-		-UnrealLocation.Y / 100.0,
-		UnrealLocation.Z / 100.0
-	);
-}
-
-FQuat UCaptureManager::UnrealRotationToRosQuat(const FRotator& UnrealRotation)
-{
-	// THAT IS WRONGGGG, WE HAVE TO CHECK ITTTT
-	// Current simulator convention: ROS x = UE x, ROS y = -UE y, ROS z = UE z.
-	// For the rover this keeps the previous yaw convention: ros_yaw = -unreal_yaw.
-	const double RosYawRad = FMath::DegreesToRadians(-UnrealRotation.Yaw);
-	const double HalfYaw = RosYawRad * 0.5;
-
-	return FQuat(
-		0.0,
-		0.0,
-		FMath::Sin(HalfYaw),
-		FMath::Cos(HalfYaw)
-	);
-}
-
-void UCaptureManager::AppendTrajectoryRow(
-	const FString& FilePath,
-	const FCaptureFrameInfo& FrameInfo,
-	const FCapturePose& Pose,
-	const FString& FrameId,
-	const FString& ChildFrameId)
-{
-	if (!Pose.bValid || FilePath.IsEmpty())
-	{
+void UCaptureManager::AppendTrajectoryRow(const FString& FilePath, const FCaptureFrameInfo& FrameInfo, const FCapturePose& Pose, const FString& FrameId, const FString& ChildFrameId) {
+	if (!Pose.bValid || FilePath.IsEmpty()) {
 		return;
 	}
 
-	const FVector RosLocation = UnrealLocationToRosMeters(Pose.Position);
-	const FQuat RosQuat = UnrealRotationToRosQuat(Pose.Rotation);
+	const FVector RosLocation = UnrealToRosConversion::PositionCmToRosMeters(Pose.Position);
+	const FQuat RosQuat = UnrealToRosConversion::RotationToRosQuat(Pose.Rotation);
 
 	const FString Row = FString::Printf(
 		TEXT("%.9f,%d,%s,%s,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f,%.9f\n"),

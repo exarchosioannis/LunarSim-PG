@@ -89,10 +89,7 @@ private:
 	AGTCamera* GroundTruthCamera = nullptr;
 
 	bool bWarnedMissingGroundTruthCamera = false;
-	
-	// Rover / Robot ground truth
-	// Assign the current rover actor here. It can be BP_RoverVehicle, the old RoverRobot,
-	// or the future final rover. RobotCamRig only needs a generic actor with the
+
 	// RoverGroundTruthPublisherComponent attached.
 	UPROPERTY(EditAnywhere, Category = "Robot")
 	AActor* RoverActor = nullptr;
