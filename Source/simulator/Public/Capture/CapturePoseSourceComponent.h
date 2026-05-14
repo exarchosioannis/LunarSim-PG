@@ -21,5 +21,5 @@ public:
 
 private:
 	UPROPERTY(EditAnywhere, Category = "Capture|Pose")
-	FName PoseSourceName = TEXT("rover_base");
+	FName PoseSourceName = TEXT("base_link");
 };

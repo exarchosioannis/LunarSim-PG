@@ -5,7 +5,7 @@
 #include "Capture/CaptureManager.h"
 #include "Sensors/RgbCameraCaptureComponent.h"
 #include "Sensors/CameraRosPublisherComponent.h"
-
+#include "TempoROSNode.h"
 #include "RobotCamRig.generated.h"
 
 class USceneComponent;
@@ -90,9 +90,14 @@ private:
 
 	bool bWarnedMissingGroundTruthCamera = false;
 
-	// RoverGroundTruthPublisherComponent attached.
-	UPROPERTY(EditAnywhere, Category = "Robot")
+	// Rover actor used for rover ground truth and optional camera-rig mounting.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Robot", meta=(AllowPrivateAccess="true"))
 	AActor* RoverActor = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rover Mount", meta=(AllowPrivateAccess="true"))
+	FName RoverSensorMountComponentName = TEXT("RoverSensorMount");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Rover Mount", meta=(AllowPrivateAccess="true"))
+	bool bAttachToRoverSensorMountOnBeginPlay = true;
 
 	UPROPERTY()
 	URoverGroundTruthPublisherComponent* RoverGroundTruthPublisher = nullptr;
@@ -112,15 +117,28 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	int32 Width = 1280;
-
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	int32 Height = 720;
 
-	UPROPERTY(EditAnywhere, Category = "Camera")
-	FString FrameId = TEXT("left_camera");
+	// TF2
+	UPROPERTY()
+	UTempoROSNode* CameraTfROSNode = nullptr;
+	UPROPERTY(VisibleAnywhere, Category = "Camera|Frames")
+	FString BaseFrameId = TEXT("base_link");
 
-	UPROPERTY(EditAnywhere, Category = "Camera")
-	FString RightFrameId = TEXT("right_camera");
+	UPROPERTY(VisibleAnywhere, Category = "Camera|Frames")
+	FString LeftCameraLinkFrameId = TEXT("left_camera_link");
+	UPROPERTY(VisibleAnywhere, Category = "Camera|Frames")
+	FString RightCameraLinkFrameId = TEXT("right_camera_link");
+
+	UPROPERTY(VisibleAnywhere, Category = "Camera|Frames")
+	FString LeftCameraOpticalFrameId = TEXT("left_camera_optical_frame");
+	UPROPERTY(VisibleAnywhere, Category = "Camera|Frames")
+	FString RightCameraOpticalFrameId = TEXT("right_camera_optical_frame");
+
+	void SetupCameraTfNode();
+	void PublishStaticCameraTransforms();
+	void EnforceCameraFrameIds();
 
 	// Unreal uses centimeters.
 	// The left/reference camera remains at RobotCamRig local (0,0,0).

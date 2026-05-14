@@ -11,6 +11,7 @@
 #include "Sensors/CameraRosPublisherComponent.h"
 #include "Robots/RoverGroundTruthPublisherComponent.h"
 #include "Capture/CapturePoseSourceComponent.h"
+#include "TempoROSNode.h"
 #include "EngineUtils.h"
 
 ARobotCamRig::ARobotCamRig()
@@ -79,11 +80,60 @@ void ARobotCamRig::OnConstruction(const FTransform& Transform)
 void ARobotCamRig::BeginPlay()
 {
 	Super::BeginPlay();
+	EnforceCameraFrameIds();
 
+	//Attach RobotCamRig to the rover sensor mount first.
+	if (bAttachToRoverSensorMountOnBeginPlay && RoverActor)
+	{
+		USceneComponent* MountComponent = nullptr;
+
+		TArray<USceneComponent*> SceneComponents;
+		RoverActor->GetComponents<USceneComponent>(SceneComponents);
+
+		for (USceneComponent* SceneComponent : SceneComponents)
+		{
+			if (SceneComponent && SceneComponent->GetFName() == RoverSensorMountComponentName)
+			{
+				MountComponent = SceneComponent;
+				break;
+			}
+		}
+
+		if (MountComponent)
+		{
+			AttachToComponent(
+				MountComponent,
+				FAttachmentTransformRules::SnapToTargetNotIncludingScale
+			);
+
+			SetActorRelativeLocation(FVector::ZeroVector);
+			SetActorRelativeRotation(FRotator::ZeroRotator);
+			SetActorRelativeScale3D(FVector::OneVector);
+
+			UE_LOG(LogTemp, Log, TEXT("RobotCamRig attached to rover sensor mount: %s"),
+				*RoverSensorMountComponentName.ToString());
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("RobotCamRig could not find rover sensor mount component: %s"),
+				*RoverSensorMountComponentName.ToString());
+		}
+	}
+
+	//Finalize camera component transforms before publishing TF.
 	ApplyStereoBaseline();
-	ResolveGroundTruthCameraChild();
 
-	if (RgbCaptureComponent && RGBCapture) {
+	//Resolve actor/component references.
+	ResolveGroundTruthCameraChild();
+	ResolveRoverGroundTruthComponents();
+
+	//Create TempoROS TF node and publish static camera transforms.
+	SetupCameraTfNode();
+	PublishStaticCameraTransforms();
+
+	//Initialize RGB capture components.
+	if (RgbCaptureComponent && RGBCapture)
+	{
 		RgbCaptureComponent->Initialize(
 			RGBCapture,
 			Width,
@@ -95,7 +145,8 @@ void ARobotCamRig::BeginPlay()
 		);
 	}
 
-	if (RightRgbCaptureComponent && RightRGBCapture) {
+	if (RightRgbCaptureComponent && RightRGBCapture)
+	{
 		RightRgbCaptureComponent->Initialize(
 			RightRGBCapture,
 			Width,
@@ -106,47 +157,55 @@ void ARobotCamRig::BeginPlay()
 			ExposureCompensation
 		);
 	}
-	
-	// Left publisher owns the /control subscription for the whole capture pipeline.
-	if (RosPublisherComponent && Camera) {
+
+	//Initialize ROS image/camera_info/frame_index publishers.
+	//Image and camera_info messages should use optical frames.
+	if (RosPublisherComponent && Camera)
+	{
 		RosPublisherComponent->Initialize(
 			Width,
 			Height,
-			FrameId,
+			LeftCameraOpticalFrameId,
 			TEXT("/left_camera"),
 			Camera,
 			true,
 			false,
 			0.0
 		);
-		RosPublisherComponent->OnCaptureControlReceived.AddUObject(this, &ARobotCamRig::OnCaptureControl);
+
+		RosPublisherComponent->OnCaptureControlReceived.AddUObject(
+			this,
+			&ARobotCamRig::OnCaptureControl
+		);
 	}
 
-	// Right publisher publishes only. It does not subscribe to /control.
-	if (RightRosPublisherComponent && RightCamera) {
+	if (RightRosPublisherComponent && RightCamera)
+	{
 		RightRosPublisherComponent->Initialize(
 			Width,
 			Height,
-			RightFrameId,
+			RightCameraOpticalFrameId,
 			TEXT("/right_camera"),
 			RightCamera,
 			false,
 			true,
-			(double)StereoBaselineCm / 100.0
+			static_cast<double>(StereoBaselineCm) / 100.0
 		);
 	}
-	
+
+	//Initialize CaptureManager after camera components exist and are configured.
 	CaptureManager = NewObject<UCaptureManager>(this);
+
 	if (CaptureManager)
 	{
 		CaptureManager->Initialize(CaptureConfig);
 		CaptureManager->SetLeftCameraPoseSource(Camera);
 		CaptureManager->SetRightCameraPoseSource(RightCamera);
-	}
 
-	ResolveRoverGroundTruthComponents();
-	if (CaptureManager && RoverPoseSource) {
-		CaptureManager->SetRoverPoseSource(RoverPoseSource);
+		if (RoverPoseSource)
+		{
+			CaptureManager->SetRoverPoseSource(RoverPoseSource);
+		}
 	}
 }
 
@@ -270,6 +329,10 @@ void ARobotCamRig::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	
+	if (CameraTfROSNode) {
+		CameraTfROSNode->Tick(DeltaSeconds);
+	}
+
 	if (RosPublisherComponent) {
 		RosPublisherComponent->TickRos(DeltaSeconds);
 	}
@@ -409,6 +472,7 @@ void ARobotCamRig::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (CaptureManager) {
 		CaptureManager->StopCapture();
 	}
+	CameraTfROSNode = nullptr;
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -430,10 +494,115 @@ void ARobotCamRig::SetStereoBaselineCm(float NewBaselineCm)
 	if (RightRosPublisherComponent) {
 		RightRosPublisherComponent->SetStereoCalibration(true, (double)StereoBaselineCm / 100.0);
 	}
+
+	// If the baseline is changed at runtime, refresh the static camera TFs too.
+	if (CameraTfROSNode) {
+		PublishStaticCameraTransforms();
+	}
 }
 
 
 float ARobotCamRig::GetStereoBaselineCm() const
 {
 	return StereoBaselineCm;
+}
+
+// TF2
+void ARobotCamRig::EnforceCameraFrameIds()
+{
+	// These frame names are part of the simulator contract.
+	// Force them at runtime so old Blueprint/level overrides cannot silently break TF or image headers.
+	BaseFrameId = TEXT("base_link");
+	LeftCameraLinkFrameId = TEXT("left_camera_link");
+	RightCameraLinkFrameId = TEXT("right_camera_link");
+	LeftCameraOpticalFrameId = TEXT("left_camera_optical_frame");
+	RightCameraOpticalFrameId = TEXT("right_camera_optical_frame");
+}
+
+void ARobotCamRig::SetupCameraTfNode()
+{
+	if (CameraTfROSNode) return;
+	CameraTfROSNode = UTempoROSNode::Create(TEXT("robot_cam_rig_tf_node"), this, false );
+	if (!CameraTfROSNode) {
+		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: failed to create camera TF ROS node."));
+		return;
+	}
+	UE_LOG(LogTemp, Log, TEXT("RobotCamRig: camera TF ROS node created."));
+}
+
+void ARobotCamRig::PublishStaticCameraTransforms()
+{
+	EnforceCameraFrameIds();
+
+	if (!CameraTfROSNode)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: cannot publish camera TFs because CameraTfROSNode is null."));
+		return;
+	}
+
+	if (!RoverActor)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: cannot publish camera TFs because RoverActor is null."));
+		return;
+	}
+
+	if (!Camera || !RightCamera)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: cannot publish camera TFs because one or both camera components are null."));
+		return;
+	}
+
+	const FTransform BaseWorldTransform = RoverActor->GetActorTransform();
+
+	const FTransform LeftCameraRelativeTransform =
+		Camera->GetComponentTransform().GetRelativeTransform(BaseWorldTransform);
+
+	const FTransform RightCameraRelativeTransform =
+		RightCamera->GetComponentTransform().GetRelativeTransform(BaseWorldTransform);
+
+	const bool bLeftLinkOk = CameraTfROSNode->PublishStaticTransform(
+		LeftCameraRelativeTransform,
+		LeftCameraLinkFrameId,
+		BaseFrameId
+	);
+
+	const bool bRightLinkOk = CameraTfROSNode->PublishStaticTransform(
+		RightCameraRelativeTransform,
+		RightCameraLinkFrameId,
+		BaseFrameId
+	);
+
+	const FTransform CameraLinkToOpticalTransform(
+		FQuat(0.5, 0.5, 0.5, 0.5),
+		FVector::ZeroVector,
+		FVector::OneVector
+	);
+
+	const bool bLeftOpticalOk = CameraTfROSNode->PublishStaticTransform(
+		CameraLinkToOpticalTransform,
+		LeftCameraOpticalFrameId,
+		LeftCameraLinkFrameId
+	);
+
+	const bool bRightOpticalOk = CameraTfROSNode->PublishStaticTransform(
+		CameraLinkToOpticalTransform,
+		RightCameraOpticalFrameId,
+		RightCameraLinkFrameId
+	);
+
+	if (bLeftLinkOk && bRightLinkOk && bLeftOpticalOk && bRightOpticalOk)
+	{
+		UE_LOG(LogTemp, Log,
+			TEXT("RobotCamRig: published static camera TFs: %s -> %s -> %s and %s -> %s -> %s"),
+			*BaseFrameId,
+			*LeftCameraLinkFrameId,
+			*LeftCameraOpticalFrameId,
+			*BaseFrameId,
+			*RightCameraLinkFrameId,
+			*RightCameraOpticalFrameId);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: failed to publish one or more static camera TFs."));
+	}
 }

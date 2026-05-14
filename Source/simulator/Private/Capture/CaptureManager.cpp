@@ -1,6 +1,5 @@
 #include "Capture/CaptureManager.h"
 #include "Capture/CapturePoseSourceComponent.h"
-#include "Utils/UnrealToRosConversion.h"
 #include "Components/SceneComponent.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -9,6 +8,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Actor.h"
+#include "Utils/UnrealToRosConversion.h"
 
 void UCaptureManager::Initialize(const FCaptureConfig& InConfig)
 {
@@ -42,7 +42,11 @@ void UCaptureManager::StartCapture()
 	// The manifest is always created for every capture session.
 	// It is the main synchronization file between ROS, UnrealGT, and offline tools.
 	if (!RoverPoseSource) {
-		RoverPoseSource = FindPoseSourceByName(TEXT("rover_base"));
+		RoverPoseSource = FindPoseSourceByName(TEXT("base_link"));
+		if (!RoverPoseSource) {
+			// Backward-compatible fallback for older Blueprint instances.
+			RoverPoseSource = FindPoseSourceByName(TEXT("rover_base"));
+		}
 	}
 	bCaptureEnabled = true;
 	StartManifest();
@@ -97,12 +101,12 @@ FCaptureFrameInfo UCaptureManager::NextFrameWithPose(double StampSeconds, const 
 	// Rover trajectory is always written when rover pose is available.
 	// Left camera trajectory is written when left/reference imagery exists: left ROS or UnrealGT.
 	// Right camera trajectory is written only for stereo ROS modes.
-	AppendTrajectoryRow(RoverGtTrajectoryFilePath, FrameInfo, CompletePoseData.RoverBasePose, TEXT("map"), TEXT("rover_base"));
+	AppendTrajectoryRow(RoverGtTrajectoryFilePath, FrameInfo, CompletePoseData.RoverBasePose, TEXT("map"), TEXT("base_link"));
 	if (Config.IsLeftRosCameraEnabled() || Config.IsGroundTruthEnabled()) {
-		AppendTrajectoryRow(LeftCameraGtTrajectoryFilePath, FrameInfo, CompletePoseData.LeftCameraPose, TEXT("map"), TEXT("left_camera"));
+		AppendTrajectoryRow(LeftCameraGtTrajectoryFilePath, FrameInfo, CompletePoseData.LeftCameraPose, TEXT("map"), TEXT("left_camera_link"));
 	}
 	if (Config.IsRightRosCameraEnabled()) {
-		AppendTrajectoryRow(RightCameraGtTrajectoryFilePath, FrameInfo, CompletePoseData.RightCameraPose, TEXT("map"), TEXT("right_camera"));
+		AppendTrajectoryRow(RightCameraGtTrajectoryFilePath, FrameInfo, CompletePoseData.RightCameraPose, TEXT("map"), TEXT("right_camera_link"));
 	}
 
 	return FrameInfo;
@@ -215,8 +219,15 @@ void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo, cons
 	);
 }
 
-void UCaptureManager::AppendTrajectoryRow(const FString& FilePath, const FCaptureFrameInfo& FrameInfo, const FCapturePose& Pose, const FString& FrameId, const FString& ChildFrameId) {
-	if (!Pose.bValid || FilePath.IsEmpty()) {
+void UCaptureManager::AppendTrajectoryRow(
+	const FString& FilePath,
+	const FCaptureFrameInfo& FrameInfo,
+	const FCapturePose& Pose,
+	const FString& FrameId,
+	const FString& ChildFrameId)
+{
+	if (!Pose.bValid || FilePath.IsEmpty())
+	{
 		return;
 	}
 

@@ -46,7 +46,7 @@ void URoverGroundTruthPublisherComponent::SetupRos()
 	}
 
 	FROSQOSProfile DefaultQOS;
-	DefaultQOS.CustomQueueSize(10).Reliable();
+	DefaultQOS.CustomQueueSize(10).Reliable().Volatile();
 
 	if (bPublishPoseStamped) {
 		ROSNode->AddPublisher<geometry_msgs::msg::PoseStamped>(*PoseTopic, DefaultQOS, false);
@@ -57,6 +57,8 @@ void URoverGroundTruthPublisherComponent::SetupRos()
 	}
 
 	if (bPublishTf) {
+		// Dynamic TF must be volatile, not transient local.
+		// This publisher is used once per synchronized FrameInfo.
 		ROSNode->AddPublisher<tf2_msgs::msg::TFMessage>(*TfTopic, DefaultQOS, false);
 	}
 

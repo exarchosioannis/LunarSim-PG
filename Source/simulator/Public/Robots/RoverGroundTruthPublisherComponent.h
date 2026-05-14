@@ -62,11 +62,10 @@ private:
 	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth")
 	FString PathTopic = TEXT("/gt/path");
 
-	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth")
+	UPROPERTY(VisibleAnywhere, Category = "ROS|Frames")
 	FString FrameId = TEXT("map");
-
-	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth")
-	FString ChildFrameId = TEXT("rover_base");
+	UPROPERTY(VisibleAnywhere, Category = "ROS|Frames")
+	FString ChildFrameId = TEXT("base_link");
 
 	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth")
 	bool bPublishPoseStamped = true;
