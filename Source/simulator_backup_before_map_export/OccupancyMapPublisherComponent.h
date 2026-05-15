@@ -19,12 +19,11 @@
  *   - Tag obstacle actors/components with MapObstacle.
  *
  * ROS output:
- *   /gt/map/occupancy    nav_msgs/msg/OccupancyGrid
- *   frame_id             map
+ *   /gt/map/occupancy nav_msgs/msg/OccupancyGrid
+ *   frame_id map
  *
  * Notes:
  *   - The map is generated once from Unreal raycasts.
- *   - The already-generated map is republished slowly for RViz/late subscribers.
  *   - This is not part of the synchronized per-frame capture pipeline.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -37,12 +36,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Ground Truth Map")
 	void RegenerateAndPublishMap();
-
-	// Exports the already generated map to a dataset Maps directory.
-	// Creates:
-	//   <BaseFileName>.pgm
-	//   <BaseFileName>.yaml
-	bool ExportMapToDirectory(const FString& MapsDirectory, const FString& BaseFileName = TEXT("occupancy_map"));
 
 protected:
 	virtual void BeginPlay() override;
@@ -58,10 +51,6 @@ private:
 	FVector RosMapToUnrealWorldCm(double RosX_m, double RosY_m) const;
 	int8 ClassifyCell(double CellCenterRosX_m, double CellCenterRosY_m) const;
 	bool HitHasOccupiedTag(const FHitResult& Hit) const;
-
-	bool SaveMapPgm(const FString& FilePath) const;
-	bool SaveMapYaml(const FString& FilePath, const FString& ImageFileName) const;
-	uint8 OccupancyValueToPgmPixel(int8 CellValue) const;
 
 private:
 	// UTempoROSNode is a UObject, so keep it as UPROPERTY for Unreal GC safety.

@@ -33,7 +33,6 @@ void UCaptureManager::StartCapture()
 		TEXT("Datasets"),
 		CurrentSessionName));
 	CurrentImagesDirectory = FPaths::Combine(CurrentSessionDirectory, TEXT("Images"));
-	CurrentMapsDirectory = FPaths::Combine(CurrentSessionDirectory, TEXT("Maps"));
 	ManifestFilePath = FPaths::Combine(CurrentSessionDirectory, TEXT("manifest.csv"));
 	const FString NavigationDirectory = FPaths::Combine(CurrentSessionDirectory, TEXT("Navigation"));
 	RoverGtTrajectoryFilePath = FPaths::Combine(NavigationDirectory, TEXT("rover_gt_trajectory_ros.csv"));
@@ -138,11 +137,6 @@ FString UCaptureManager::GetCurrentImagesDirectory() const
 	return CurrentImagesDirectory;
 }
 
-FString UCaptureManager::GetCurrentMapsDirectory() const
-{
-	return CurrentMapsDirectory;
-}
-
 FString UCaptureManager::GetManifestFilePath() const
 {
 	return ManifestFilePath;
@@ -173,11 +167,6 @@ void UCaptureManager::StartManifest()
 	if (!PlatformFile.DirectoryExists(*CurrentImagesDirectory))
 	{
 		PlatformFile.CreateDirectoryTree(*CurrentImagesDirectory);
-	}
-
-	if (!PlatformFile.DirectoryExists(*CurrentMapsDirectory))
-	{
-		PlatformFile.CreateDirectoryTree(*CurrentMapsDirectory);
 	}
 
 	const FString NavigationDirectory = FPaths::GetPath(RoverGtTrajectoryFilePath);

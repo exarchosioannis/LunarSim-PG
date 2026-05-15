@@ -6,7 +6,6 @@
 #include "TempoROSNode.h"
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
-#include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "tf2_msgs/msg/tf_message.hpp"
 #include "builtin_interfaces/msg/time.hpp"
@@ -44,46 +43,26 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	// This is a UObject pointer, so keep it as UPROPERTY for Unreal GC safety.
 	UPROPERTY()
 	UTempoROSNode* ROSNode = nullptr;
 
-	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth")
-	FString NodeName = TEXT("rover_ground_truth_publisher");
+	const FString NodeName = TEXT("rover_ground_truth_publisher");
 
-	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth")
-	FString PoseTopic = TEXT("/rover/gt/pose");
+	const FString PoseTopic = TEXT("/gt/rover/pose");
+	const FString TfTopic = TEXT("/tf");
+	const FString PathTopic = TEXT("/gt/rover/path");
 
-	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth")
-	FString OdomTopic = TEXT("/gt/odom");
+	const FString FrameId = TEXT("map");
+	const FString ChildFrameId = TEXT("base_link");
 
-	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth")
-	FString TfTopic = TEXT("/tf");
+	const bool bPublishPoseStamped = true;
+	const bool bPublishTf = true;
+	const bool bPublishPath = true;
 
-	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth")
-	FString PathTopic = TEXT("/gt/path");
-
-	UPROPERTY(VisibleAnywhere, Category = "ROS|Frames")
-	FString FrameId = TEXT("map");
-	UPROPERTY(VisibleAnywhere, Category = "ROS|Frames")
-	FString ChildFrameId = TEXT("base_link");
-
-	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth")
-	bool bPublishPoseStamped = true;
-
-	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth")
-	bool bPublishOdometry = true;
-
-	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth")
-	bool bPublishTf = true;
-
-	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth")
-	bool bPublishPath = true;
-
-	UPROPERTY(EditAnywhere, Category = "ROS Ground Truth", meta = (ClampMin = "1", UIMin = "1"))
-	int32 MaxPathLength = 5000;
+	const int32 MaxPathLength = 5000; // number of poses to keep in the pat
 
 	geometry_msgs::msg::PoseStamped ReusablePoseMsg;
-	nav_msgs::msg::Odometry ReusableOdomMsg;
 	tf2_msgs::msg::TFMessage ReusableTfMsg;
 	nav_msgs::msg::Path ReusablePathMsg;
 

@@ -6,7 +6,6 @@
 #include "TempoROSTypes.h"
 
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(geometry_msgs::msg::PoseStamped);
-DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(nav_msgs::msg::Odometry);
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(nav_msgs::msg::Path);
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(tf2_msgs::msg::TFMessage);
 
@@ -50,10 +49,6 @@ void URoverGroundTruthPublisherComponent::SetupRos()
 
 	if (bPublishPoseStamped) {
 		ROSNode->AddPublisher<geometry_msgs::msg::PoseStamped>(*PoseTopic, DefaultQOS, false);
-	}
-
-	if (bPublishOdometry) {
-		ROSNode->AddPublisher<nav_msgs::msg::Odometry>(*OdomTopic, DefaultQOS, false);
 	}
 
 	if (bPublishTf) {
@@ -137,24 +132,6 @@ void URoverGroundTruthPublisherComponent::PublishGroundTruth(const FCaptureFrame
 
 	if (bPublishPoseStamped) {
 		ROSNode->Publish<geometry_msgs::msg::PoseStamped>(*PoseTopic, ReusablePoseMsg);
-	}
-
-	if (bPublishOdometry) {
-		ReusableOdomMsg.header.stamp = Stamp;
-		ReusableOdomMsg.header.frame_id = TCHAR_TO_UTF8(*FrameId);
-		ReusableOdomMsg.child_frame_id = TCHAR_TO_UTF8(*ChildFrameId);
-		ReusableOdomMsg.pose.pose = ReusablePoseMsg.pose;
-
-		// We intentionally leave twist at zero for now.
-		// This message is synchronized pose ground truth, not estimated wheel odometry.
-		ReusableOdomMsg.twist.twist.linear.x = 0.0;
-		ReusableOdomMsg.twist.twist.linear.y = 0.0;
-		ReusableOdomMsg.twist.twist.linear.z = 0.0;
-		ReusableOdomMsg.twist.twist.angular.x = 0.0;
-		ReusableOdomMsg.twist.twist.angular.y = 0.0;
-		ReusableOdomMsg.twist.twist.angular.z = 0.0;
-
-		ROSNode->Publish<nav_msgs::msg::Odometry>(*OdomTopic, ReusableOdomMsg);
 	}
 
 	if (bPublishTf) {

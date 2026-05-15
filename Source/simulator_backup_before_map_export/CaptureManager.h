@@ -50,9 +50,6 @@ public:
 	FString GetCurrentImagesDirectory() const;
 
 	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetCurrentMapsDirectory() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
 	FString GetManifestFilePath() const;
 
 	UFUNCTION(BlueprintPure, Category = "Capture|Session")
@@ -95,7 +92,6 @@ private:
 	FString CurrentSessionName;
 	FString CurrentSessionDirectory;
 	FString CurrentImagesDirectory;
-	FString CurrentMapsDirectory;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Capture|Pose", meta = (AllowPrivateAccess = "true"))
 	UCapturePoseSourceComponent* RoverPoseSource = nullptr;

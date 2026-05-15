@@ -10,7 +10,6 @@
 #include "Sensors/RgbCameraCaptureComponent.h"
 #include "Sensors/CameraRosPublisherComponent.h"
 #include "Robots/RoverGroundTruthPublisherComponent.h"
-#include "Maps/OccupancyMapPublisherComponent.h"
 #include "Capture/CapturePoseSourceComponent.h"
 #include "TempoROSNode.h"
 #include "EngineUtils.h"
@@ -322,7 +321,7 @@ void ARobotCamRig::ResolveRoverGroundTruthComponents()
 	}
 
 	if (RoverActor && !RoverGroundTruthPublisher) {
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: RoverActor '%s' has no RoverGroundTruthPublisherComponent. CSV pose may work if it has CapturePoseSourceComponent, but /rover/gt/pose, /gt/odom, /tf and /gt/path will not publish."), *RoverActor->GetName());
+		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: RoverActor '%s' has no RoverGroundTruthPublisherComponent. CSV pose may work if it has CapturePoseSourceComponent, but /gt/rover/pose, /tf and /gt/rover/path will not publish."), *RoverActor->GetName());
 	}
 }
 
@@ -453,73 +452,13 @@ void ARobotCamRig::PollOneRgbCaptureAndPublish(
 	}
 }
 
-void ARobotCamRig::ExportOccupancyMapsForCurrentSession()
-{
-	if (!CaptureManager)
-	{
-		return;
-	}
-
-	const FString MapsDirectory = CaptureManager->GetCurrentMapsDirectory();
-	if (MapsDirectory.IsEmpty())
-	{
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	int32 ExportedMapCount = 0;
-
-	for (TActorIterator<AActor> ActorIt(World); ActorIt; ++ActorIt)
-	{
-		AActor* Actor = *ActorIt;
-		if (!Actor)
-		{
-			continue;
-		}
-
-		TArray<UOccupancyMapPublisherComponent*> MapComponents;
-		Actor->GetComponents<UOccupancyMapPublisherComponent>(MapComponents);
-
-		for (UOccupancyMapPublisherComponent* MapComponent : MapComponents)
-		{
-			if (!MapComponent)
-			{
-				continue;
-			}
-
-			const FString BaseFileName = ExportedMapCount == 0
-				? FString(TEXT("occupancy_map"))
-				: FString::Printf(TEXT("occupancy_map_%02d"), ExportedMapCount + 1);
-
-			if (MapComponent->ExportMapToDirectory(MapsDirectory, BaseFileName))
-			{
-				++ExportedMapCount;
-			}
-		}
-	}
-
-	if (ExportedMapCount == 0)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: no OccupancyMapPublisherComponent found, so no map files were exported."));
-	}
-}
-
 void ARobotCamRig::OnCaptureControl(int32 ControlValue)
 {
 	if (ControlValue == 1) {
 		if (RoverGroundTruthPublisher) {
 			RoverGroundTruthPublisher->ResetPath();
 		}
-		if (CaptureManager)
-		{
-			CaptureManager->StartCapture();
-			ExportOccupancyMapsForCurrentSession();
-		}
+		if (CaptureManager) CaptureManager->StartCapture();
 		PublishAccumulator = 0.0f;
 		bWarnedMissingGroundTruthCamera = false;
 	}
