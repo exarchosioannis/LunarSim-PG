@@ -10,22 +10,31 @@
 #include "OccupancyMapPublisherComponent.generated.h"
 
 /*
- * Publishes a static global ground-truth 2D occupancy map from the Unreal level.
+ * Publishes a static global ground-truth 2D occupancy map from the Unreal level
+ * and exports occupancy, elevation, slope, and traversability map files when the level starts.
  *
  * Suggested usage:
  *   - Create an empty Blueprint actor, for example BP_GroundTruthMapPublisher.
  *   - Add this component to it.
- *   - Place the actor at the center of the 100m x 100m area you want to map.
+ *   - Place the actor at the center of the area you want to map.
  *   - Tag obstacle actors/components with MapObstacle.
  *
  * ROS output:
  *   /gt/map/occupancy    nav_msgs/msg/OccupancyGrid
  *   frame_id             map
  *
- * Notes:
- *   - The map is generated once from Unreal raycasts.
- *   - The already-generated map is republished slowly for RViz/late subscribers.
- *   - This is not part of the synchronized per-frame capture pipeline.
+ * Disk export:
+ *   Saved/Datasets/<run_timestamp>/Maps/occupancy_map.pgm
+ *   Saved/Datasets/<run_timestamp>/Maps/occupancy_map.yaml
+ *   Saved/Datasets/<run_timestamp>/Maps/elevation_map.csv
+ *   Saved/Datasets/<run_timestamp>/Maps/elevation_map.yaml
+ *   Saved/Datasets/<run_timestamp>/Maps/elevation_map_preview.pgm
+ *   Saved/Datasets/<run_timestamp>/Maps/slope_map.csv
+ *   Saved/Datasets/<run_timestamp>/Maps/slope_map.yaml
+ *   Saved/Datasets/<run_timestamp>/Maps/slope_map_preview.pgm
+ *   Saved/Datasets/<run_timestamp>/Maps/traversability_map.csv
+ *   Saved/Datasets/<run_timestamp>/Maps/traversability_map.pgm
+ *   Saved/Datasets/<run_timestamp>/Maps/traversability_map.yaml
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class SIMULATOR_API UOccupancyMapPublisherComponent : public UActorComponent
@@ -38,11 +47,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ground Truth Map")
 	void RegenerateAndPublishMap();
 
-	// Exports the already generated map to a dataset Maps directory.
-	// Creates:
-	//   <BaseFileName>.pgm
-	//   <BaseFileName>.yaml
+	UFUNCTION(BlueprintCallable, Category = "Ground Truth Map")
 	bool ExportMapToDirectory(const FString& MapsDirectory, const FString& BaseFileName = TEXT("occupancy_map"));
+
+	UFUNCTION(BlueprintCallable, Category = "Ground Truth Map")
+	bool ExportMapToDefaultDatasetDirectory();
 
 protected:
 	virtual void BeginPlay() override;
@@ -52,47 +61,73 @@ protected:
 private:
 	void SetupRos();
 	void GenerateOccupancyMap();
+	void ComputeSlopeMap();
+	void ComputeTraversabilityMap();
 	void PublishMap();
 	builtin_interfaces::msg::Time ToRosTime(double Seconds) const;
 
 	FVector RosMapToUnrealWorldCm(double RosX_m, double RosY_m) const;
 	int8 ClassifyCell(double CellCenterRosX_m, double CellCenterRosY_m) const;
+	bool SampleElevationCell(double CellCenterRosX_m, double CellCenterRosY_m, float& OutElevationMeters) const;
 	bool HitHasOccupiedTag(const FHitResult& Hit) const;
 
 	bool SaveMapPgm(const FString& FilePath) const;
 	bool SaveMapYaml(const FString& FilePath, const FString& ImageFileName) const;
+
+	bool SaveElevationCsv(const FString& FilePath) const;
+	bool SaveElevationYaml(const FString& FilePath, const FString& CsvFileName, const FString& PreviewFileName) const;
+	bool SaveElevationPreviewPgm(const FString& FilePath) const;
+
+	bool SaveSlopeCsv(const FString& FilePath) const;
+	bool SaveSlopeYaml(const FString& FilePath, const FString& CsvFileName, const FString& PreviewFileName) const;
+	bool SaveSlopePreviewPgm(const FString& FilePath) const;
+
+	bool SaveTraversabilityCsv(const FString& FilePath) const;
+	bool SaveTraversabilityPgm(const FString& FilePath) const;
+	bool SaveTraversabilityYaml(const FString& FilePath, const FString& CsvFileName, const FString& PgmFileName) const;
+
 	uint8 OccupancyValueToPgmPixel(int8 CellValue) const;
+	uint8 ElevationValueToPreviewPixel(float ElevationMeters, float MinElevationMeters, float MaxElevationMeters) const;
+	uint8 SlopeValueToPreviewPixel(float SlopeDegrees, float MaxPreviewSlopeDegrees) const;
+	uint8 TraversabilityValueToPgmPixel(int8 TraversabilityValue) const;
+	FString MakeElevationBaseFileName(const FString& OccupancyBaseFileName) const;
+	FString MakeSlopeBaseFileName(const FString& OccupancyBaseFileName) const;
+	FString MakeTraversabilityBaseFileName(const FString& OccupancyBaseFileName) const;
 
 private:
-	// UTempoROSNode is a UObject, so keep it as UPROPERTY for Unreal GC safety.
 	UPROPERTY()
 	UTempoROSNode* ROSNode = nullptr;
 
-	// Fixed ROS settings.
 	const FString NodeName = TEXT("occupancy_map_publisher");
 	const FString MapTopic = TEXT("/gt/map/occupancy");
 	const FString MapFrameId = TEXT("map");
 
-	// Fixed global map settings.
-	// 100m x 100m with 0.20m cells gives a 500 x 500 occupancy grid.
-	const float ResolutionMeters = 0.20f;
-	const float MapWidthMeters = 100.0f;
-	const float MapHeightMeters = 100.0f;
+	// Covers the current landscape better than the old 100m x 100m setup.
+	// 220m x 220m at 0.40m/cell gives a 550 x 550 grid.
+	const float ResolutionMeters = 0.40f;
+	const float MapWidthMeters = 220.0f;
+	const float MapHeightMeters = 220.0f;
 
-	// Vertical raycast settings in Unreal centimeters.
-	// 2500 cm = 25m above/below the map actor Z location.
+	// Unreal uses centimeters. 2500 cm = 25m above/below the map center height.
 	const float TraceStartHeightCm = 2500.0f;
 	const float TraceEndDepthCm = 2500.0f;
 
-	// Static world geometry channel. Tagged hits become occupied cells.
 	const ECollisionChannel TraceChannel = ECC_WorldStatic;
 	const FName OccupiedTag = TEXT("MapObstacle");
 
-	// The map is static, but we republish slowly so RViz/late subscribers always receive it,
-	// even if their subscription QoS is volatile.
+	// Republish the already-generated occupancy map for RViz/late-subscriber stability.
+	// The map is NOT regenerated and files are NOT rewritten every 5 seconds.
 	const float RepublishPeriodSeconds = 5.0f;
 
+	// Simple first-version traversability thresholds for rover terrain safety.
+	// These are intentionally conservative and can be tuned later for the real rover limits.
+	const float SafeSlopeDegrees = 15.0f;
+	const float MaxTraversableSlopeDegrees = 25.0f;
+
 	nav_msgs::msg::OccupancyGrid ReusableMapMsg;
+	TArray<float> ElevationDataMeters;
+	TArray<float> SlopeDataDegrees;
+	TArray<int8> TraversabilityData;
 
 	bool bMapGenerated = false;
 	float PublishAccumulator = 0.0f;
@@ -100,3 +135,4 @@ private:
 	float ComputedOriginYMapMeters = 0.0f;
 	float TraceBaseZCm = 0.0f;
 };
+

@@ -9,6 +9,7 @@
 
 class UCapturePoseSourceComponent;
 class USceneComponent;
+class UWorld;
 
 UCLASS()
 class SIMULATOR_API UCaptureManager : public UObject
@@ -18,6 +19,8 @@ class SIMULATOR_API UCaptureManager : public UObject
 public:
 	UFUNCTION(BlueprintCallable, Category = "Capture")
 	void Initialize(const FCaptureConfig& InConfig);
+
+	virtual UWorld* GetWorld() const override;
 
 	UFUNCTION(BlueprintCallable, Category = "Capture")
 	void StartCapture();
@@ -53,6 +56,9 @@ public:
 	FString GetCurrentMapsDirectory() const;
 
 	UFUNCTION(BlueprintPure, Category = "Capture|Session")
+	FString GetCurrentDatasetRunDirectory() const;
+
+	UFUNCTION(BlueprintPure, Category = "Capture|Session")
 	FString GetManifestFilePath() const;
 
 	UFUNCTION(BlueprintPure, Category = "Capture|Session")
@@ -75,6 +81,7 @@ public:
 
 private:
 	void StartManifest();
+	void EnsureDatasetRunDirectory();
 	void AppendManifestRow(const FCaptureFrameInfo& FrameInfo, const FCaptureFramePoseData& PoseData);
 	void AppendTrajectoryRow(const FString& FilePath, const FCaptureFrameInfo& FrameInfo, const FCapturePose& Pose, const FString& FrameId, const FString& ChildFrameId);
 	
@@ -92,6 +99,7 @@ private:
 	FString RoverGtTrajectoryFilePath;
 	FString LeftCameraGtTrajectoryFilePath;
 	FString RightCameraGtTrajectoryFilePath;
+	FString CurrentDatasetRunDirectory;
 	FString CurrentSessionName;
 	FString CurrentSessionDirectory;
 	FString CurrentImagesDirectory;
@@ -106,3 +114,4 @@ private:
 	UPROPERTY()
 	USceneComponent* RightCameraPoseSource = nullptr;
 };
+

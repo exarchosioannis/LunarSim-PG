@@ -174,5 +174,4 @@ private:
 	// Ground truth helpers
 	void ResolveGroundTruthCameraChild();
 	void ResolveRoverGroundTruthComponents();
-	void ExportOccupancyMapsForCurrentSession();
 };

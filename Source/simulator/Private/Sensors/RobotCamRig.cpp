@@ -10,7 +10,6 @@
 #include "Sensors/RgbCameraCaptureComponent.h"
 #include "Sensors/CameraRosPublisherComponent.h"
 #include "Robots/RoverGroundTruthPublisherComponent.h"
-#include "Maps/OccupancyMapPublisherComponent.h"
 #include "Capture/CapturePoseSourceComponent.h"
 #include "TempoROSNode.h"
 #include "EngineUtils.h"
@@ -453,62 +452,6 @@ void ARobotCamRig::PollOneRgbCaptureAndPublish(
 	}
 }
 
-void ARobotCamRig::ExportOccupancyMapsForCurrentSession()
-{
-	if (!CaptureManager)
-	{
-		return;
-	}
-
-	const FString MapsDirectory = CaptureManager->GetCurrentMapsDirectory();
-	if (MapsDirectory.IsEmpty())
-	{
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	int32 ExportedMapCount = 0;
-
-	for (TActorIterator<AActor> ActorIt(World); ActorIt; ++ActorIt)
-	{
-		AActor* Actor = *ActorIt;
-		if (!Actor)
-		{
-			continue;
-		}
-
-		TArray<UOccupancyMapPublisherComponent*> MapComponents;
-		Actor->GetComponents<UOccupancyMapPublisherComponent>(MapComponents);
-
-		for (UOccupancyMapPublisherComponent* MapComponent : MapComponents)
-		{
-			if (!MapComponent)
-			{
-				continue;
-			}
-
-			const FString BaseFileName = ExportedMapCount == 0
-				? FString(TEXT("occupancy_map"))
-				: FString::Printf(TEXT("occupancy_map_%02d"), ExportedMapCount + 1);
-
-			if (MapComponent->ExportMapToDirectory(MapsDirectory, BaseFileName))
-			{
-				++ExportedMapCount;
-			}
-		}
-	}
-
-	if (ExportedMapCount == 0)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: no OccupancyMapPublisherComponent found, so no map files were exported."));
-	}
-}
-
 void ARobotCamRig::OnCaptureControl(int32 ControlValue)
 {
 	if (ControlValue == 1) {
@@ -518,7 +461,6 @@ void ARobotCamRig::OnCaptureControl(int32 ControlValue)
 		if (CaptureManager)
 		{
 			CaptureManager->StartCapture();
-			ExportOccupancyMapsForCurrentSession();
 		}
 		PublishAccumulator = 0.0f;
 		bWarnedMissingGroundTruthCamera = false;

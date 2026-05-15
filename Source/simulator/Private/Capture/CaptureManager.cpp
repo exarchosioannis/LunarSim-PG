@@ -10,9 +10,93 @@
 #include "GameFramework/Actor.h"
 #include "Utils/UnrealToRosConversion.h"
 
+namespace
+{
+	FString GetDatasetRootDirectory()
+	{
+		return FPaths::ConvertRelativePathToFull(FPaths::Combine(
+			FPaths::ProjectSavedDir(),
+			TEXT("Datasets")
+		));
+	}
+
+	FString GetCurrentDatasetRunMarkerPath()
+	{
+		return FPaths::Combine(GetDatasetRootDirectory(), TEXT("current_dataset_run.txt"));
+	}
+
+	bool TryReadCurrentDatasetRunDirectory(FString& OutRunDirectory)
+	{
+		FString MarkerContent;
+		if (!FFileHelper::LoadFileToString(MarkerContent, *GetCurrentDatasetRunMarkerPath()))
+		{
+			return false;
+		}
+
+		MarkerContent.TrimStartAndEndInline();
+		if (MarkerContent.IsEmpty())
+		{
+			return false;
+		}
+
+		IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
+		if (!PlatformFile.DirectoryExists(*MarkerContent))
+		{
+			return false;
+		}
+
+		OutRunDirectory = MarkerContent;
+		return true;
+	}
+
+	FString CreateNewDatasetRunDirectory()
+	{
+		IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
+
+		const FString DatasetRootDirectory = GetDatasetRootDirectory();
+		if (!PlatformFile.DirectoryExists(*DatasetRootDirectory))
+		{
+			PlatformFile.CreateDirectoryTree(*DatasetRootDirectory);
+		}
+
+		const FString DateString = FDateTime::Now().ToString(TEXT("%Y-%m-%d_%H-%M-%S"));
+		FString RunDirectory = FPaths::Combine(DatasetRootDirectory, DateString);
+
+		int32 Suffix = 2;
+		while (PlatformFile.DirectoryExists(*RunDirectory))
+		{
+			RunDirectory = FPaths::Combine(
+				DatasetRootDirectory,
+				FString::Printf(TEXT("%s_%02d"), *DateString, Suffix)
+			);
+			++Suffix;
+		}
+
+		PlatformFile.CreateDirectoryTree(*RunDirectory);
+		FFileHelper::SaveStringToFile(
+			RunDirectory,
+			*GetCurrentDatasetRunMarkerPath(),
+			FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM
+		);
+
+		return RunDirectory;
+	}
+}
+
+
 void UCaptureManager::Initialize(const FCaptureConfig& InConfig)
 {
 	Config = InConfig;
+}
+
+UWorld* UCaptureManager::GetWorld() const
+{
+	if (const UObject* OuterObject = GetOuter())
+	{
+		return OuterObject->GetWorld();
+	}
+
+	return nullptr;
 }
 
 void UCaptureManager::StartCapture()
@@ -23,17 +107,16 @@ void UCaptureManager::StartCapture()
 		return;
 	}
 
+	EnsureDatasetRunDirectory();
+
 	CurrentSessionId++;
 	FrameIndex = 0;
 
-	const FString DateString = FDateTime::Now().ToString(TEXT("%Y-%m-%d_%H-%M-%S"));
-	CurrentSessionName = FString::Printf(TEXT("%s_session_%d"), *DateString, CurrentSessionId.load());
-	CurrentSessionDirectory = FPaths::ConvertRelativePathToFull(FPaths::Combine(
-		FPaths::ProjectSavedDir(),
-		TEXT("Datasets"),
-		CurrentSessionName));
+	CurrentSessionName = FString::Printf(TEXT("Session_%03d"), CurrentSessionId.load());
+	CurrentSessionDirectory = FPaths::Combine(CurrentDatasetRunDirectory, CurrentSessionName);
 	CurrentImagesDirectory = FPaths::Combine(CurrentSessionDirectory, TEXT("Images"));
-	CurrentMapsDirectory = FPaths::Combine(CurrentSessionDirectory, TEXT("Maps"));
+	CurrentMapsDirectory = FPaths::Combine(CurrentDatasetRunDirectory, TEXT("Maps"));
+
 	ManifestFilePath = FPaths::Combine(CurrentSessionDirectory, TEXT("manifest.csv"));
 	const FString NavigationDirectory = FPaths::Combine(CurrentSessionDirectory, TEXT("Navigation"));
 	RoverGtTrajectoryFilePath = FPaths::Combine(NavigationDirectory, TEXT("rover_gt_trajectory_ros.csv"));
@@ -49,8 +132,13 @@ void UCaptureManager::StartCapture()
 			RoverPoseSource = FindPoseSourceByName(TEXT("rover_base"));
 		}
 	}
+
 	bCaptureEnabled = true;
 	StartManifest();
+
+	UE_LOG(LogTemp, Log, TEXT("CaptureManager: started %s inside dataset run %s"),
+		*CurrentSessionName,
+		*CurrentDatasetRunDirectory);
 }
 
 void UCaptureManager::StopCapture()
@@ -143,6 +231,11 @@ FString UCaptureManager::GetCurrentMapsDirectory() const
 	return CurrentMapsDirectory;
 }
 
+FString UCaptureManager::GetCurrentDatasetRunDirectory() const
+{
+	return CurrentDatasetRunDirectory;
+}
+
 FString UCaptureManager::GetManifestFilePath() const
 {
 	return ManifestFilePath;
@@ -201,6 +294,33 @@ void UCaptureManager::StartManifest()
 	FFileHelper::SaveStringToFile(TrajectoryHeader, *RoverGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
 	FFileHelper::SaveStringToFile(TrajectoryHeader, *LeftCameraGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
 	FFileHelper::SaveStringToFile(TrajectoryHeader, *RightCameraGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
+}
+
+
+
+void UCaptureManager::EnsureDatasetRunDirectory()
+{
+	FString MarkerRunDirectory;
+	if (TryReadCurrentDatasetRunDirectory(MarkerRunDirectory))
+	{
+		CurrentDatasetRunDirectory = MarkerRunDirectory;
+	}
+	else if (CurrentDatasetRunDirectory.IsEmpty())
+	{
+		CurrentDatasetRunDirectory = CreateNewDatasetRunDirectory();
+	}
+
+	CurrentMapsDirectory = FPaths::Combine(CurrentDatasetRunDirectory, TEXT("Maps"));
+
+	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
+	if (!PlatformFile.DirectoryExists(*CurrentDatasetRunDirectory))
+	{
+		PlatformFile.CreateDirectoryTree(*CurrentDatasetRunDirectory);
+	}
+	if (!PlatformFile.DirectoryExists(*CurrentMapsDirectory))
+	{
+		PlatformFile.CreateDirectoryTree(*CurrentMapsDirectory);
+	}
 }
 
 void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo, const FCaptureFramePoseData& PoseData)
@@ -315,3 +435,4 @@ UCapturePoseSourceComponent* UCaptureManager::FindPoseSourceByName(FName SourceN
 	}
 	return nullptr;
 }
+
