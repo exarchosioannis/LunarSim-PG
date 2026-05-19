@@ -171,6 +171,10 @@ private:
 	// Command helper
 	void OnCaptureControl(int32 ControlValue);
 
+	// Keyboard helper
+	void ToggleCaptureFromKeyboard();
+	void ShowCaptureScreenMessage(const FString& Message, const FColor& Color);
+
 	// Ground truth helpers
 	void ResolveGroundTruthCameraChild();
 	void ResolveRoverGroundTruthComponents();
