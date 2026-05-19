@@ -410,8 +410,11 @@ void UGTSceneCaptureComponent2D::SetupSegmentationPostProccess(
     bool bUseFilterForColorEachComponentDifferent,
     const FGTObjectFilter& ColorEachComponentDifferentFilter)
 {
-    ColorArray.Init(FColor::Black, MaxColorIndex + 1);  // Prefill with black.
+    ColorArray.Init(FColor::Black, MaxColorIndex + 1);  // index 0 = background / no object
+    ColorIndexCache.Empty();
     ColorIndexCache.Reserve(MaxColorIndex + 1);
+    ColorIndexCache.Emplace(FColor::Black, 0);
+    NextAssignableColorArrayIndex = 1;
 
     for (TObjectIterator<UPrimitiveComponent> Itr; Itr; ++Itr)
     {

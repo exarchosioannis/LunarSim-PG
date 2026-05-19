@@ -114,7 +114,7 @@ protected:
 
 private:
     TArray<FColor> ColorArray;
-    int NextAssignableColorArrayIndex = 0;
+    int NextAssignableColorArrayIndex = 1;
     TMap<FColor, int> ColorIndexCache;
     FGTRandomColorGenerator RandomColorGenerator;
 
