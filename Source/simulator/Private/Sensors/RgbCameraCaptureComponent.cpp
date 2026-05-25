@@ -26,6 +26,9 @@ void URgbCameraCaptureComponent::Initialize(
 	bUseFixedExposure = bInUseFixedExposure;
 	ExposureCompensation = InExposureCompensation;
 
+	bCaptureInProgress = false;
+	bWaitingToEnqueueReadback = false;
+
 	SetupRenderTarget();
 	ApplyCameraLook();
 
@@ -35,18 +38,20 @@ void URgbCameraCaptureComponent::Initialize(
 
 void URgbCameraCaptureComponent::SetupRenderTarget()
 {
-	if (!RGBRenderTarget) 
+	if (!RGBRenderTarget) {
 		RGBRenderTarget = NewObject<UTextureRenderTarget2D>(this, TEXT("RGBRenderTarget"));
-	
+	}
+
 	if (RGBRenderTarget) {
 		RGBRenderTarget->RenderTargetFormat = RTF_RGBA8;
 		RGBRenderTarget->TargetGamma = bUseGammaCorrection ? OutputGamma : 1.0f;
 		RGBRenderTarget->InitAutoFormat(Width, Height);
 		RGBRenderTarget->UpdateResourceImmediate(true);
 	}
-	
+
 	if (SceneCapture && RGBRenderTarget) {
 		SceneCapture->TextureTarget = RGBRenderTarget;
+		// Warm-up capture only. Real dataset frames are captured in StartCaptureAsync().
 		SceneCapture->CaptureScene();
 	}
 }
@@ -55,7 +60,16 @@ void URgbCameraCaptureComponent::ApplyCameraLook()
 {
 	if (!SceneCapture) return;
 
-	SceneCapture->bAlwaysPersistRenderingState = true;
+	// Keep this false for dataset capture. We manually capture when FrameInfo is created.
+	SceneCapture->bCaptureEveryFrame = false;
+	SceneCapture->bCaptureOnMovement = false;
+
+	// Avoid temporal history for sensor-like output.
+	SceneCapture->bAlwaysPersistRenderingState = false;
+	SceneCapture->ShowFlags.SetTemporalAA(false);
+	SceneCapture->ShowFlags.SetMotionBlur(false);
+	SceneCapture->ShowFlags.SetAntiAliasing(false);
+
 	SceneCapture->PostProcessBlendWeight = 1.0f;
 	FPostProcessSettings& PPS = SceneCapture->PostProcessSettings;
 
@@ -73,52 +87,84 @@ void URgbCameraCaptureComponent::ApplyCameraLook()
 
 bool URgbCameraCaptureComponent::StartCaptureAsync(const FCaptureFrameInfo& FrameInfo)
 {
-	if (bReadbackInFlight) {
-		UE_LOG(LogTemp, Warning, TEXT("RGB capture readback already in flight, cannot start new capture for frame %d"), FrameInfo.FrameIndex);
+	if (bCaptureInProgress) {
+		UE_LOG(LogTemp, Warning, TEXT("RGB capture already in progress, cannot start new capture for frame %d"), FrameInfo.FrameIndex);
 		return false;
 	}
-	
+
 	if (!SceneCapture) {
 		UE_LOG(LogTemp, Warning, TEXT("SceneCapture component is null, cannot start RGB capture for frame %d"), FrameInfo.FrameIndex);
 		return false;
 	}
-	
+
 	if (!RGBRenderTarget) {
 		UE_LOG(LogTemp, Warning, TEXT("RGBRenderTarget is null, cannot start RGB capture for frame %d"), FrameInfo.FrameIndex);
 		return false;
 	}
-	
+
 	if (!GPUReadback.IsValid()) {
 		UE_LOG(LogTemp, Warning, TEXT("GPUReadback is invalid, cannot start RGB capture for frame %d"), FrameInfo.FrameIndex);
 		return false;
 	}
 
-	FTextureRenderTargetResource* Res = RGBRenderTarget->GameThread_GetRenderTargetResource();
-	if (!Res) {
-		UE_LOG(LogTemp, Warning, TEXT("RenderTarget resource is null, cannot start RGB capture for frame %d"), FrameInfo.FrameIndex);
-		return false;
-	}
-
-	// Store the frame info for later retrieval
+	// Store the metadata for THIS capture request.
 	PendingFrameInfo = FrameInfo;
-	
-	SceneCapture->CaptureScene();
-	ENQUEUE_RENDER_COMMAND(EnqueueRgbCaptureReadback)(
-		[Readback = GPUReadback.Get(), RTRes = Res](FRHICommandListImmediate& RHICmdList) {
-			if (!Readback || !RTRes) return;
-			FRHITexture* Tex = RTRes->GetRenderTargetTexture();
-			if (!Tex) return;
-			Readback->EnqueueCopy(RHICmdList, Tex);
-		});
 
-	bReadbackInFlight = true;
+	// Important synchronization detail:
+	// CaptureScene() queues scene-capture work on the render thread. If we enqueue the GPU
+	// readback immediately in the same game-thread function, the readback can observe the
+	// previous render target contents on some frames. That gives pixels from visual frame N-1
+	// with metadata from frame N.
+	//
+	// So we do this in two phases:
+	//   1. StartCaptureAsync(): request the SceneCapture for FrameInfo.
+	//   2. PollReadback() on a later game tick: enqueue the GPU copy, after the capture has
+	//      had a chance to update the render target.
+	SceneCapture->CaptureScene();
+
+	bCaptureInProgress = true;
+	bWaitingToEnqueueReadback = true;
+
+	UE_LOG(LogTemp, Verbose, TEXT("RGB START frame=%d stamp=%.6f"), FrameInfo.FrameIndex, FrameInfo.StampSeconds);
+
 	return true;
 }
 
 bool URgbCameraCaptureComponent::PollReadback(TArray<uint8>& OutPixels, FCaptureFrameInfo& OutFrameInfo)
 {
-	if (!bReadbackInFlight) return false;
+	if (!bCaptureInProgress) return false;
 	if (!GPUReadback.IsValid()) return false;
+
+	// Phase 2: enqueue the readback one game tick after CaptureScene().
+	// No new capture can start while bCaptureInProgress is true, so the render target should
+	// still correspond to PendingFrameInfo.
+	if (bWaitingToEnqueueReadback) {
+		if (!RGBRenderTarget) {
+			bCaptureInProgress = false;
+			bWaitingToEnqueueReadback = false;
+			return false;
+		}
+
+		FTextureRenderTargetResource* Res = RGBRenderTarget->GameThread_GetRenderTargetResource();
+		if (!Res) {
+			bCaptureInProgress = false;
+			bWaitingToEnqueueReadback = false;
+			return false;
+		}
+
+		ENQUEUE_RENDER_COMMAND(EnqueueRgbCaptureReadback)(
+			[Readback = GPUReadback.Get(), RTRes = Res, FrameIndex = PendingFrameInfo.FrameIndex](FRHICommandListImmediate& RHICmdList) {
+				if (!Readback || !RTRes) return;
+				FRHITexture* Tex = RTRes->GetRenderTargetTexture();
+				if (!Tex) return;
+				Readback->EnqueueCopy(RHICmdList, Tex);
+				UE_LOG(LogTemp, Verbose, TEXT("RGB READBACK ENQUEUED frame=%d"), FrameIndex);
+			});
+
+		bWaitingToEnqueueReadback = false;
+		return false;
+	}
+
 	if (!GPUReadback->IsReady()) return false;
 
 	const int32 W = Width;
@@ -126,41 +172,42 @@ bool URgbCameraCaptureComponent::PollReadback(TArray<uint8>& OutPixels, FCapture
 	const int32 BytesPerPixel = 4;
 
 	int32 RowPitchInPixels = 0;
-	uint8* Ptr = (uint8*)GPUReadback->Lock(RowPitchInPixels);
+	uint8* Ptr = static_cast<uint8*>(GPUReadback->Lock(RowPitchInPixels));
 	if (!Ptr) {
-		bReadbackInFlight = false;
-		return false;
-	}
-	if (RowPitchInPixels < W) {
-		GPUReadback->Unlock();
-		bReadbackInFlight = false;
+		bCaptureInProgress = false;
 		return false;
 	}
 
-	// Prepare output pixel array
-	const int32 TotalPixels = W * H * BytesPerPixel;
-	OutPixels.SetNum(TotalPixels);
-	
+	if (RowPitchInPixels < W) {
+		GPUReadback->Unlock();
+		bCaptureInProgress = false;
+		return false;
+	}
+
+	const int32 TotalBytes = W * H * BytesPerPixel;
+	OutPixels.SetNum(TotalBytes);
+
 	const int32 SrcRowBytes = RowPitchInPixels * BytesPerPixel;
 	const int32 DstRowBytes = W * BytesPerPixel;
 	uint8* Dst = OutPixels.GetData();
-	
+
 	for (int32 y = 0; y < H; ++y) {
-		FMemory::Memcpy(Dst + (size_t)y * DstRowBytes, Ptr + (size_t)y * SrcRowBytes, DstRowBytes);
+		FMemory::Memcpy(Dst + static_cast<size_t>(y) * DstRowBytes, Ptr + static_cast<size_t>(y) * SrcRowBytes, DstRowBytes);
 	}
 
 	GPUReadback->Unlock();
-	bReadbackInFlight = false;
 
-	// Return the frame info that was passed to StartCaptureAsync
 	OutFrameInfo = PendingFrameInfo;
-	
+
+	UE_LOG(LogTemp, Verbose, TEXT("RGB READBACK DONE frame=%d stamp=%.6f"), OutFrameInfo.FrameIndex, OutFrameInfo.StampSeconds);
+
+	bCaptureInProgress = false;
 	return true;
 }
 
 bool URgbCameraCaptureComponent::IsCaptureInProgress() const
 {
-	return bReadbackInFlight;
+	return bCaptureInProgress;
 }
 
 UTextureRenderTarget2D* URgbCameraCaptureComponent::GetRenderTarget() const
@@ -170,7 +217,8 @@ UTextureRenderTarget2D* URgbCameraCaptureComponent::GetRenderTarget() const
 
 void URgbCameraCaptureComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	bReadbackInFlight = false;
+	bCaptureInProgress = false;
+	bWaitingToEnqueueReadback = false;
 	if (GPUReadback.IsValid()) {
 		GPUReadback.Reset();
 	}

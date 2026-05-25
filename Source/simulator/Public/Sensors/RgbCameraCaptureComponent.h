@@ -48,7 +48,12 @@ private:
 
 	TUniquePtr<FRHIGPUTextureReadback> GPUReadback;
 
-	bool bReadbackInFlight = false;
+	// True from CaptureScene() request until the matching GPU readback is returned.
+	bool bCaptureInProgress = false;
+
+	// True only during the one-tick gap between CaptureScene() and EnqueueCopy().
+	bool bWaitingToEnqueueReadback = false;
+
 	FCaptureFrameInfo PendingFrameInfo;
 
 	int32 Width = 1280;
