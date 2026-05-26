@@ -10,7 +10,7 @@ The project combines:
 - ROS 2 control and publishing through TempoROS
 - synchronized stereo RGB capture
 - UnrealGT ground-truth image outputs
-- rover pose, path, and TF outputs
+- rover pose, path, TF, and IMU outputs
 - occupancy and elevation map outputs
 
 The main purpose is to generate ground-truth-rich autonomy datasets where online ROS topics and offline files can be matched by a shared frame index and timestamp.
@@ -34,6 +34,8 @@ Capture is coordinated by `UCaptureManager`. When capture starts, it creates a d
 
 Map generation is handled separately by `UOccupancyMapPublisherComponent`. It raycasts the level to produce occupancy, elevation, and elevation point cloud outputs. The map files are written under the dataset run `Maps` directory.
 
+The rover also has an independent IMU sensor through `UImuSensorPublisherComponent`. The IMU is mounted using `IMU_Mount`, publishes `/rover/imu` at its own configurable rate, and is synchronized with the rest of the simulator by ROS timestamp.
+
 ## Current Level Setup Notes
 
 For now, the level expects `BP_GroundTruthMapPublisher` to be placed at the center of the map, currently world location `0, 0, 0`. The map publisher uses its owner actor location as the center of the generated map area.
@@ -46,13 +48,14 @@ For now, the level expects `BP_GroundTruthMapPublisher` to be placed at the cent
 | `Rover Sensor Mount Component Name` | `RoverSensorMount` |
 | `Attach To Rover Sensor Mount On Begin Play` | Enabled |
 | `Ground Truth Camera Class` | `BP_UnrealGT_Camera` |
+| `IMU_Mount` | Scene component on the rover used by the IMU sensor. |
 
 ## Source/simulator Folder Structure
 
 | Folder | Responsibility |
 | --- | --- |
 | `Capture/` | Capture configuration, frame metadata, session directories, manifest writing, and synchronized trajectory CSV output. |
-| `Sensors/` | Camera rig, RGB render-target capture, ROS camera publishers, and the bridge actor used to trigger UnrealGT. |
+| `Sensors/` | Camera rig, RGB render-target capture, ROS camera publishers, IMU sensor publisher, and the bridge actor used to trigger UnrealGT. |
 | `Robots/` | ROS rover command input and synchronized rover ground-truth publishing. |
 | `Maps/` | Ground-truth occupancy, elevation, point cloud publishing, and map file export. |
 | `Utils/` | Shared Unreal-to-ROS coordinate conversion helpers. |
@@ -71,6 +74,7 @@ For now, the level expects `BP_GroundTruthMapPublisher` to be placed at the cent
 | `Sensors/RgbCameraCaptureComponent.*` | `URgbCameraCaptureComponent` | Captures RGB from a `USceneCaptureComponent2D` using asynchronous GPU readback. |
 | `Sensors/CameraRosPublisherComponent.*` | `UCameraRosPublisherComponent` | Publishes ROS image, camera info, and frame index topics for one camera. The left camera also listens to `/control`. |
 | `Sensors/GTCamera.*` | `AGTCamera` | Actor wrapper used by Blueprint ground-truth cameras to call UnrealGT generator triggers with frame metadata. |
+| `Sensors/ImuSensorPublisherComponent.*` | `UImuSensorPublisherComponent` | Publishes the rover IMU topic from `IMU_Mount`, including static TF `base_link -> imu_link`, optional noise, and optional bias. |
 | `Robots/RoverCmdVelVehicleControllerComponent.*` | `URoverCmdVelVehicleControllerComponent` | Subscribes to `/cmd_vel` and converts ROS twist commands into Chaos vehicle throttle, steering, and brake input. |
 | `Robots/RoverGroundTruthPublisherComponent.*` | `URoverGroundTruthPublisherComponent` | Publishes synchronized rover pose, path, and dynamic TF. Also acts as a capture pose source. |
 | `Maps/OccupancyMapPublisherComponent.*` | `UOccupancyMapPublisherComponent` | Generates and publishes occupancy and elevation point cloud map topics. Exports map files. |
@@ -93,6 +97,8 @@ session_id + frame_index + timestamp_sec
 
 The intent is that outputs with the same `session_id` and `frame_index` refer to the same capture frame. `timestamp_sec` is the UE world time converted into ROS message stamps where applicable.
 
+The IMU is different from the frame-based capture outputs. It runs continuously at its own rate and is synchronized by ROS timestamp, not by `frame_index`.
+
 `URgbCameraCaptureComponent` uses asynchronous GPU readback. The code keeps the `FCaptureFrameInfo` with the pending readback and delays the GPU copy until a later tick so that the published ROS image corresponds to the intended capture frame rather than the previous render target contents.
 
 ## ROS Topics
@@ -111,8 +117,9 @@ Topics supported by the simulator code:
 | Right camera | `/right_camera/frame_index` | `std_msgs/msg/Int32`; synchronized frame index. |
 | Rover ground truth | `/gt/rover/pose` | `geometry_msgs/msg/PoseStamped`. |
 | Rover ground truth | `/gt/rover/path` | `nav_msgs/msg/Path`. |
+| Rover IMU | `/rover/imu` | `sensor_msgs/msg/Imu`; independent simulated IMU stream from `imu_link`. |
 | TF | `/tf` | Dynamic rover transform `map -> base_link`. |
-| TF | `/tf_static` | Static camera transforms published through TempoROS. |
+| TF | `/tf_static` | Static sensor transforms published through TempoROS, including camera frames and `base_link -> imu_link`. |
 | Maps | `/gt/map/occupancy` | `nav_msgs/msg/OccupancyGrid`. |
 | Maps | `/gt/map/elevation_points` | `sensor_msgs/msg/PointCloud2`. |
 
@@ -172,8 +179,9 @@ The current code focuses on:
 - ROS camera info and frame index topics
 - UnrealGT image outputs such as RGB, depth, segmentation, and actor/bounding-box data when configured in the ground-truth camera Blueprint
 - rover pose, path, and TF
-- static camera TF tree
+- static camera and IMU TF tree
+- simulated rover IMU with optional noise and bias
 - occupancy and elevation map outputs
 - elevation point cloud publishing
 
-IMU and LiDAR are not implemented in `Source/simulator` at the moment and would be future extensions.
+LiDAR is not implemented in `Source/simulator` at the moment and would be a future extension.
