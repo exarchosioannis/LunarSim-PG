@@ -150,6 +150,9 @@ void ARobotCamRig::BeginPlay()
 	CaptureManager = NewObject<UCaptureManager>(this);
 
 	if (CaptureManager) {
+		CaptureConfig.ImageWidth = Width;
+		CaptureConfig.ImageHeight = Height;
+		CaptureConfig.StereoBaselineMeters = static_cast<double>(StereoBaselineCm) / 100.0;
 		CaptureManager->Initialize(CaptureConfig);
 		CaptureManager->SetLeftCameraPoseSource(Camera);
 		CaptureManager->SetRightCameraPoseSource(RightCamera);
@@ -431,6 +434,9 @@ void ARobotCamRig::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void ARobotCamRig::SetCaptureConfig(const FCaptureConfig& NewConfig)
 {
 	CaptureConfig = NewConfig;
+	CaptureConfig.ImageWidth = Width;
+	CaptureConfig.ImageHeight = Height;
+	CaptureConfig.StereoBaselineMeters = static_cast<double>(StereoBaselineCm) / 100.0;
 }
 
 FCaptureConfig ARobotCamRig::GetCaptureConfig() const
@@ -441,6 +447,7 @@ FCaptureConfig ARobotCamRig::GetCaptureConfig() const
 void ARobotCamRig::SetStereoBaselineCm(float NewBaselineCm)
 {
 	StereoBaselineCm = FMath::Clamp(NewBaselineCm, 1.0f, 200.0f);
+	CaptureConfig.StereoBaselineMeters = static_cast<double>(StereoBaselineCm) / 100.0;
 	ApplyStereoBaseline();
 	if (RightRosPublisherComponent) {
 		RightRosPublisherComponent->SetStereoCalibration(true, (double)StereoBaselineCm / 100.0);

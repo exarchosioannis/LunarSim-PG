@@ -81,6 +81,25 @@ namespace
 
 		return RunDirectory;
 	}
+
+	FString CaptureModeToString(ECaptureMode CaptureMode)
+	{
+		switch (CaptureMode)
+		{
+		case ECaptureMode::MonoRos:
+			return TEXT("MonoRos");
+		case ECaptureMode::GroundTruth:
+			return TEXT("GroundTruth");
+		case ECaptureMode::StereoRos:
+			return TEXT("StereoRos");
+		case ECaptureMode::MonoRosGroundTruth:
+			return TEXT("MonoRosGroundTruth");
+		case ECaptureMode::StereoRosGroundTruth:
+			return TEXT("StereoRosGroundTruth");
+		default:
+			return TEXT("Unknown");
+		}
+	}
 }
 
 
@@ -135,6 +154,7 @@ void UCaptureManager::StartCapture()
 
 	bCaptureEnabled = true;
 	StartManifest();
+	WriteSessionMetadata();
 
 	UE_LOG(LogTemp, Log, TEXT("CaptureManager: started %s inside dataset run %s"),
 		*CurrentSessionName,
@@ -182,9 +202,8 @@ FCaptureFrameInfo UCaptureManager::NextFrameWithPose(double StampSeconds, const 
 	FrameInfo.StampSeconds = StampSeconds;
 	FrameInfo.SessionId = CurrentSessionId;
 
-	// Always write one manifest row for every frame, regardless of capture mode.
-	// The manifest only describes synchronization and which outputs exist for this frame.
-	AppendManifestRow(FrameInfo, CompletePoseData);
+	// Always write one canonical synchronization row for every capture frame.
+	AppendManifestRow(FrameInfo);
 
 	// Pose data lives in trajectory files, in ROS coordinates, with matching column names.
 	// Rover trajectory is always written when rover pose is available.
@@ -279,12 +298,12 @@ void UCaptureManager::StartManifest()
 	}
 	
 	// Manifest = synchronization index only. Pose values are stored in the ROS-style trajectory files.
-	const FString Header = TEXT(
-		"session_id,frame_index,timestamp_sec,"
-		"has_rover_gt,has_left_camera,has_right_camera,has_gt_camera\n"
-	);
+	const FString Header = TEXT("session_id,frame_index,timestamp_sec\n");
 
-	FFileHelper::SaveStringToFile(Header, *ManifestFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
+	if (!FFileHelper::SaveStringToFile(Header, *ManifestFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM, &IFileManager::Get(), FILEWRITE_None))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: failed to write manifest header to %s"), *ManifestFilePath);
+	}
 
 	const FString TrajectoryHeader = TEXT(
 		"timestamp_sec,frame_index,frame_id,child_frame_id,"
@@ -294,6 +313,38 @@ void UCaptureManager::StartManifest()
 	FFileHelper::SaveStringToFile(TrajectoryHeader, *RoverGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
 	FFileHelper::SaveStringToFile(TrajectoryHeader, *LeftCameraGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
 	FFileHelper::SaveStringToFile(TrajectoryHeader, *RightCameraGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
+}
+
+void UCaptureManager::WriteSessionMetadata()
+{
+	const FString MetadataFilePath = FPaths::Combine(CurrentSessionDirectory, TEXT("session_metadata.json"));
+	const FString CreatedAt = FDateTime::Now().ToString(TEXT("%Y-%m-%d_%H-%M-%S"));
+
+	const FString Json = FString::Printf(
+		TEXT("{\n")
+		TEXT("  \"session_id\": %d,\n")
+		TEXT("  \"session_name\": \"%s\",\n")
+		TEXT("  \"created_at\": \"%s\",\n")
+		TEXT("  \"capture_mode\": \"%s\",\n")
+		TEXT("  \"publish_hz\": %d,\n")
+		TEXT("  \"image_width\": %d,\n")
+		TEXT("  \"image_height\": %d,\n")
+		TEXT("  \"stereo_baseline_m\": %s\n")
+		TEXT("}\n"),
+		CurrentSessionId.load(),
+		*CurrentSessionName,
+		*CreatedAt,
+		*CaptureModeToString(Config.CaptureMode),
+		Config.PublishHz,
+		Config.ImageWidth,
+		Config.ImageHeight,
+		*FString::SanitizeFloat(Config.StereoBaselineMeters)
+	);
+
+	if (!FFileHelper::SaveStringToFile(Json, *MetadataFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: failed to write session metadata to %s"), *MetadataFilePath);
+	}
 }
 
 
@@ -323,31 +374,24 @@ void UCaptureManager::EnsureDatasetRunDirectory()
 	}
 }
 
-void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo, const FCaptureFramePoseData& PoseData)
+void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo)
 {
-	const int32 HasRoverGt = PoseData.RoverBasePose.bValid ? 1 : 0;
-	const int32 HasLeftCamera = ((Config.IsLeftRosCameraEnabled() || Config.IsGroundTruthEnabled()) && PoseData.LeftCameraPose.bValid) ? 1 : 0;
-	const int32 HasRightCamera = (Config.IsRightRosCameraEnabled() && PoseData.RightCameraPose.bValid) ? 1 : 0;
-	const int32 HasGtCamera = Config.IsGroundTruthEnabled() ? 1 : 0;
-
 	const FString Row = FString::Printf(
-		TEXT("%d,%d,%.9f,%d,%d,%d,%d\n"),
+		TEXT("%d,%d,%.9f\n"),
 		FrameInfo.SessionId,
 		FrameInfo.FrameIndex,
-		FrameInfo.StampSeconds,
-		HasRoverGt,
-		HasLeftCamera,
-		HasRightCamera,
-		HasGtCamera
+		FrameInfo.StampSeconds
 	);
 
-	FFileHelper::SaveStringToFile(
+	if (!FFileHelper::SaveStringToFile(
 		Row,
 		*ManifestFilePath,
-		FFileHelper::EEncodingOptions::AutoDetect,
+		FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM,
 		&IFileManager::Get(),
-		FILEWRITE_Append
-	);
+		FILEWRITE_Append))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: failed to append manifest row to %s"), *ManifestFilePath);
+	}
 }
 
 void UCaptureManager::AppendTrajectoryRow(
@@ -435,4 +479,3 @@ UCapturePoseSourceComponent* UCaptureManager::FindPoseSourceByName(FName SourceN
 	}
 	return nullptr;
 }
-

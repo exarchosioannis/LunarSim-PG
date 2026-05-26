@@ -22,15 +22,11 @@
 
 	ROS output:
 		/gt/map/occupancy          nav_msgs/msg/OccupancyGrid
-		/gt/map/traversability     nav_msgs/msg/OccupancyGrid
 		/gt/map/elevation_points   sensor_msgs/msg/PointCloud2
 		frame_id                   map
 
-	Traversability ROS values follow OccupancyGrid/cost-style semantics:
-		0   = safe / low cost
-		50  = risky / medium cost
-		100 = blocked / lethal
-   		-1  = unknown
+	The elevation layer samples the first valid vertical hit from either
+	MapTerrain or MapObstacle. Actors/components tagged MapIgnore are skipped.
 */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class SIMULATOR_API UOccupancyMapPublisherComponent : public UActorComponent
@@ -57,8 +53,6 @@ protected:
 private:
 	void SetupRos();
 	void GenerateOccupancyMap();
-	void ComputeSlopeMap();
-	void ComputeTraversabilityMap();
 	void BuildElevationPointCloud();
 	void PublishMap();
 	builtin_interfaces::msg::Time ToRosTime(double Seconds) const;
@@ -79,11 +73,9 @@ private:
 
 	const FString NodeName = TEXT("map_publisher");
 	const FString OccupancyMapTopic = TEXT("/gt/map/occupancy");
-	const FString TraversabilityMapTopic = TEXT("/gt/map/traversability");
 	const FString ElevationPointCloudTopic = TEXT("/gt/map/elevation_points");
 	const FString MapFrameId = TEXT("map");
 
-	// Covers the current landscape better than the old 100m x 100m setup.
 	// 220m x 220m at 0.40m/cell gives a 550 x 550 grid.
 	const float ResolutionMeters = 0.40f;
 	const float MapWidthMeters = 220.0f;
@@ -102,22 +94,11 @@ private:
 	// The maps are NOT regenerated and files are NOT rewritten every 5 seconds.
 	const float RepublishPeriodSeconds = 5.0f;
 
-	// maybe needs tune later
-	// The published traversability grid uses OccupancyGrid/cost-style values
-	//   0   = safe / low cost
-	//   50  = risky / medium cost
-	//   100 = blocked / lethal
-	//   -1  = unknown
-	const float SafeSlopeDegrees = 15.0f;
-	const float MaxTraversableSlopeDegrees = 25.0f;
 
 	nav_msgs::msg::OccupancyGrid ReusableMapMsg;
-	nav_msgs::msg::OccupancyGrid ReusableTraversabilityMapMsg;
 	sensor_msgs::msg::PointCloud2 ReusableElevationPointCloudMsg;
 
 	TArray<float> ElevationDataMeters;
-	TArray<float> SlopeDataDegrees;
-	TArray<int8> TraversabilityData;
 
 	bool bMapGenerated = false;
 	float PublishAccumulator = 0.0f;
@@ -125,4 +106,3 @@ private:
 	float ComputedOriginYMapMeters = 0.0f;
 	float TraceBaseZCm = 0.0f;
 };
-

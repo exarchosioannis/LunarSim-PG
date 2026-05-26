@@ -81,8 +81,9 @@ public:
 
 private:
 	void StartManifest();
+	void WriteSessionMetadata();
 	void EnsureDatasetRunDirectory();
-	void AppendManifestRow(const FCaptureFrameInfo& FrameInfo, const FCaptureFramePoseData& PoseData);
+	void AppendManifestRow(const FCaptureFrameInfo& FrameInfo);
 	void AppendTrajectoryRow(const FString& FilePath, const FCaptureFrameInfo& FrameInfo, const FCapturePose& Pose, const FString& FrameId, const FString& ChildFrameId);
 	
 	UCapturePoseSourceComponent* FindPoseSourceByName(FName SourceName) const;
@@ -114,4 +115,3 @@ private:
 	UPROPERTY()
 	USceneComponent* RightCameraPoseSource = nullptr;
 };
-

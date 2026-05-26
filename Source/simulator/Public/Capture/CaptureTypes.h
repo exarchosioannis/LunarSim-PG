@@ -27,6 +27,15 @@ struct SIMULATOR_API FCaptureConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ROS Ground Truth")
 	bool bEnableRosRoverGtPose = true;
 
+	UPROPERTY(BlueprintReadWrite, Category = "Capture|Acquisition")
+	int32 ImageWidth = 1280;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Capture|Acquisition")
+	int32 ImageHeight = 720;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Capture|Acquisition")
+	double StereoBaselineMeters = 0.2;
+
 	bool IsLeftRosCameraEnabled() const
 	{
 		return CaptureMode == ECaptureMode::MonoRos ||

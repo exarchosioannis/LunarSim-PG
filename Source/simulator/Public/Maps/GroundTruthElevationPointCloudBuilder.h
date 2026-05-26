@@ -27,7 +27,5 @@ struct FGroundTruthElevationPointCloudBuildInfo
 class FGroundTruthElevationPointCloudBuilder
 {
 public:
-	static sensor_msgs::msg::PointCloud2 BuildElevationPointCloud(
-		const FGroundTruthElevationPointCloudBuildInfo& Info,
-		const TArray<float>& ElevationDataMeters);
+	static sensor_msgs::msg::PointCloud2 BuildElevationPointCloud(const FGroundTruthElevationPointCloudBuildInfo& Info, const TArray<float>& ElevationDataMeters);
 };

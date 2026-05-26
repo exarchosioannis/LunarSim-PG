@@ -121,7 +121,6 @@ void UOccupancyMapPublisherComponent::SetupRos()
 	MapQOS.CustomQueueSize(1).Reliable().TransientLocal();
 
 	ROSNode->AddPublisher<nav_msgs::msg::OccupancyGrid>(*OccupancyMapTopic, MapQOS, false);
-	ROSNode->AddPublisher<nav_msgs::msg::OccupancyGrid>(*TraversabilityMapTopic, MapQOS, false);
 	ROSNode->AddPublisher<sensor_msgs::msg::PointCloud2>(*ElevationPointCloudTopic, MapQOS, false);
 }
 
@@ -139,14 +138,14 @@ builtin_interfaces::msg::Time UOccupancyMapPublisherComponent::ToRosTime(double 
 	return T;
 }
 
-// Regenerates all map layers and immediately republishes them to ROS.
+// Regenerates the occupancy/elevation map layers and immediately republishes them to ROS.
 void UOccupancyMapPublisherComponent::RegenerateAndPublishMap()
 {
 	GenerateOccupancyMap();
 	PublishMap();
 }
 
-// Builds the full ground truth map stack occupancy, elevation, slope, traversability, and elevation point cloud.
+// Builds the ground truth map stack: occupancy, elevation, and elevation point cloud.
 void UOccupancyMapPublisherComponent::GenerateOccupancyMap()
 {
 	UWorld* World = GetWorld();
@@ -190,11 +189,6 @@ void UOccupancyMapPublisherComponent::GenerateOccupancyMap()
 	ElevationDataMeters.Empty(TotalCells);
 	ElevationDataMeters.SetNum(TotalCells);
 
-	SlopeDataDegrees.Empty(TotalCells);
-	SlopeDataDegrees.SetNum(TotalCells);
-
-	TraversabilityData.Empty(TotalCells);
-	TraversabilityData.SetNum(TotalCells);
 
 	BuildIgnoredMapActors();
 	for (int32 Y = 0; Y < HeightCells; ++Y) {
@@ -214,168 +208,13 @@ void UOccupancyMapPublisherComponent::GenerateOccupancyMap()
 		}
 	}
 
-	ComputeSlopeMap();
-	ComputeTraversabilityMap();
-
-	ReusableTraversabilityMapMsg = ReusableMapMsg;
-	ReusableTraversabilityMapMsg.data.clear();
-	ReusableTraversabilityMapMsg.data.resize(static_cast<size_t>(TotalCells), -1);
-
-	if (TraversabilityData.Num() == TotalCells) {
-		for (int32 Index = 0; Index < TotalCells; ++Index) {
-			ReusableTraversabilityMapMsg.data[Index] = TraversabilityData[Index];
-		}
-	}
 
 	BuildElevationPointCloud();
 
 	bMapGenerated = true;
-	UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: generated occupancy/elevation/slope/traversability/elevation point cloud maps %dx%d at %.3f m/cell, origin=(%.3f, %.3f), frame=%s"),
+	UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: generated occupancy/elevation/elevation point cloud maps %dx%d at %.3f m/cell, origin=(%.3f, %.3f), frame=%s"),
 		WidthCells, HeightCells, SafeResolution,
 		ComputedOriginXMapMeters, ComputedOriginYMapMeters, *MapFrameId);
-}
-
-// Computes the terrain slope in degrees from the elevation grid using neighboring cells.
-void UOccupancyMapPublisherComponent::ComputeSlopeMap()
-{
-	const int32 Width = static_cast<int32>(ReusableMapMsg.info.width);
-	const int32 Height = static_cast<int32>(ReusableMapMsg.info.height);
-	const float Resolution = ReusableMapMsg.info.resolution;
-
-	if (Width <= 0 || Height <= 0 || Resolution <= KINDA_SMALL_NUMBER || ElevationDataMeters.Num() != Width * Height) {
-		SlopeDataDegrees.Empty();
-		return;
-	}
-
-	SlopeDataDegrees.Empty(Width * Height);
-	SlopeDataDegrees.SetNum(Width * Height);
-
-	auto IsValidElevation = [](float Value) -> bool {
-		return !FMath::IsNaN(Value);
-	};
-
-	for (int32 Y = 0; Y < Height; ++Y) {
-		for (int32 X = 0; X < Width; ++X) {
-			const int32 Index = Y * Width + X;
-			const float Center = ElevationDataMeters[Index];
-
-			if (!IsValidElevation(Center)) {
-				SlopeDataDegrees[Index] = NAN;
-				continue;
-			}
-
-			bool bHasDx = false;
-			bool bHasDy = false;
-			float DzDx = 0.0f;
-			float DzDy = 0.0f;
-
-			// Prefer central difference. If one side is unknown/outside the map, fall back to one-sided difference.
-			if (X > 0 && X < Width - 1) {
-				const float Left = ElevationDataMeters[Y * Width + (X - 1)];
-				const float Right = ElevationDataMeters[Y * Width + (X + 1)];
-				if (IsValidElevation(Left) && IsValidElevation(Right)) {
-					DzDx = (Right - Left) / (2.0f * Resolution);
-					bHasDx = true;
-				}
-			}
-
-			if (!bHasDx && X > 0) {
-				const float Left = ElevationDataMeters[Y * Width + (X - 1)];
-				if (IsValidElevation(Left)) {
-					DzDx = (Center - Left) / Resolution;
-					bHasDx = true;
-				}
-			}
-
-			if (!bHasDx && X < Width - 1) {
-				const float Right = ElevationDataMeters[Y * Width + (X + 1)];
-				if (IsValidElevation(Right)) {
-					DzDx = (Right - Center) / Resolution;
-					bHasDx = true;
-				}
-			}
-
-			if (Y > 0 && Y < Height - 1) {
-				const float Down = ElevationDataMeters[(Y - 1) * Width + X];
-				const float Up = ElevationDataMeters[(Y + 1) * Width + X];
-				if (IsValidElevation(Down) && IsValidElevation(Up)) {
-					DzDy = (Up - Down) / (2.0f * Resolution);
-					bHasDy = true;
-				}
-			}
-
-			if (!bHasDy && Y > 0) {
-				const float Down = ElevationDataMeters[(Y - 1) * Width + X];
-				if (IsValidElevation(Down)) {
-					DzDy = (Center - Down) / Resolution;
-					bHasDy = true;
-				}
-			}
-
-			if (!bHasDy && Y < Height - 1) {
-				const float Up = ElevationDataMeters[(Y + 1) * Width + X];
-				if (IsValidElevation(Up)) {
-					DzDy = (Up - Center) / Resolution;
-					bHasDy = true;
-				}
-			}
-
-			if (!bHasDx && !bHasDy) {
-				SlopeDataDegrees[Index] = 0.0f;
-				continue;
-			}
-
-			const float SlopeRadians = FMath::Atan(FMath::Sqrt((DzDx * DzDx) + (DzDy * DzDy)));
-			SlopeDataDegrees[Index] = FMath::RadiansToDegrees(SlopeRadians);
-		}
-	}
-}
-
-// combines occupancy and slope into a traversability cost map: safe, risky, blocked, or unknown.
-void UOccupancyMapPublisherComponent::ComputeTraversabilityMap()
-{
-	const int32 Width = static_cast<int32>(ReusableMapMsg.info.width);
-	const int32 Height = static_cast<int32>(ReusableMapMsg.info.height);
-
-	if (Width <= 0 || Height <= 0 || ReusableMapMsg.data.size() != static_cast<size_t>(Width * Height) || SlopeDataDegrees.Num() != Width * Height) {
-		TraversabilityData.Empty();
-		return;
-	}
-
-	TraversabilityData.Empty(Width * Height);
-	TraversabilityData.SetNum(Width * Height);
-
-	for (int32 Index = 0; Index < Width * Height; ++Index) {
-		const int8 OccupancyValue = ReusableMapMsg.data[Index];
-		const float SlopeDegrees = SlopeDataDegrees[Index];
-
-		if (OccupancyValue < 0) {
-			TraversabilityData[Index] = -1; // unknown
-			continue;
-		}
-
-		if (OccupancyValue >= 65) {
-			TraversabilityData[Index] = 100; // blocked by obstacle / lethal cost
-			continue;
-		}
-
-		if (FMath::IsNaN(SlopeDegrees)) {
-			TraversabilityData[Index] = -1; // unknown slope
-			continue;
-		}
-
-		if (SlopeDegrees > MaxTraversableSlopeDegrees) {
-			TraversabilityData[Index] = 100; // too steep / lethal cost
-			continue;
-		}
-
-		if (SlopeDegrees > SafeSlopeDegrees) {
-			TraversabilityData[Index] = 50; // risky / medium cost
-			continue;
-		}
-
-		TraversabilityData[Index] = 0; // safe / low cost
-	}
 }
 
 // ROS to UE5 conversion 
@@ -483,10 +322,11 @@ bool UOccupancyMapPublisherComponent::SampleElevationCell(double CellCenterRosX_
 	if (!bHitAnything || Hits.Num() == 0) return false;
 	
 	for (const FHitResult& Hit : Hits) {
-		if (HitHasIgnoreTag(Hit))continue;
-		if (!HitHasTerrainTag(Hit)) continue;
-		OutElevationMeters = static_cast<float>(Hit.ImpactPoint.Z / 100.0);
-		return true;
+		if (HitHasIgnoreTag(Hit)) continue;
+		if (HitHasTerrainTag(Hit) || HitHasOccupiedTag(Hit)) {
+			OutElevationMeters = static_cast<float>(Hit.ImpactPoint.Z / 100.0);
+			return true;
+		}
 	}
 
 	return false;
@@ -561,11 +401,6 @@ bool UOccupancyMapPublisherComponent::ExportMapToDirectory(const FString& MapsDi
 	ExportInfo.BaseFileName = BaseFileName;
 	ExportInfo.OccupancyMapMsg = &ReusableMapMsg;
 	ExportInfo.ElevationDataMeters = &ElevationDataMeters;
-	ExportInfo.SlopeDataDegrees = &SlopeDataDegrees;
-	ExportInfo.TraversabilityData = &TraversabilityData;
-	ExportInfo.SafeSlopeDegrees = SafeSlopeDegrees;
-	ExportInfo.MaxTraversableSlopeDegrees = MaxTraversableSlopeDegrees;
-
 	return FGroundTruthMapFileExporter::ExportToDirectory(MapsDirectory, ExportInfo);
 }
 
@@ -603,13 +438,6 @@ void UOccupancyMapPublisherComponent::PublishMap()
 
 	//occupancy 
 	ROSNode->Publish<nav_msgs::msg::OccupancyGrid>(*OccupancyMapTopic, ReusableMapMsg);
-
-	ReusableTraversabilityMapMsg.header.stamp = Stamp;
-	ReusableTraversabilityMapMsg.info.map_load_time = Stamp;
-	ReusableTraversabilityMapMsg.header.frame_id = TCHAR_TO_UTF8(*MapFrameId);
-
-	//traversability
-	ROSNode->Publish<nav_msgs::msg::OccupancyGrid>(*TraversabilityMapTopic, ReusableTraversabilityMapMsg);
 
 	ReusableElevationPointCloudMsg.header.stamp = Stamp;
 	ReusableElevationPointCloudMsg.header.frame_id = TCHAR_TO_UTF8(*MapFrameId);
