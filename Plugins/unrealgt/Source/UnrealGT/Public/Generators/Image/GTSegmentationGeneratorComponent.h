@@ -47,12 +47,21 @@ public:
 
 protected:
     FString GenerateSegmentationInfoJSON() const;
+    FString GenerateSegmentationClassesJSON() const;
 
     virtual void BeginPlay() override;
 
     virtual void DrawDebug(FViewport* Viewport, FCanvas* Canvas) override;
 
 private:
+    struct FSegmentationClassLegendEntry
+    {
+        FString Name;
+        FColor Color;
+    };
+
+    FString DeriveClassNameFromFilter(const FGTObjectFilter& Filter, int32 FallbackIndex) const;
+
     /**
      * Assigns a segmentation color to the component/mesh if it matches the corresponding filter.
      */

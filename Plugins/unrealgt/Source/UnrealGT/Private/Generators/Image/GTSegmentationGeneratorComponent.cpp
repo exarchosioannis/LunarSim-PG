@@ -4,6 +4,7 @@
 
 #include "Algo/Accumulate.h"
 #include "CanvasItem.h"
+#include "Components/PrimitiveComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
@@ -31,6 +32,7 @@ void UGTSegmentationGeneratorComponent::RegisterForSegmentation(
 
 void UGTSegmentationGeneratorComponent::GenerateData(const FDateTime& TimeStamp, int32 SessionId, FSessionValidationFunc SessionValidator)
 {
+    bool bShouldWriteSegmentationClasses = false;
     if (!WaitingToBeRegistered.IsEmpty())
     {
         for (auto p : WaitingToBeRegistered)
@@ -47,9 +49,17 @@ void UGTSegmentationGeneratorComponent::GenerateData(const FDateTime& TimeStamp,
             FPaths::Combine(TEXT("SegmentationInfo"), TEXT("segmentation_info.json")),
             FGTFileUtilities::StringToCharArray(GenerateSegmentationInfoJSON()),
             GetWorld());
+        bShouldWriteSegmentationClasses = true;
         WaitingToBeRegistered.Empty(WaitingToBeRegistered.Num());
     }
     Super::GenerateData(TimeStamp, SessionId, SessionValidator);
+    if (bShouldWriteSegmentationClasses)
+    {
+        FGTFileUtilities::WriteFileToSessionDirectory(
+            FPaths::Combine(TEXT("SegmentationInfo"), TEXT("segmentation_classes.json")),
+            FGTFileUtilities::StringToCharArray(GenerateSegmentationClassesJSON()),
+            GetWorld());
+    }
 }
 
 void UGTSegmentationGeneratorComponent::GenerateData(
@@ -79,7 +89,8 @@ void UGTSegmentationGeneratorComponent::GenerateData(
     // BeginPlay can run before the simulator CaptureManager creates its session folder.
     // Write the metadata again on the first synchronized frame so every dataset session
     // contains its own SegmentationInfo/segmentation_info.json file.
-    if (FrameIndex == 1 || bHadPendingRegistrations)
+    const bool bShouldWriteSegmentationClasses = FrameIndex == 1 || bHadPendingRegistrations;
+    if (bShouldWriteSegmentationClasses)
     {
         FGTFileUtilities::WriteFileToSessionDirectory(
             FPaths::Combine(TEXT("SegmentationInfo"), TEXT("segmentation_info.json")),
@@ -88,6 +99,13 @@ void UGTSegmentationGeneratorComponent::GenerateData(
     }
 
     Super::GenerateData(TimeStamp, SessionId, MoveTemp(SessionValidator), FrameIndex, StampSeconds);
+    if (bShouldWriteSegmentationClasses)
+    {
+        FGTFileUtilities::WriteFileToSessionDirectory(
+            FPaths::Combine(TEXT("SegmentationInfo"), TEXT("segmentation_classes.json")),
+            FGTFileUtilities::StringToCharArray(GenerateSegmentationClassesJSON()),
+            GetWorld());
+    }
 }
 
 FString UGTSegmentationGeneratorComponent::GenerateSegmentationInfoJSON() const
@@ -140,6 +158,110 @@ FString UGTSegmentationGeneratorComponent::GenerateSegmentationInfoJSON() const
     JsonWriter->Close();
 
     return SegmentationJSONInformation;
+}
+
+FString UGTSegmentationGeneratorComponent::GenerateSegmentationClassesJSON() const
+{
+    TArray<FSegmentationClassLegendEntry> Entries;
+    Entries.Reserve(ComponentToColor.Num());
+
+    int32 FallbackIndex = 0;
+    for (const TPair<FGTObjectFilter, FColor>& FilterColorPair : ComponentToColor)
+    {
+        FSegmentationClassLegendEntry Entry;
+        Entry.Name = DeriveClassNameFromFilter(FilterColorPair.Key, FallbackIndex);
+        Entry.Color = FilterColorPair.Value;
+        Entries.Add(Entry);
+        FallbackIndex++;
+    }
+
+    Entries.Sort([](const FSegmentationClassLegendEntry& A, const FSegmentationClassLegendEntry& B) {
+        if (A.Name != B.Name)
+        {
+            return A.Name < B.Name;
+        }
+        if (A.Color.R != B.Color.R)
+        {
+            return A.Color.R < B.Color.R;
+        }
+        if (A.Color.G != B.Color.G)
+        {
+            return A.Color.G < B.Color.G;
+        }
+        if (A.Color.B != B.Color.B)
+        {
+            return A.Color.B < B.Color.B;
+        }
+        return A.Color.A < B.Color.A;
+    });
+
+    FString SegmentationClassesJSON;
+    TSharedRef<TJsonWriter<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>> JsonWriter =
+        TJsonWriterFactory<TCHAR, TPrettyJsonPrintPolicy<TCHAR>>::Create(
+            &SegmentationClassesJSON);
+
+    JsonWriter->WriteObjectStart();
+    JsonWriter->WriteValue(TEXT("type"), TEXT("segmentation_classes"));
+    JsonWriter->WriteValue(TEXT("color_format"), TEXT("RGBA"));
+    JsonWriter->WriteArrayStart(TEXT("classes"));
+    for (int32 ClassId = 0; ClassId < Entries.Num(); ++ClassId)
+    {
+        const FSegmentationClassLegendEntry& Entry = Entries[ClassId];
+        JsonWriter->WriteObjectStart();
+        JsonWriter->WriteValue(TEXT("class_id"), ClassId);
+        JsonWriter->WriteValue(TEXT("name"), Entry.Name);
+        JsonWriter->WriteArrayStart(TEXT("color"));
+        JsonWriter->WriteValue(static_cast<int32>(Entry.Color.R));
+        JsonWriter->WriteValue(static_cast<int32>(Entry.Color.G));
+        JsonWriter->WriteValue(static_cast<int32>(Entry.Color.B));
+        JsonWriter->WriteValue(static_cast<int32>(Entry.Color.A));
+        JsonWriter->WriteArrayEnd();
+        JsonWriter->WriteObjectEnd();
+    }
+    JsonWriter->WriteArrayEnd();
+    JsonWriter->WriteObjectEnd();
+    JsonWriter->Close();
+
+    return SegmentationClassesJSON;
+}
+
+FString UGTSegmentationGeneratorComponent::DeriveClassNameFromFilter(
+    const FGTObjectFilter& Filter,
+    int32 FallbackIndex) const
+{
+    if (!Filter.ActorTag.IsNone())
+    {
+        return Filter.ActorTag.ToString();
+    }
+    if (!Filter.ComponentTag.IsNone())
+    {
+        return Filter.ComponentTag.ToString();
+    }
+    if (IsValid(Filter.StaticMesh))
+    {
+        return Filter.StaticMesh->GetName();
+    }
+    if (IsValid(Filter.SkeletalMesh))
+    {
+        return Filter.SkeletalMesh->GetName();
+    }
+    if (!Filter.WildcardMeshName.IsEmpty())
+    {
+        return Filter.WildcardMeshName;
+    }
+    if (const UClass* ActorClass = Filter.ActorClass.Get())
+    {
+        return ActorClass->GetName();
+    }
+    if (const UClass* ComponentClass = Filter.ComponentClass.Get())
+    {
+        return ComponentClass->GetName();
+    }
+    if (IsValid(Filter.ActorInstance))
+    {
+        return Filter.ActorInstance->GetName();
+    }
+    return FString::Printf(TEXT("class_%d"), FallbackIndex);
 }
 
 void UGTSegmentationGeneratorComponent::BeginPlay()
