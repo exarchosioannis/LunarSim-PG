@@ -293,9 +293,6 @@ void ARobotCamRig::Tick(float DeltaSeconds)
 	if (RightRosPublisherComponent) {
 		RightRosPublisherComponent->TickRos(DeltaSeconds);
 	}
-	if (RoverGroundTruthPublisher) {
-		RoverGroundTruthPublisher->TickRos(DeltaSeconds);
-	}
 	
 	PollRgbCaptureAndPublish();
 	if (!CaptureManager || !CaptureManager->IsCaptureEnabled()) return;
@@ -335,9 +332,6 @@ void ARobotCamRig::StartRgbCaptureAndPublish()
 	const double CaptureTimeSeconds = GetWorld()->GetTimeSeconds();
 	const FCaptureFrameInfo FrameInfo = CaptureManager->NextFrame(CaptureTimeSeconds);
 
-	if (Config.bEnableRosRoverGtPose && RoverGroundTruthPublisher) {
-		RoverGroundTruthPublisher->PublishGroundTruth(FrameInfo);
-	}
 	if (Config.IsGroundTruthEnabled()) {
 		if (GroundTruthCamera) {
 			if (Camera) GroundTruthCamera->SetActorTransform(Camera->GetComponentTransform());

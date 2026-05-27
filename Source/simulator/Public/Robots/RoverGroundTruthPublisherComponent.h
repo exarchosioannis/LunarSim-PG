@@ -13,11 +13,11 @@
 #include "RoverGroundTruthPublisherComponent.generated.h"
 
 /**
- * Reusable synchronized rover ground-truth publisher.
+ * Live rover ground-truth publisher.
  *
- * Attach this component to the current rover actor. RobotCamRig calls
- * PublishGroundTruth(FrameInfo) once per capture frame, using the same
- * frame_index and timestamp as RGB, UnrealGT, manifest, and trajectory files.
+ * Attach this component to the current rover actor. It publishes live ROS
+ * rover pose, TF, and path from Play using world time. Dataset CSV trajectory
+ * generation remains owned by CaptureManager.
  *
  * Because this component derives from UCapturePoseSourceComponent, CaptureManager
  * can also use it as the rover pose source for CSV trajectory generation.
@@ -30,7 +30,7 @@ class SIMULATOR_API URoverGroundTruthPublisherComponent : public UCapturePoseSou
 public:
 	URoverGroundTruthPublisherComponent();
 
-	// Called by RobotCamRig when one synchronized capture frame is created.
+	// Kept for compatibility. Live ROS publishing owns the rover ROS topics.
 	void PublishGroundTruth(const FCaptureFrameInfo& FrameInfo);
 
 	// Called when /control = 1 starts a new capture session.
@@ -40,6 +40,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
@@ -56,9 +57,23 @@ private:
 	const FString FrameId = TEXT("map");
 	const FString ChildFrameId = TEXT("base_link");
 
-	const bool bPublishPoseStamped = true;
-	const bool bPublishTf = true;
-	const bool bPublishPath = true;
+	UPROPERTY(EditAnywhere, Category = "ROS|Live")
+	bool bEnableLiveGroundTruthPublishing = true;
+
+	UPROPERTY(EditAnywhere, Category = "ROS|Live")
+	bool bPublishLivePoseStamped = true;
+
+	UPROPERTY(EditAnywhere, Category = "ROS|Live")
+	bool bPublishLiveTf = true;
+
+	UPROPERTY(EditAnywhere, Category = "ROS|Live")
+	bool bPublishLivePath = true;
+
+	UPROPERTY(EditAnywhere, Category = "ROS|Live", meta = (ClampMin = "1.0", UIMin = "1.0"))
+	float LivePoseTfPublishHz = 20.0f;
+
+	UPROPERTY(EditAnywhere, Category = "ROS|Live", meta = (ClampMin = "1.0", UIMin = "1.0"))
+	float LivePathPublishHz = 10.0f;
 
 	const int32 MaxPathLength = 5000; // number of poses to keep in the pat
 
@@ -66,8 +81,15 @@ private:
 	tf2_msgs::msg::TFMessage ReusableTfMsg;
 	nav_msgs::msg::Path ReusablePathMsg;
 
+	float LivePoseTfPublishAccumulator = 0.0f;
+	float LivePathPublishAccumulator = 0.0f;
+
 	void SetupRos();
 	void SetupReusableMessages();
+	void PublishLiveGroundTruth(float DeltaTime);
+	void PublishLivePoseAndTf(double StampSeconds);
+	void PublishLivePath(double StampSeconds);
+	bool PopulateReusablePoseMessage(double StampSeconds);
 
 	builtin_interfaces::msg::Time ToRosTime(double StampSeconds) const;
 	FVector UnrealLocationToRosMeters(const FVector& UnrealLocation) const;
