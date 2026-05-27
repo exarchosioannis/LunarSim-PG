@@ -1,65 +1,13 @@
 #include "Maps/OccupancyMapPublisherComponent.h"
 #include "Maps/GroundTruthElevationPointCloudBuilder.h"
 #include "Maps/GroundTruthMapFileExporter.h"
+#include "Utils/DatasetRunSubsystem.h"
 
 #include "TempoROSTypes.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"	
 #include "GameFramework/Actor.h"
 #include "CollisionQueryParams.h"
-#include "Misc/FileHelper.h"
-#include "Misc/Paths.h"
-#include "Misc/DateTime.h"
-#include "HAL/PlatformFileManager.h"
-
-namespace
-{
-	FString GetDatasetRootDirectory()
-	{
-		return FPaths::ConvertRelativePathToFull(FPaths::Combine(
-			FPaths::ProjectSavedDir(),
-			TEXT("Datasets")
-		));
-	}
-
-	FString GetCurrentDatasetRunMarkerPath()
-	{
-		return FPaths::Combine(GetDatasetRootDirectory(), TEXT("current_dataset_run.txt"));
-	}
-
-	FString CreateNewBeginPlayDatasetRunDirectory()
-	{
-		IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
-
-		const FString DatasetRootDirectory = GetDatasetRootDirectory();
-		if (!PlatformFile.DirectoryExists(*DatasetRootDirectory))
-		{
-			PlatformFile.CreateDirectoryTree(*DatasetRootDirectory);
-		}
-
-		const FString DateString = FDateTime::Now().ToString(TEXT("%Y-%m-%d_%H-%M-%S"));
-		FString RunDirectory = FPaths::Combine(DatasetRootDirectory, DateString);
-
-		int32 Suffix = 2;
-		while (PlatformFile.DirectoryExists(*RunDirectory))
-		{
-			RunDirectory = FPaths::Combine(
-				DatasetRootDirectory,
-				FString::Printf(TEXT("%s_%02d"), *DateString, Suffix)
-			);
-			++Suffix;
-		}
-
-		PlatformFile.CreateDirectoryTree(*RunDirectory);
-		FFileHelper::SaveStringToFile(
-			RunDirectory,
-			*GetCurrentDatasetRunMarkerPath(),
-			FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM
-		);
-
-		return RunDirectory;
-	}
-}
 
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(nav_msgs::msg::OccupancyGrid);
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(sensor_msgs::msg::PointCloud2);
@@ -367,18 +315,14 @@ bool UOccupancyMapPublisherComponent::HitHasIgnoreTag(const FHitResult& Hit) con
 
 bool UOccupancyMapPublisherComponent::ExportMapToDefaultDatasetDirectory()
 {
-	// One dataset run folder is created when the level starts.
-	// Capture sessions created through /control or C button inside this folder as Session_001, Session_002, etc.
-	static UWorld* CachedWorld = nullptr;
-	static FString CachedRunDirectory;
-
-	UWorld* CurrentWorld = GetWorld();
-	if (CachedWorld != CurrentWorld || CachedRunDirectory.IsEmpty()) {
-		CachedWorld = CurrentWorld;
-		CachedRunDirectory = CreateNewBeginPlayDatasetRunDirectory();
+	UWorld* World = GetWorld();
+	UDatasetRunSubsystem* DatasetRunSubsystem = World ? World->GetSubsystem<UDatasetRunSubsystem>() : nullptr;
+	if (!DatasetRunSubsystem) {
+		UE_LOG(LogTemp, Warning, TEXT("OccupancyMapPublisherComponent: cannot export map because DatasetRunSubsystem is unavailable."));
+		return false;
 	}
 
-	const FString MapsDirectory = FPaths::Combine(CachedRunDirectory, TEXT("Maps"));
+	const FString MapsDirectory = DatasetRunSubsystem->GetMapsDirectory();
 	return ExportMapToDirectory(MapsDirectory, TEXT("occupancy_map"));
 }
 

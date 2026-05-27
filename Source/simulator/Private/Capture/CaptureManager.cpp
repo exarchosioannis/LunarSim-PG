@@ -1,5 +1,6 @@
 #include "Capture/CaptureManager.h"
 #include "Capture/CapturePoseSourceComponent.h"
+#include "Utils/DatasetRunSubsystem.h"
 #include "Components/SceneComponent.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -12,80 +13,9 @@
 
 namespace
 {
-	FString GetDatasetRootDirectory()
-	{
-		return FPaths::ConvertRelativePathToFull(FPaths::Combine(
-			FPaths::ProjectSavedDir(),
-			TEXT("Datasets")
-		));
-	}
-
-	FString GetCurrentDatasetRunMarkerPath()
-	{
-		return FPaths::Combine(GetDatasetRootDirectory(), TEXT("current_dataset_run.txt"));
-	}
-
-	bool TryReadCurrentDatasetRunDirectory(FString& OutRunDirectory)
-	{
-		FString MarkerContent;
-		if (!FFileHelper::LoadFileToString(MarkerContent, *GetCurrentDatasetRunMarkerPath()))
-		{
-			return false;
-		}
-
-		MarkerContent.TrimStartAndEndInline();
-		if (MarkerContent.IsEmpty())
-		{
-			return false;
-		}
-
-		IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
-		if (!PlatformFile.DirectoryExists(*MarkerContent))
-		{
-			return false;
-		}
-
-		OutRunDirectory = MarkerContent;
-		return true;
-	}
-
-	FString CreateNewDatasetRunDirectory()
-	{
-		IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
-
-		const FString DatasetRootDirectory = GetDatasetRootDirectory();
-		if (!PlatformFile.DirectoryExists(*DatasetRootDirectory))
-		{
-			PlatformFile.CreateDirectoryTree(*DatasetRootDirectory);
-		}
-
-		const FString DateString = FDateTime::Now().ToString(TEXT("%Y-%m-%d_%H-%M-%S"));
-		FString RunDirectory = FPaths::Combine(DatasetRootDirectory, DateString);
-
-		int32 Suffix = 2;
-		while (PlatformFile.DirectoryExists(*RunDirectory))
-		{
-			RunDirectory = FPaths::Combine(
-				DatasetRootDirectory,
-				FString::Printf(TEXT("%s_%02d"), *DateString, Suffix)
-			);
-			++Suffix;
-		}
-
-		PlatformFile.CreateDirectoryTree(*RunDirectory);
-		FFileHelper::SaveStringToFile(
-			RunDirectory,
-			*GetCurrentDatasetRunMarkerPath(),
-			FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM
-		);
-
-		return RunDirectory;
-	}
-
 	FString CaptureModeToString(ECaptureMode CaptureMode)
 	{
-		switch (CaptureMode)
-		{
+		switch (CaptureMode) {
 		case ECaptureMode::MonoRos:
 			return TEXT("MonoRos");
 		case ECaptureMode::GroundTruth:
@@ -110,8 +40,7 @@ void UCaptureManager::Initialize(const FCaptureConfig& InConfig)
 
 UWorld* UCaptureManager::GetWorld() const
 {
-	if (const UObject* OuterObject = GetOuter())
-	{
+	if (const UObject* OuterObject = GetOuter()) {
 		return OuterObject->GetWorld();
 	}
 
@@ -127,14 +56,37 @@ void UCaptureManager::StartCapture()
 	}
 
 	EnsureDatasetRunDirectory();
+	if (CurrentDatasetRunDirectory.IsEmpty()) {
+		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: cannot start capture because dataset run directory is unavailable."));
+		return;
+	}
 
 	CurrentSessionId++;
 	FrameIndex = 0;
 
-	CurrentSessionName = FString::Printf(TEXT("Session_%03d"), CurrentSessionId.load());
-	CurrentSessionDirectory = FPaths::Combine(CurrentDatasetRunDirectory, CurrentSessionName);
+	const FString DefaultSessionName = FString::Printf(TEXT("Session_%03d"), CurrentSessionId.load());
+	CurrentSessionName = DefaultSessionName;
+	CurrentSessionDirectory.Empty();
+
+	if (UWorld* World = GetWorld()) {
+		if (UDatasetRunSubsystem* DatasetRunSubsystem = World->GetSubsystem<UDatasetRunSubsystem>()) {
+			CurrentSessionDirectory = DatasetRunSubsystem->CreateNextSessionDirectory(CurrentSessionName);
+			CurrentDatasetRunDirectory = DatasetRunSubsystem->GetOrCreateCurrentRunDirectory();
+			CurrentMapsDirectory = DatasetRunSubsystem->GetMapsDirectory();
+		}
+	}
+
+	if (CurrentSessionName.IsEmpty()) {
+		CurrentSessionName = DefaultSessionName;
+	}
+	if (CurrentSessionDirectory.IsEmpty()) {
+		CurrentSessionDirectory = FPaths::Combine(CurrentDatasetRunDirectory, CurrentSessionName);
+	}
+
 	CurrentImagesDirectory = FPaths::Combine(CurrentSessionDirectory, TEXT("Images"));
-	CurrentMapsDirectory = FPaths::Combine(CurrentDatasetRunDirectory, TEXT("Maps"));
+	if (CurrentMapsDirectory.IsEmpty()) {
+		CurrentMapsDirectory = FPaths::Combine(CurrentDatasetRunDirectory, TEXT("Maps"));
+	}
 
 	ManifestFilePath = FPaths::Combine(CurrentSessionDirectory, TEXT("manifest.csv"));
 	const FString NavigationDirectory = FPaths::Combine(CurrentSessionDirectory, TEXT("Navigation"));
@@ -146,19 +98,13 @@ void UCaptureManager::StartCapture()
 	// It is the main synchronization file between ROS, UnrealGT, and offline tools.
 	if (!RoverPoseSource) {
 		RoverPoseSource = FindPoseSourceByName(TEXT("base_link"));
-		if (!RoverPoseSource) {
-			// Backward-compatible fallback for older Blueprint instances.
-			RoverPoseSource = FindPoseSourceByName(TEXT("rover_base"));
-		}
 	}
 
 	bCaptureEnabled = true;
 	StartManifest();
 	WriteSessionMetadata();
 
-	UE_LOG(LogTemp, Log, TEXT("CaptureManager: started %s inside dataset run %s"),
-		*CurrentSessionName,
-		*CurrentDatasetRunDirectory);
+	UE_LOG(LogTemp, Log, TEXT("CaptureManager: started %s inside dataset run %s"), *CurrentSessionName, *CurrentDatasetRunDirectory);
 }
 
 void UCaptureManager::StopCapture()
@@ -230,49 +176,9 @@ bool UCaptureManager::IsSessionValid(int32 SessionId) const
 	return SessionId == CurrentSessionId;
 }
 
-FString UCaptureManager::GetCurrentSessionName() const
-{
-	return CurrentSessionName;
-}
-
-FString UCaptureManager::GetCurrentSessionDirectory() const
-{
-	return CurrentSessionDirectory;
-}
-
 FString UCaptureManager::GetCurrentImagesDirectory() const
 {
 	return CurrentImagesDirectory;
-}
-
-FString UCaptureManager::GetCurrentMapsDirectory() const
-{
-	return CurrentMapsDirectory;
-}
-
-FString UCaptureManager::GetCurrentDatasetRunDirectory() const
-{
-	return CurrentDatasetRunDirectory;
-}
-
-FString UCaptureManager::GetManifestFilePath() const
-{
-	return ManifestFilePath;
-}
-
-FString UCaptureManager::GetRoverGtTrajectoryFilePath() const
-{
-	return RoverGtTrajectoryFilePath;
-}
-
-FString UCaptureManager::GetLeftCameraGtTrajectoryFilePath() const
-{
-	return LeftCameraGtTrajectoryFilePath;
-}
-
-FString UCaptureManager::GetRightCameraGtTrajectoryFilePath() const
-{
-	return RightCameraGtTrajectoryFilePath;
 }
 
 void UCaptureManager::StartManifest()
@@ -351,25 +257,24 @@ void UCaptureManager::WriteSessionMetadata()
 
 void UCaptureManager::EnsureDatasetRunDirectory()
 {
-	FString MarkerRunDirectory;
-	if (TryReadCurrentDatasetRunDirectory(MarkerRunDirectory))
-	{
-		CurrentDatasetRunDirectory = MarkerRunDirectory;
+	if (UWorld* World = GetWorld()) {
+		if (UDatasetRunSubsystem* DatasetRunSubsystem = World->GetSubsystem<UDatasetRunSubsystem>()) {
+			CurrentDatasetRunDirectory = DatasetRunSubsystem->GetOrCreateCurrentRunDirectory();
+			CurrentMapsDirectory = DatasetRunSubsystem->GetMapsDirectory();
+		}
 	}
-	else if (CurrentDatasetRunDirectory.IsEmpty())
-	{
-		CurrentDatasetRunDirectory = CreateNewDatasetRunDirectory();
-	}
-
-	CurrentMapsDirectory = FPaths::Combine(CurrentDatasetRunDirectory, TEXT("Maps"));
 
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
-	if (!PlatformFile.DirectoryExists(*CurrentDatasetRunDirectory))
-	{
+	if (CurrentDatasetRunDirectory.IsEmpty()) {
+		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: dataset run directory is unavailable."));
+		return;
+	}
+
+	if (!PlatformFile.DirectoryExists(*CurrentDatasetRunDirectory)) {
 		PlatformFile.CreateDirectoryTree(*CurrentDatasetRunDirectory);
 	}
-	if (!PlatformFile.DirectoryExists(*CurrentMapsDirectory))
-	{
+
+	if (!PlatformFile.DirectoryExists(*CurrentMapsDirectory)) {
 		PlatformFile.CreateDirectoryTree(*CurrentMapsDirectory);
 	}
 }

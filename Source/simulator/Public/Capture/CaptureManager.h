@@ -44,31 +44,7 @@ public:
 	bool IsSessionValid(int32 SessionId) const;
 
 	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetCurrentSessionName() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetCurrentSessionDirectory() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
 	FString GetCurrentImagesDirectory() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetCurrentMapsDirectory() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetCurrentDatasetRunDirectory() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetManifestFilePath() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetRoverGtTrajectoryFilePath() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetLeftCameraGtTrajectoryFilePath() const;
-
-	UFUNCTION(BlueprintPure, Category = "Capture|Session")
-	FString GetRightCameraGtTrajectoryFilePath() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Capture|Pose")
 	void SetRoverPoseSource(UCapturePoseSourceComponent* InRoverPoseSource);
