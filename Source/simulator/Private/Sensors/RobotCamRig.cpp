@@ -276,7 +276,7 @@ void ARobotCamRig::ResolveRoverGroundTruthComponents()
 	}
 
 	if (RoverActor && !RoverGroundTruthPublisher) {
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: RoverActor '%s' has no RoverGroundTruthPublisherComponent. CSV pose may work if it has CapturePoseSourceComponent, but /rover/gt/pose, /gt/odom, /tf and /gt/path will not publish."), *RoverActor->GetName());
+		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: RoverActor '%s' has no RoverGroundTruthPublisherComponent. CSV pose may work if it has CapturePoseSourceComponent, but /rover/gt/pose, /tf and rover/gt/path will not publish."), *RoverActor->GetName());
 	}
 }
 

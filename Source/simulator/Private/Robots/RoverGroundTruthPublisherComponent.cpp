@@ -6,6 +6,7 @@
 #include "TempoROSTypes.h"
 
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(geometry_msgs::msg::PoseStamped);
+DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(nav_msgs::msg::Odometry);
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(nav_msgs::msg::Path);
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(tf2_msgs::msg::TFMessage);
 
@@ -24,6 +25,7 @@ void URoverGroundTruthPublisherComponent::BeginPlay()
 	if (bEnableLiveGroundTruthPublishing && GetWorld()) {
 		const double NowSeconds = GetWorld()->GetTimeSeconds();
 		PublishLivePoseAndTf(NowSeconds);
+		PublishLiveOdometry(NowSeconds);
 		PublishLivePath(NowSeconds);
 	}
 }
@@ -38,9 +40,14 @@ void URoverGroundTruthPublisherComponent::SetupReusableMessages()
 {
 	ReusableTfMsg.transforms.resize(1);
 
+	ReusableOdomMsg.header.frame_id = TCHAR_TO_UTF8(*FrameId);
+	ReusableOdomMsg.child_frame_id = TCHAR_TO_UTF8(*ChildFrameId);
+
 	ReusablePathMsg.header.frame_id = TCHAR_TO_UTF8(*FrameId);
 	ReusablePathMsg.poses.clear();
 	ReusablePathMsg.poses.reserve((size_t)FMath::Max(1, MaxPathLength));
+
+	ResetOdometryState();
 }
 
 void URoverGroundTruthPublisherComponent::SetupRos()
@@ -56,6 +63,10 @@ void URoverGroundTruthPublisherComponent::SetupRos()
 
 	if (bPublishLivePoseStamped) {
 		ROSNode->AddPublisher<geometry_msgs::msg::PoseStamped>(*PoseTopic, DefaultQOS, false);
+	}
+
+	if (bPublishLiveOdometry) {
+		ROSNode->AddPublisher<nav_msgs::msg::Odometry>(*OdomTopic, DefaultQOS, false);
 	}
 
 	if (bPublishLiveTf) {
@@ -90,6 +101,17 @@ void URoverGroundTruthPublisherComponent::ResetPath()
 {
 	ReusablePathMsg.header.frame_id = TCHAR_TO_UTF8(*FrameId);
 	ReusablePathMsg.poses.clear();
+
+	// Start odometry velocity estimation cleanly after a new capture session starts.
+	ResetOdometryState();
+}
+
+void URoverGroundTruthPublisherComponent::ResetOdometryState()
+{
+	bHasPreviousOdomSample = false;
+	PreviousOdomTimeSeconds = 0.0;
+	PreviousOdomRosPositionMeters = FVector::ZeroVector;
+	PreviousOdomRosRotation = FQuat::Identity;
 }
 
 void URoverGroundTruthPublisherComponent::PublishLiveGroundTruth(float DeltaTime)
@@ -100,13 +122,14 @@ void URoverGroundTruthPublisherComponent::PublishLiveGroundTruth(float DeltaTime
 
 	const double NowSeconds = GetWorld()->GetTimeSeconds();
 
-	if (bPublishLivePoseStamped || bPublishLiveTf) {
+	if (bPublishLivePoseStamped || bPublishLiveOdometry || bPublishLiveTf) {
 		const float SafePoseTfHz = FMath::Max(1.0f, LivePoseTfPublishHz);
 		const float PoseTfPeriod = 1.0f / SafePoseTfHz;
 		LivePoseTfPublishAccumulator += DeltaTime;
 		if (LivePoseTfPublishAccumulator >= PoseTfPeriod) {
 			LivePoseTfPublishAccumulator = FMath::Fmod(LivePoseTfPublishAccumulator, PoseTfPeriod);
 			PublishLivePoseAndTf(NowSeconds);
+			PublishLiveOdometry(NowSeconds);
 		}
 	}
 
@@ -173,6 +196,73 @@ void URoverGroundTruthPublisherComponent::PublishLivePoseAndTf(double StampSecon
 
 		ROSNode->Publish<tf2_msgs::msg::TFMessage>(*TfTopic, ReusableTfMsg);
 	}
+}
+
+void URoverGroundTruthPublisherComponent::PublishLiveOdometry(double StampSeconds)
+{
+	if (!bPublishLiveOdometry || !PopulateReusablePoseMessage(StampSeconds)) {
+		return;
+	}
+
+	const FVector CurrentRosPositionMeters(
+		ReusablePoseMsg.pose.position.x,
+		ReusablePoseMsg.pose.position.y,
+		ReusablePoseMsg.pose.position.z
+	);
+
+	FQuat CurrentRosRotation(
+		ReusablePoseMsg.pose.orientation.x,
+		ReusablePoseMsg.pose.orientation.y,
+		ReusablePoseMsg.pose.orientation.z,
+		ReusablePoseMsg.pose.orientation.w
+	);
+	CurrentRosRotation.Normalize();
+
+	FVector LinearVelocityBodyMps = FVector::ZeroVector;
+	FVector AngularVelocityBodyRadPerSec = FVector::ZeroVector;
+
+	if (bHasPreviousOdomSample) {
+		const double Dt = StampSeconds - PreviousOdomTimeSeconds;
+
+		if (Dt > KINDA_SMALL_NUMBER) {
+			const FVector LinearVelocityWorldMps = (CurrentRosPositionMeters - PreviousOdomRosPositionMeters) / Dt;
+			LinearVelocityBodyMps = CurrentRosRotation.Inverse().RotateVector(LinearVelocityWorldMps);
+
+			FQuat DeltaRotation = CurrentRosRotation * PreviousOdomRosRotation.Inverse();
+			DeltaRotation.Normalize();
+
+			FVector DeltaAxis = FVector::ForwardVector;
+			float DeltaAngle = 0.0f;
+			DeltaRotation.ToAxisAndAngle(DeltaAxis, DeltaAngle);
+
+			if (DeltaAngle > PI) {
+				DeltaAngle -= 2.0f * PI;
+			}
+
+			const FVector AngularVelocityWorldRadPerSec = DeltaAxis * (DeltaAngle / static_cast<float>(Dt));
+			AngularVelocityBodyRadPerSec = CurrentRosRotation.Inverse().RotateVector(AngularVelocityWorldRadPerSec);
+		}
+	}
+
+	ReusableOdomMsg.header = ReusablePoseMsg.header;
+	ReusableOdomMsg.child_frame_id = TCHAR_TO_UTF8(*ChildFrameId);
+
+	ReusableOdomMsg.pose.pose = ReusablePoseMsg.pose;
+
+	ReusableOdomMsg.twist.twist.linear.x = LinearVelocityBodyMps.X;
+	ReusableOdomMsg.twist.twist.linear.y = LinearVelocityBodyMps.Y;
+	ReusableOdomMsg.twist.twist.linear.z = LinearVelocityBodyMps.Z;
+
+	ReusableOdomMsg.twist.twist.angular.x = AngularVelocityBodyRadPerSec.X;
+	ReusableOdomMsg.twist.twist.angular.y = AngularVelocityBodyRadPerSec.Y;
+	ReusableOdomMsg.twist.twist.angular.z = AngularVelocityBodyRadPerSec.Z;
+
+	ROSNode->Publish<nav_msgs::msg::Odometry>(*OdomTopic, ReusableOdomMsg);
+
+	PreviousOdomTimeSeconds = StampSeconds;
+	PreviousOdomRosPositionMeters = CurrentRosPositionMeters;
+	PreviousOdomRosRotation = CurrentRosRotation;
+	bHasPreviousOdomSample = true;
 }
 
 void URoverGroundTruthPublisherComponent::PublishLivePath(double StampSeconds)
