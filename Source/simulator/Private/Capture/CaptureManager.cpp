@@ -30,6 +30,12 @@ namespace
 			return TEXT("Unknown");
 		}
 	}
+
+	FString NormalizeManifestPath(FString Path)
+	{
+		Path.ReplaceInline(TEXT("\\"), TEXT("/"));
+		return Path;
+	}
 }
 
 
@@ -203,8 +209,12 @@ void UCaptureManager::StartManifest()
 		PlatformFile.CreateDirectoryTree(*NavigationDirectory);
 	}
 	
-	// Manifest = synchronization index only. Pose values are stored in the ROS-style trajectory files.
-	const FString Header = TEXT("session_id,frame_index,timestamp_sec\n");
+	// Manifest = per-frame dataset index. Pose values remain stored in the ROS-style trajectory files.
+	const FString Header = TEXT(
+		"session_id,frame_index,timestamp_sec,"
+		"rgb_path,depth_path,segmentation_path,bounding_boxes_path,"
+		"rover_trajectory_file,left_camera_trajectory_file,right_camera_trajectory_file\n"
+	);
 
 	if (!FFileHelper::SaveStringToFile(Header, *ManifestFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM, &IFileManager::Get(), FILEWRITE_None))
 	{
@@ -225,6 +235,46 @@ void UCaptureManager::WriteSessionMetadata()
 {
 	const FString MetadataFilePath = FPaths::Combine(CurrentSessionDirectory, TEXT("session_metadata.json"));
 	const FString CreatedAt = FDateTime::Now().ToString(TEXT("%Y-%m-%d_%H-%M-%S"));
+	const FString LevelName = GetWorld() ? GetWorld()->GetMapName() : TEXT("Unknown");
+	const auto EscapeJsonString = [](const FString& Value) -> FString
+	{
+		FString Escaped;
+		Escaped.Reserve(Value.Len());
+		for (int32 Index = 0; Index < Value.Len(); ++Index) {
+			const TCHAR Character = Value[Index];
+			switch (Character) {
+			case TEXT('\\'):
+				Escaped += TEXT("\\\\");
+				break;
+			case TEXT('"'):
+				Escaped += TEXT("\\\"");
+				break;
+			case TEXT('\b'):
+				Escaped += TEXT("\\b");
+				break;
+			case TEXT('\f'):
+				Escaped += TEXT("\\f");
+				break;
+			case TEXT('\n'):
+				Escaped += TEXT("\\n");
+				break;
+			case TEXT('\r'):
+				Escaped += TEXT("\\r");
+				break;
+			case TEXT('\t'):
+				Escaped += TEXT("\\t");
+				break;
+			default:
+				if (Character < 0x20) {
+					Escaped += FString::Printf(TEXT("\\u%04x"), static_cast<uint32>(Character));
+				} else {
+					Escaped.AppendChar(Character);
+				}
+				break;
+			}
+		}
+		return Escaped;
+	};
 
 	const FString Json = FString::Printf(
 		TEXT("{\n")
@@ -233,18 +283,41 @@ void UCaptureManager::WriteSessionMetadata()
 		TEXT("  \"created_at\": \"%s\",\n")
 		TEXT("  \"capture_mode\": \"%s\",\n")
 		TEXT("  \"publish_hz\": %d,\n")
-		TEXT("  \"image_width\": %d,\n")
-		TEXT("  \"image_height\": %d,\n")
-		TEXT("  \"stereo_baseline_m\": %s\n")
+		TEXT("  \"camera\": {\n")
+		TEXT("    \"image_width\": %d,\n")
+		TEXT("    \"image_height\": %d,\n")
+		TEXT("    \"fov_deg\": 90.0,\n")
+		TEXT("    \"stereo_baseline_m\": %s\n")
+		TEXT("  },\n")
+		TEXT("  \"frames\": {\n")
+		TEXT("    \"map\": \"map\",\n")
+		TEXT("    \"base_link\": \"base_link\",\n")
+		TEXT("    \"imu\": \"imu_link\",\n")
+		TEXT("    \"left_camera_link\": \"left_camera_link\",\n")
+		TEXT("    \"right_camera_link\": \"right_camera_link\",\n")
+		TEXT("    \"left_camera_optical\": \"left_camera_optical_frame\",\n")
+		TEXT("    \"right_camera_optical\": \"right_camera_optical_frame\"\n")
+		TEXT("  },\n")
+		TEXT("  \"maps\": {\n")
+		TEXT("    \"enabled\": true,\n")
+		TEXT("    \"occupancy_map\": \"Maps/occupancy_map.yaml\",\n")
+		TEXT("    \"elevation_map\": \"Maps/elevation_map.yaml\",\n")
+		TEXT("    \"elevation_csv\": \"Maps/elevation_map.csv\",\n")
+		TEXT("    \"elevation_preview\": \"Maps/elevation_map_preview.pgm\"\n")
+		TEXT("  },\n")
+		TEXT("  \"scene\": {\n")
+		TEXT("    \"level_name\": \"%s\"\n")
+		TEXT("  }\n")
 		TEXT("}\n"),
 		CurrentSessionId.load(),
-		*CurrentSessionName,
-		*CreatedAt,
-		*CaptureModeToString(Config.CaptureMode),
+		*EscapeJsonString(CurrentSessionName),
+		*EscapeJsonString(CreatedAt),
+		*EscapeJsonString(CaptureModeToString(Config.CaptureMode)),
 		Config.PublishHz,
 		Config.ImageWidth,
 		Config.ImageHeight,
-		*FString::SanitizeFloat(Config.StereoBaselineMeters)
+		*FString::SanitizeFloat(Config.StereoBaselineMeters),
+		*EscapeJsonString(LevelName)
 	);
 
 	if (!FFileHelper::SaveStringToFile(Json, *MetadataFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
@@ -281,11 +354,44 @@ void UCaptureManager::EnsureDatasetRunDirectory()
 
 void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo)
 {
+	const FString FrameFileStem = FString::FromInt(FrameInfo.FrameIndex);
+	const bool bGroundTruthEnabled = Config.IsGroundTruthEnabled();
+
+	const FString RgbPath = bGroundTruthEnabled
+		? NormalizeManifestPath(FPaths::Combine(TEXT("Images"), TEXT("RGB"), FrameFileStem + TEXT(".png")))
+		: FString();
+	const FString DepthPath = bGroundTruthEnabled
+		? NormalizeManifestPath(FPaths::Combine(TEXT("Images"), TEXT("Depth"), FrameFileStem + TEXT(".png")))
+		: FString();
+	const FString SegmentationPath = bGroundTruthEnabled
+		? NormalizeManifestPath(FPaths::Combine(TEXT("Images"), TEXT("Segmentation"), FrameFileStem + TEXT(".png")))
+		: FString();
+	const FString BoundingBoxesPath = bGroundTruthEnabled
+		? NormalizeManifestPath(FPaths::Combine(TEXT("Images"), TEXT("BoundingBoxes"), FrameFileStem + TEXT(".csv")))
+		: FString();
+
+	const FString RoverTrajectoryPath = RoverGtTrajectoryFilePath.IsEmpty()
+		? FString()
+		: NormalizeManifestPath(FPaths::Combine(TEXT("Navigation"), TEXT("rover_gt_trajectory_ros.csv")));
+	const FString LeftCameraTrajectoryPath = LeftCameraGtTrajectoryFilePath.IsEmpty()
+		? FString()
+		: NormalizeManifestPath(FPaths::Combine(TEXT("Navigation"), TEXT("left_camera_gt_trajectory_ros.csv")));
+	const FString RightCameraTrajectoryPath = RightCameraGtTrajectoryFilePath.IsEmpty()
+		? FString()
+		: NormalizeManifestPath(FPaths::Combine(TEXT("Navigation"), TEXT("right_camera_gt_trajectory_ros.csv")));
+
 	const FString Row = FString::Printf(
-		TEXT("%d,%d,%.9f\n"),
+		TEXT("%d,%d,%.9f,%s,%s,%s,%s,%s,%s,%s\n"),
 		FrameInfo.SessionId,
 		FrameInfo.FrameIndex,
-		FrameInfo.StampSeconds
+		FrameInfo.StampSeconds,
+		*RgbPath,
+		*DepthPath,
+		*SegmentationPath,
+		*BoundingBoxesPath,
+		*RoverTrajectoryPath,
+		*LeftCameraTrajectoryPath,
+		*RightCameraTrajectoryPath
 	);
 
 	if (!FFileHelper::SaveStringToFile(
