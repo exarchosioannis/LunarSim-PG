@@ -13,6 +13,17 @@ UImuSensorPublisherComponent::UImuSensorPublisherComponent()
 	PrimaryComponentTick.bCanEverTick = true;
 }
 
+void UImuSensorPublisherComponent::SetImuPublishHz(float NewPublishHz)
+{
+	ImuPublishHz = FMath::Clamp(NewPublishHz, 1.0f, 400.0f);
+	PublishAccumulator = 0.0f;
+}
+
+float UImuSensorPublisherComponent::GetImuPublishHz() const
+{
+	return FMath::Clamp(ImuPublishHz, 1.0f, 400.0f);
+}
+
 void UImuSensorPublisherComponent::BeginPlay()
 {
 	Super::BeginPlay();

@@ -31,6 +31,8 @@ public:
 	void SetStereoBaselineCm(float NewBaselineCm);
 	float GetStereoBaselineCm() const;
 
+	AActor* GetRoverActor() const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;

@@ -29,6 +29,9 @@ class SIMULATOR_API UImuSensorPublisherComponent : public UActorComponent
 public:
 	UImuSensorPublisherComponent();
 
+	void SetImuPublishHz(float NewPublishHz);
+	float GetImuPublishHz() const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;

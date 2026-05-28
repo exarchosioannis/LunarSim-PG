@@ -276,7 +276,7 @@ void ARobotCamRig::ResolveRoverGroundTruthComponents()
 	}
 
 	if (RoverActor && !RoverGroundTruthPublisher) {
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: RoverActor '%s' has no RoverGroundTruthPublisherComponent. CSV pose may work if it has CapturePoseSourceComponent, but /rover/gt/pose, /tf and rover/gt/path will not publish."), *RoverActor->GetName());
+		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: RoverActor '%s' has no RoverGroundTruthPublisherComponent. CSV pose may work if it has CapturePoseSourceComponent, but /gt/rover/pose, /gt/rover/odom, /tf and /gt/rover/path will not publish."), *RoverActor->GetName());
 	}
 }
 
@@ -456,6 +456,11 @@ void ARobotCamRig::SetStereoBaselineCm(float NewBaselineCm)
 float ARobotCamRig::GetStereoBaselineCm() const
 {
 	return StereoBaselineCm;
+}
+
+AActor* ARobotCamRig::GetRoverActor() const
+{
+	return RoverActor;
 }
 
 // TF2

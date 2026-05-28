@@ -23,6 +23,11 @@ void UOccupancyMapPublisherComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (!bEnableGroundTruthMaps) {
+		UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: ground truth maps are disabled."));
+		return;
+	}
+
 	SetupRos();
 
 	//Maps are environment-level ground truth, so they are generated/exported when the level starts,
@@ -41,6 +46,8 @@ void UOccupancyMapPublisherComponent::EndPlay(const EEndPlayReason::Type EndPlay
 void UOccupancyMapPublisherComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (!bEnableGroundTruthMaps) return;
 
 	if (ROSNode) {
 		ROSNode->Tick(DeltaTime);
@@ -89,6 +96,11 @@ builtin_interfaces::msg::Time UOccupancyMapPublisherComponent::ToRosTime(double 
 // Regenerates the occupancy/elevation map layers and immediately republishes them to ROS.
 void UOccupancyMapPublisherComponent::RegenerateAndPublishMap()
 {
+	if (!bEnableGroundTruthMaps) {
+		UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: map generation skipped because ground truth maps are disabled."));
+		return;
+	}
+
 	GenerateOccupancyMap();
 	PublishMap();
 }
@@ -315,6 +327,11 @@ bool UOccupancyMapPublisherComponent::HitHasIgnoreTag(const FHitResult& Hit) con
 
 bool UOccupancyMapPublisherComponent::ExportMapToDefaultDatasetDirectory()
 {
+	if (!bEnableGroundTruthMaps) {
+		UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: map export skipped because ground truth maps are disabled."));
+		return false;
+	}
+
 	UWorld* World = GetWorld();
 	UDatasetRunSubsystem* DatasetRunSubsystem = World ? World->GetSubsystem<UDatasetRunSubsystem>() : nullptr;
 	if (!DatasetRunSubsystem) {
@@ -329,6 +346,11 @@ bool UOccupancyMapPublisherComponent::ExportMapToDefaultDatasetDirectory()
 // Exports the current map to the specified directory with the given base file name. Returns true on success.
 bool UOccupancyMapPublisherComponent::ExportMapToDirectory(const FString& MapsDirectory, const FString& BaseFileName)
 {
+	if (!bEnableGroundTruthMaps) {
+		UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: map export skipped because ground truth maps are disabled."));
+		return false;
+	}
+
 	if (MapsDirectory.IsEmpty()) {
 		UE_LOG(LogTemp, Warning, TEXT("OccupancyMapPublisherComponent: cannot export map because MapsDirectory is empty."));
 		return false;
@@ -372,6 +394,7 @@ void UOccupancyMapPublisherComponent::BuildElevationPointCloud()
 
 void UOccupancyMapPublisherComponent::PublishMap()
 {
+	if (!bEnableGroundTruthMaps) return;
 	if (!ROSNode || !bMapGenerated) return;
 	
 	const double NowSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;

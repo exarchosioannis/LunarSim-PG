@@ -36,6 +36,9 @@ class SIMULATOR_API UOccupancyMapPublisherComponent : public UActorComponent
 public:
 	UOccupancyMapPublisherComponent();
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ground Truth Map")
+	bool bEnableGroundTruthMaps = true;
+
 	UFUNCTION(BlueprintCallable, Category = "Ground Truth Map")
 	void RegenerateAndPublishMap();
 
