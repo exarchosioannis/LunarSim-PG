@@ -184,4 +184,11 @@ The current code focuses on:
 - occupancy and elevation map outputs
 - elevation point cloud publishing
 
-LiDAR is not implemented in `Source/simulator` at the moment and would be a future extension.
+
+
+
+
+
+BP_UnrealGT_Camera
+RGB COMPONENT 
+TARGET GAMMA 2.2
