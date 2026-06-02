@@ -6,8 +6,8 @@
 
 UGTImageGeneratorComponent::UGTImageGeneratorComponent()
     : Super()
-    , bUseDisplayGamma(true)
-    , TargetGamma(1.4)
+    , bUseDisplayGamma(false)
+    , TargetGamma(2.2)
     , bUseRandomGamma(false)
     , TargetGammaMax(2.4)
 {
@@ -42,7 +42,32 @@ void UGTImageGeneratorComponent::GenerateData(
 
 void UGTImageGeneratorComponent::BeginPlay()
 {
+    bAntiAliasing = false;
+    bMotionBlur = false;
+
     Super::BeginPlay();
+
+    bUseDisplayGamma = false;
+    TargetGamma = 2.2f;
+    bUseRandomGamma = false;
+
+    PostProcessSettings = FPostProcessSettings();
+    PostProcessSettings.bOverride_AutoExposureMinBrightness = true;
+    PostProcessSettings.bOverride_AutoExposureMaxBrightness = true;
+    PostProcessSettings.bOverride_AutoExposureBias = true;
+    PostProcessSettings.AutoExposureMinBrightness = 1.0f;
+    PostProcessSettings.AutoExposureMaxBrightness = 1.0f;
+    PostProcessSettings.AutoExposureBias = 1.5f;
+
+    SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+    SceneCaptureComponent->bCaptureEveryFrame = false;
+    SceneCaptureComponent->bCaptureOnMovement = false;
+    SceneCaptureComponent->bAlwaysPersistRenderingState = false;
+    SceneCaptureComponent->ShowFlags.SetTemporalAA(false);
+    SceneCaptureComponent->ShowFlags.SetMotionBlur(false);
+    SceneCaptureComponent->ShowFlags.SetAntiAliasing(false);
+    SceneCaptureComponent->PostProcessBlendWeight = 1.0f;
+    SceneCaptureComponent->SRGB = true;
 
     SceneCaptureComponent->bUseDisplayGamma = bUseDisplayGamma;
     SceneCaptureComponent->TargetGamma = TargetGamma;
@@ -52,4 +77,5 @@ void UGTImageGeneratorComponent::BeginPlay()
     SceneCaptureComponent->bEnableClipPlane = bEnableClipPlane;
     SceneCaptureComponent->ClipPlaneBase = ClipPlaneBase;
     SceneCaptureComponent->ClipPlaneNormal = ClipPlaneNormal;
+    SceneCaptureComponent->UpdateTextureTarget();
 }
