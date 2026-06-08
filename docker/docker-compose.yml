@@ -7,7 +7,7 @@ services:
     privileged: true
 
     environment:
-      ROS_DOMAIN_ID: "0"
+      ROS_DOMAIN_ID: "9"
       ROS_LOCALHOST_ONLY: "0"
       RMW_IMPLEMENTATION: "rmw_cyclonedds_cpp"
       DISPLAY: "${DISPLAY}"
@@ -20,7 +20,7 @@ services:
       - ../bags:/ws/bags
       - ../ros2_ws:/ws/ros2_ws
       - ./scripts:/ws/scripts
-      
+
     devices:
       - /dev/dri:/dev/dri
       - /dev/input:/dev/input
