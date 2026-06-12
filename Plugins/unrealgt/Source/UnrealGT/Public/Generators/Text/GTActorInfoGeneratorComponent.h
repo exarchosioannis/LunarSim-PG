@@ -13,6 +13,7 @@
 
 class UGTSceneCaptureComponent2D;
 class UGTImageGeneratorBase;
+class UInstancedStaticMeshComponent;
 
 /**
  * Generates information about actors in a scene (e.g. MeshName, BoundingBoxes, ActorName).
@@ -30,6 +31,13 @@ public:
 
     UPROPERTY(EditAnywhere, Category = "Tracked Actors")
     TArray<FGTObjectFilter> TrackActorsThatMatchFilter;
+
+    /**
+     * Emit one record per matching ISM/HISM instance instead of one combined actor record.
+     * Actors without ISM/HISM components continue to use the normal actor path.
+     */
+    UPROPERTY(EditAnywhere, Category = "Tracked Actors")
+    bool bTrackInstancedStaticMeshInstances = false;
     
     /**
      * Requires LinkedImageGenerator to be set.
@@ -136,6 +144,33 @@ private:
     FGTImage CachedSegmentation;
 
     TMap<AActor*, FBox2D> CachedBoundingBoxes;
+
+    TArray<FBox2D> CachedInstancedBoundingBoxes;
+
+    void GenerateDataInternal(const FDateTime& TimeStamp, int32 FrameIndex);
+
+    void AppendFormattedRow(
+        FString& Result,
+        const FString& ObjectName,
+        const FString& MeshName,
+        const FVector& WorldLocation,
+        const FRotator& WorldRotation,
+        const FVector2D& ScreenLocation,
+        const FVector2D& ScreenLocationNormalized,
+        const FBox2D& ScreenBoundingBox,
+        const FBox2D& ScreenBoundingBoxNormalized);
+
+    bool DoesFilterMatchInstancedComponent(
+        const FGTObjectFilter& ObjectFilter,
+        UInstancedStaticMeshComponent* InstancedComponent) const;
+
+    bool GetInstancedStaticMeshScreenBoundingBox(
+        const FBox& LocalBounds,
+        const FTransform& InstanceTransform,
+        UGTImageGeneratorBase* ImageGeneratorComponent,
+        FBox2D& OutBox) const;
+
+    bool IsScreenBoundingBoxVisible(const FBox2D& ScreenBoundingBox) const;
 
     bool IsActorRenderedOnScreen(AActor* Actor);
 

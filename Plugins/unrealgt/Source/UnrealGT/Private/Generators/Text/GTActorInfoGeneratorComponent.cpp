@@ -4,6 +4,7 @@
 
 #include <CanvasItem.h>
 #include <CanvasTypes.h>
+#include <Components/InstancedStaticMeshComponent.h>
 #include <Components/StaticMeshComponent.h>
 #include <Engine/Engine.h>
 #include <Engine/StaticMesh.h>
@@ -35,123 +36,12 @@ UGTActorInfoGeneratorComponent::UGTActorInfoGeneratorComponent()
 
 void UGTActorInfoGeneratorComponent::GenerateData(const FDateTime& TimeStamp, int32 SessionId, FSessionValidationFunc SessionValidator)
 {
-    // Session validation for consistency (though less critical for synchronous text generation)
     if (SessionValidator && !SessionValidator(SessionId))
     {
-        return; // Session invalid, abort processing
-    }
-    
-    // Cleanup
-    CachedBoundingBoxes.Empty();
-    if (bAccurateBoundingBoxes && LinkedImageGenerator.GetComponent(GetOwner()))
-    {
-        UGTImageGeneratorBase* LinkedImageGeneratorComponent =
-            Cast<UGTImageGeneratorBase>(LinkedImageGenerator.GetComponent(GetOwner()));
-
-        SegmentationSceneCapture->SetResolution(
-            LinkedImageGeneratorComponent->GetSceneCaptureComponent()->Resolution);
-        SegmentationSceneCapture->CaptureImage(CachedSegmentation);
+        return;
     }
 
-    // GetTrackedaCtors
-    TArray<AActor*> TrackedActors;
-
-    for (TActorIterator<AActor> ActorItr(GetWorld()); ActorItr; ++ActorItr)
-    {
-        AActor* Actor = *ActorItr;
-        for (const FGTObjectFilter& ObjectFilter : TrackActorsThatMatchFilter)
-        {
-            if (ObjectFilter.MatchesActor(Actor))
-            {
-                if (FVector::DistSquared2D(Actor->GetActorLocation(), GetComponentLocation()) <=
-                    MaxDistanceToCamera * MaxDistanceToCamera)
-                {
-                    if (!bOnlyTrackOnScreenActors ||
-                        (bOnlyTrackOnScreenActors &&
-                         IsActorRenderedOnScreen(Actor)))
-                    {
-                        TrackedActors.Push(Actor);
-                    }
-                }
-            }
-        }
-    }
-
-    // Generate result string
-    FString Result = TEXT("");
-
-    Result.Append(Header);
-
-    for (AActor* TrackedActor : TrackedActors)
-    {
-        UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(
-            TrackedActor->GetComponentByClass(UStaticMeshComponent::StaticClass()));
-
-        FString MeshName(TEXT("NOMESHONTHISACTOR"));
-        if (MeshComp)
-        {
-            MeshComp->GetStaticMesh()->GetName(MeshName);
-        }
-
-        UGTImageGeneratorBase* LinkedImageGeneratorComponent =
-            Cast<UGTImageGeneratorBase>(LinkedImageGenerator.GetComponent(GetOwner()));
-
-        // Screen Location
-        FVector2D ScreenLocation(-1.f, -1.f);
-        FVector2D ScreenLocationNormalized;
-        FBox2D ScreenBoundingBox;
-        FBox2D ScreenBoundingBoxNormalized;
-        if (LinkedImageGeneratorComponent)
-        {
-            LinkedImageGeneratorComponent->GetSceneCaptureComponent()->ProjectToPixelLocation(
-                TrackedActor->GetActorLocation(), ScreenLocation);
-
-            ScreenLocationNormalized =
-                LinkedImageGeneratorComponent->GetSceneCaptureComponent()->NormalizePixelLocation(
-                    ScreenLocation);
-
-            GetActorScreenBoundingBox(
-                TrackedActor, LinkedImageGeneratorComponent, ScreenBoundingBox);
-
-            ScreenBoundingBoxNormalized.Min =
-                LinkedImageGeneratorComponent->GetSceneCaptureComponent()->NormalizePixelLocation(
-                    ScreenBoundingBox.Min);
-            ScreenBoundingBoxNormalized.Max =
-                LinkedImageGeneratorComponent->GetSceneCaptureComponent()->NormalizePixelLocation(
-                    ScreenBoundingBox.Max);
-        }
-
-        TMap<FString, FStringFormatArg> GlobalProperties{
-            {TEXT("WorldLocation"), Vector3DToFormattedString(TrackedActor->GetActorLocation())},
-            {TEXT("WorldRotation"), RotatorToFormattedString(TrackedActor->GetActorRotation())},
-            {TEXT("ScreenLocation"), Vector2DToFormattedString(ScreenLocation)},
-            {TEXT("ScreenLocationNormalized"), Vector2DToFormattedString(ScreenLocationNormalized)},
-            {TEXT("ScreenBoundingBox"), Box2DToFormattedString(ScreenBoundingBox)},
-            {TEXT("ScreenBoundingBoxNormalized"),
-             Box2DToFormattedString(ScreenBoundingBoxNormalized)},
-            {TEXT("ActorName"), TrackedActor->GetName()},
-            {TEXT("MeshName"), MeshName}};
-
-        FString ActorResult = FString::Format(*FormatActorString, GlobalProperties);
-
-        for (const TPair<FString, FString>& ReplacePair : ReplaceStrings)
-        {
-            ActorResult.ReplaceInline(
-                *ReplacePair.Key, *ReplacePair.Value, ESearchCase::CaseSensitive);
-        }
-
-        Result.Append(ActorResult);
-        Result.Append(Separator);
-    }
-
-    Result.RemoveFromEnd(Separator);
-    Result.Append(Footer);
-
-    CurrentResult = Result.ReplaceEscapedCharWithChar();
-
-    const auto Data = FGTFileUtilities::StringToCharArray(CurrentResult);
-
-    DataReadyDelegate.Broadcast(Data, TimeStamp, -1);
+    GenerateDataInternal(TimeStamp, -1);
 }
 
 void UGTActorInfoGeneratorComponent::GenerateData(
@@ -161,30 +51,169 @@ void UGTActorInfoGeneratorComponent::GenerateData(
     int32 FrameIndex,
     double StampSeconds)
 {
-    // Session validation for consistency (though less critical for synchronous text generation)
     if (SessionValidator && !SessionValidator(SessionId))
     {
-        return; // Session invalid, abort processing
+        return;
     }
-    
-    // Cleanup
+
+    GenerateDataInternal(TimeStamp, FrameIndex);
+}
+
+void UGTActorInfoGeneratorComponent::GenerateDataInternal(
+    const FDateTime& TimeStamp,
+    int32 FrameIndex)
+{
     CachedBoundingBoxes.Empty();
+    CachedInstancedBoundingBoxes.Empty();
+
+    UGTImageGeneratorBase* LinkedImageGeneratorComponent =
+        Cast<UGTImageGeneratorBase>(LinkedImageGenerator.GetComponent(GetOwner()));
+
     if (bAccurateBoundingBoxes && LinkedImageGenerator.GetComponent(GetOwner()))
     {
-        UGTImageGeneratorBase* LinkedImageGeneratorComponent =
-            Cast<UGTImageGeneratorBase>(LinkedImageGenerator.GetComponent(GetOwner()));
-
         SegmentationSceneCapture->SetResolution(
             LinkedImageGeneratorComponent->GetSceneCaptureComponent()->Resolution);
         SegmentationSceneCapture->CaptureImage(CachedSegmentation);
     }
 
-    // GetTrackedaCtors
     TArray<AActor*> TrackedActors;
+    FString Result = Header;
+
+    int32 InstancedComponentsConsidered = 0;
+    int32 InstancesConsidered = 0;
+    int32 InstancesWritten = 0;
 
     for (TActorIterator<AActor> ActorItr(GetWorld()); ActorItr; ++ActorItr)
     {
         AActor* Actor = *ActorItr;
+
+        if (bTrackInstancedStaticMeshInstances)
+        {
+            TInlineComponentArray<UInstancedStaticMeshComponent*> InstancedComponents;
+            Actor->GetComponents(InstancedComponents);
+
+            if (!InstancedComponents.IsEmpty())
+            {
+                for (UInstancedStaticMeshComponent* InstancedComponent : InstancedComponents)
+                {
+                    if (!IsValid(InstancedComponent) || !InstancedComponent->GetStaticMesh())
+                    {
+                        continue;
+                    }
+
+                    bool bMatchesAnyFilter = false;
+                    for (const FGTObjectFilter& ObjectFilter : TrackActorsThatMatchFilter)
+                    {
+                        if (DoesFilterMatchInstancedComponent(
+                                ObjectFilter, InstancedComponent))
+                        {
+                            bMatchesAnyFilter = true;
+                            break;
+                        }
+                    }
+
+                    if (!bMatchesAnyFilter)
+                    {
+                        continue;
+                    }
+
+                    InstancedComponentsConsidered++;
+
+                    const int32 InstanceCount = InstancedComponent->GetInstanceCount();
+                    const FBox LocalBounds =
+                        InstancedComponent->GetStaticMesh()->GetBoundingBox();
+                    if (!LocalBounds.IsValid)
+                    {
+                        continue;
+                    }
+
+                    const FVector LocalCenter = LocalBounds.GetCenter();
+                    for (int32 InstanceIndex = 0; InstanceIndex < InstanceCount; InstanceIndex++)
+                    {
+                        InstancesConsidered++;
+
+                        FTransform InstanceTransform;
+                        if (!InstancedComponent->GetInstanceTransform(
+                                InstanceIndex, InstanceTransform, true))
+                        {
+                            continue;
+                        }
+
+                        const FVector InstanceCenter =
+                            InstanceTransform.TransformPosition(LocalCenter);
+
+                        if (FVector::DistSquared2D(InstanceCenter, GetComponentLocation()) >
+                            MaxDistanceToCamera * MaxDistanceToCamera)
+                        {
+                            continue;
+                        }
+
+                        if (!LinkedImageGeneratorComponent)
+                        {
+                            continue;
+                        }
+
+                        FBox2D ScreenBoundingBox;
+                        if (!GetInstancedStaticMeshScreenBoundingBox(
+                                LocalBounds,
+                                InstanceTransform,
+                                LinkedImageGeneratorComponent,
+                                ScreenBoundingBox))
+                        {
+                            continue;
+                        }
+
+                        if (bOnlyTrackOnScreenActors &&
+                            !IsScreenBoundingBoxVisible(ScreenBoundingBox))
+                        {
+                            continue;
+                        }
+
+                        FVector2D ScreenLocation(-1.f, -1.f);
+                        LinkedImageGeneratorComponent->GetSceneCaptureComponent()
+                            ->ProjectToPixelLocation(InstanceCenter, ScreenLocation);
+
+                        const FVector2D ScreenLocationNormalized =
+                            LinkedImageGeneratorComponent->GetSceneCaptureComponent()
+                                ->NormalizePixelLocation(ScreenLocation);
+
+                        FBox2D ScreenBoundingBoxNormalized;
+                        ScreenBoundingBoxNormalized.Min =
+                            LinkedImageGeneratorComponent->GetSceneCaptureComponent()
+                                ->NormalizePixelLocation(ScreenBoundingBox.Min);
+                        ScreenBoundingBoxNormalized.Max =
+                            LinkedImageGeneratorComponent->GetSceneCaptureComponent()
+                                ->NormalizePixelLocation(ScreenBoundingBox.Max);
+
+                        const FString ObjectName = FString::Printf(
+                            TEXT("%s/%s/Instance_%d"),
+                            *Actor->GetActorNameOrLabel(),
+                            *InstancedComponent->GetName(),
+                            InstanceIndex);
+                        const FString MeshName =
+                            InstancedComponent->GetStaticMesh()->GetName();
+
+                        AppendFormattedRow(
+                            Result,
+                            ObjectName,
+                            MeshName,
+                            InstanceCenter,
+                            InstanceTransform.Rotator(),
+                            ScreenLocation,
+                            ScreenLocationNormalized,
+                            ScreenBoundingBox,
+                            ScreenBoundingBoxNormalized);
+
+                        CachedInstancedBoundingBoxes.Add(ScreenBoundingBox);
+                        InstancesWritten++;
+                    }
+                }
+
+                // Per-instance mode intentionally suppresses the combined parent actor row.
+                continue;
+            }
+        }
+
         for (const FGTObjectFilter& ObjectFilter : TrackActorsThatMatchFilter)
         {
             if (ObjectFilter.MatchesActor(Actor))
@@ -203,11 +232,6 @@ void UGTActorInfoGeneratorComponent::GenerateData(
         }
     }
 
-    // Generate result string
-    FString Result = TEXT("");
-
-    Result.Append(Header);
-
     for (AActor* TrackedActor : TrackedActors)
     {
         UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(
@@ -219,10 +243,6 @@ void UGTActorInfoGeneratorComponent::GenerateData(
             MeshComp->GetStaticMesh()->GetName(MeshName);
         }
 
-        UGTImageGeneratorBase* LinkedImageGeneratorComponent =
-            Cast<UGTImageGeneratorBase>(LinkedImageGenerator.GetComponent(GetOwner()));
-
-        // Screen Location
         FVector2D ScreenLocation(-1.f, -1.f);
         FVector2D ScreenLocationNormalized;
         FBox2D ScreenBoundingBox;
@@ -247,27 +267,16 @@ void UGTActorInfoGeneratorComponent::GenerateData(
                     ScreenBoundingBox.Max);
         }
 
-        TMap<FString, FStringFormatArg> GlobalProperties{
-            {TEXT("WorldLocation"), Vector3DToFormattedString(TrackedActor->GetActorLocation())},
-            {TEXT("WorldRotation"), RotatorToFormattedString(TrackedActor->GetActorRotation())},
-            {TEXT("ScreenLocation"), Vector2DToFormattedString(ScreenLocation)},
-            {TEXT("ScreenLocationNormalized"), Vector2DToFormattedString(ScreenLocationNormalized)},
-            {TEXT("ScreenBoundingBox"), Box2DToFormattedString(ScreenBoundingBox)},
-            {TEXT("ScreenBoundingBoxNormalized"),
-             Box2DToFormattedString(ScreenBoundingBoxNormalized)},
-            {TEXT("ActorName"), TrackedActor->GetName()},
-            {TEXT("MeshName"), MeshName}};
-
-        FString ActorResult = FString::Format(*FormatActorString, GlobalProperties);
-
-        for (const TPair<FString, FString>& ReplacePair : ReplaceStrings)
-        {
-            ActorResult.ReplaceInline(
-                *ReplacePair.Key, *ReplacePair.Value, ESearchCase::CaseSensitive);
-        }
-
-        Result.Append(ActorResult);
-        Result.Append(Separator);
+        AppendFormattedRow(
+            Result,
+            TrackedActor->GetName(),
+            MeshName,
+            TrackedActor->GetActorLocation(),
+            TrackedActor->GetActorRotation(),
+            ScreenLocation,
+            ScreenLocationNormalized,
+            ScreenBoundingBox,
+            ScreenBoundingBoxNormalized);
     }
 
     Result.RemoveFromEnd(Separator);
@@ -278,6 +287,125 @@ void UGTActorInfoGeneratorComponent::GenerateData(
     const auto Data = FGTFileUtilities::StringToCharArray(CurrentResult);
 
     DataReadyDelegate.Broadcast(Data, TimeStamp, FrameIndex);
+
+    if (bTrackInstancedStaticMeshInstances)
+    {
+        UE_LOG(
+            LogTemp,
+            Log,
+            TEXT(
+                "UnrealGT ActorInfo frame %d: ISM/HISM components considered=%d, "
+                "instances considered=%d, rows written=%d"),
+            FrameIndex,
+            InstancedComponentsConsidered,
+            InstancesConsidered,
+            InstancesWritten);
+    }
+}
+
+void UGTActorInfoGeneratorComponent::AppendFormattedRow(
+    FString& Result,
+    const FString& ObjectName,
+    const FString& MeshName,
+    const FVector& WorldLocation,
+    const FRotator& WorldRotation,
+    const FVector2D& ScreenLocation,
+    const FVector2D& ScreenLocationNormalized,
+    const FBox2D& ScreenBoundingBox,
+    const FBox2D& ScreenBoundingBoxNormalized)
+{
+    TMap<FString, FStringFormatArg> GlobalProperties{
+        {TEXT("WorldLocation"), Vector3DToFormattedString(WorldLocation)},
+        {TEXT("WorldRotation"), RotatorToFormattedString(WorldRotation)},
+        {TEXT("ScreenLocation"), Vector2DToFormattedString(ScreenLocation)},
+        {TEXT("ScreenLocationNormalized"), Vector2DToFormattedString(ScreenLocationNormalized)},
+        {TEXT("ScreenBoundingBox"), Box2DToFormattedString(ScreenBoundingBox)},
+        {TEXT("ScreenBoundingBoxNormalized"),
+         Box2DToFormattedString(ScreenBoundingBoxNormalized)},
+        {TEXT("ActorName"), ObjectName},
+        {TEXT("MeshName"), MeshName}};
+
+    FString Row = FString::Format(*FormatActorString, GlobalProperties);
+    for (const TPair<FString, FString>& ReplacePair : ReplaceStrings)
+    {
+        Row.ReplaceInline(*ReplacePair.Key, *ReplacePair.Value, ESearchCase::CaseSensitive);
+    }
+
+    Result.Append(Row);
+    Result.Append(Separator);
+}
+
+bool UGTActorInfoGeneratorComponent::DoesFilterMatchInstancedComponent(
+    const FGTObjectFilter& ObjectFilter,
+    UInstancedStaticMeshComponent* InstancedComponent) const
+{
+    if (!IsValid(InstancedComponent))
+    {
+        return false;
+    }
+
+    if (ObjectFilter.ActorInstance)
+    {
+        return ObjectFilter.ActorInstance == InstancedComponent->GetOwner();
+    }
+
+    return ObjectFilter.MatchesComponent(InstancedComponent);
+}
+
+bool UGTActorInfoGeneratorComponent::GetInstancedStaticMeshScreenBoundingBox(
+    const FBox& LocalBounds,
+    const FTransform& InstanceTransform,
+    UGTImageGeneratorBase* ImageGeneratorComponent,
+    FBox2D& OutBox) const
+{
+    if (!LocalBounds.IsValid || !ImageGeneratorComponent)
+    {
+        return false;
+    }
+
+    const FVector LocalCenter = LocalBounds.GetCenter();
+    const FVector LocalExtent = LocalBounds.GetExtent();
+    OutBox = FBox2D(EForceInit::ForceInit);
+
+    const FVector BoundsPointMapping[8] = {
+        FVector(1, 1, 1),
+        FVector(1, 1, -1),
+        FVector(1, -1, 1),
+        FVector(1, -1, -1),
+        FVector(-1, 1, 1),
+        FVector(-1, 1, -1),
+        FVector(-1, -1, 1),
+        FVector(-1, -1, -1)};
+
+    int32 ProjectedPointCount = 0;
+    for (const FVector& BoundsPoint : BoundsPointMapping)
+    {
+        const FVector WorldBoundsPoint =
+            InstanceTransform.TransformPosition(LocalCenter + BoundsPoint * LocalExtent);
+        FVector2D ProjectedWorldLocation;
+        if (ImageGeneratorComponent->GetSceneCaptureComponent()->ProjectToPixelLocation(
+                WorldBoundsPoint, ProjectedWorldLocation))
+        {
+            OutBox += ProjectedWorldLocation;
+            ProjectedPointCount++;
+        }
+    }
+
+    return ProjectedPointCount > 0 && OutBox.bIsValid &&
+           !OutBox.GetSize().IsNearlyZero();
+}
+
+bool UGTActorInfoGeneratorComponent::IsScreenBoundingBoxVisible(
+    const FBox2D& ScreenBoundingBox) const
+{
+    const FVector2D ScreenBoundingBoxSize = ScreenBoundingBox.GetSize();
+    if (!bRequireMinimumVisibleBoundingBox && !ScreenBoundingBoxSize.IsNearlyZero())
+    {
+        return true;
+    }
+
+    return ScreenBoundingBoxSize.X >= MinimalRequiredBoundingBoxSize.X &&
+           ScreenBoundingBoxSize.Y >= MinimalRequiredBoundingBoxSize.Y;
 }
 
 void UGTActorInfoGeneratorComponent::DrawDebug(FViewport* Viewport, FCanvas* Canvas)
@@ -313,6 +441,16 @@ void UGTActorInfoGeneratorComponent::DrawDebug(FViewport* Viewport, FCanvas* Can
                 ActorBoundingBoxPair.Value.Min + VectorOffset,
                 ActorBoundingBoxPair.Value.GetSize());
             BoxItem.SetColor(FColor::Red);
+            BoxItem.LineThickness = 1.f;
+            Canvas->DrawItem(BoxItem);
+        }
+        for (const FBox2D& InstanceBoundingBox : CachedInstancedBoundingBoxes)
+        {
+            FVector2D VectorOffset(1.f, 1.f);
+            FCanvasBoxItem BoxItem(
+                InstanceBoundingBox.Min + VectorOffset,
+                InstanceBoundingBox.GetSize());
+            BoxItem.SetColor(FColor::Green);
             BoxItem.LineThickness = 1.f;
             Canvas->DrawItem(BoxItem);
         }
@@ -385,6 +523,28 @@ void UGTActorInfoGeneratorComponent::BeginPlay()
 {
     Super::BeginPlay();
 
+    if (bTrackInstancedStaticMeshInstances &&
+        !LinkedImageGenerator.GetComponent(GetOwner()))
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT(
+                "UnrealGT ActorInfo per-instance tracking requires a linked image "
+                "generator; no ISM/HISM rows will be written."));
+    }
+
+    if (bTrackInstancedStaticMeshInstances && bAccurateBoundingBoxes)
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT(
+                "UnrealGT ActorInfo per-instance boxes use projected mesh bounds. "
+                "Accurate segmentation refinement is actor/component based and is not "
+                "applied per ISM/HISM instance."));
+    }
+
     if (bAccurateBoundingBoxes && LinkedImageGenerator.GetComponent(GetOwner()))
     {
         UGTImageGeneratorBase* LinkedImageGeneratorComponent =
@@ -405,18 +565,7 @@ bool UGTActorInfoGeneratorComponent::IsActorRenderedOnScreen(AActor* Actor)
     {
         FBox2D ScreenBoundingBox;
         GetActorScreenBoundingBox(Actor, LinkedImageGeneratorComponent, ScreenBoundingBox);
-        const auto ScreenBoundingBoxSize = ScreenBoundingBox.GetSize();
-
-        if (!bRequireMinimumVisibleBoundingBox && !ScreenBoundingBoxSize.IsNearlyZero())
-        {
-            return true;
-        }
-        
-        if (ScreenBoundingBoxSize.X < MinimalRequiredBoundingBoxSize.X ||
-            ScreenBoundingBoxSize.Y < MinimalRequiredBoundingBoxSize.Y)
-        {
-            return false;
-        }
+        return IsScreenBoundingBoxVisible(ScreenBoundingBox);
     }
 
     return true;
