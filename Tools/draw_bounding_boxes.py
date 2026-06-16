@@ -121,8 +121,8 @@ def draw_boxes(image_path: Path, boxes, output_path: Path, line_width: int = 3, 
         max_y = box["max_y"]
         label = box["label"]
 
-        # Green GT boxes.
-        color = (0, 255, 0)
+        # Red GT boxes.
+        color = (255, 0, 0)
 
         for i in range(line_width):
             draw.rectangle(
@@ -146,7 +146,7 @@ def draw_boxes(image_path: Path, boxes, output_path: Path, line_width: int = 3, 
 
             draw.rectangle(
                 [text_x, text_y, text_x + text_width + 6, text_y + text_height + 4],
-                fill=(0, 255, 0)
+                fill=(255, 0, 0)
             )
             draw.text(
                 (text_x + 3, text_y + 2),

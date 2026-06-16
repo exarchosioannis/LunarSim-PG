@@ -1,8 +1,8 @@
 #include "Robots/RoverCmdVelVehicleControllerComponent.h"
 
 #include "ChaosVehicleMovementComponent.h"
-#include "GameFramework/Actor.h"
 #include "Engine/World.h"
+#include "GameFramework/Actor.h"
 
 URoverCmdVelVehicleControllerComponent::URoverCmdVelVehicleControllerComponent()
 {
@@ -54,16 +54,28 @@ void URoverCmdVelVehicleControllerComponent::ResolveVehicleMovement()
 		return;
 	}
 
-	VehicleMovement = Owner->FindComponentByClass<UChaosVehicleMovementComponent>();
+	if (VehicleMovementOverride) {
+		VehicleMovement = VehicleMovementOverride;
+	} else {
+		VehicleMovement = Owner->FindComponentByClass<UChaosVehicleMovementComponent>();
+	}
 
 	if (!VehicleMovement) {
 		UE_LOG(
 			LogTemp,
 			Warning,
-			TEXT("RoverCmdVelVehicleControllerComponent: No ChaosVehicleMovementComponent found on %s."),
+			TEXT("RoverCmdVelVehicleControllerComponent: No ChaosVehicleMovementComponent found on %s. Put this component on the rover Pawn, or set VehicleMovementOverride in Details."),
 			*Owner->GetName()
 		);
+		return;
 	}
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("RoverCmdVelVehicleControllerComponent: Using ChaosVehicleMovementComponent on %s."),
+		*Owner->GetName()
+	);
 }
 
 void URoverCmdVelVehicleControllerComponent::SetupRos()
@@ -82,6 +94,8 @@ void URoverCmdVelVehicleControllerComponent::SetupRos()
 			&URoverCmdVelVehicleControllerComponent::OnCmdVel
 		)
 	);
+
+	UE_LOG(LogTemp, Log, TEXT("RoverCmdVelVehicleControllerComponent: Subscribed to %s."), *CmdVelTopic);
 }
 
 void URoverCmdVelVehicleControllerComponent::OnCmdVel(const FTwist& Msg)
@@ -91,6 +105,30 @@ void URoverCmdVelVehicleControllerComponent::OnCmdVel(const FTwist& Msg)
 	if (GetWorld()) {
 		LastCmdTime = GetWorld()->GetTimeSeconds();
 	}
+
+	if (bLogReceivedCmdVel) {
+		UE_LOG(
+			LogTemp,
+			Log,
+			TEXT("cmd_vel received: linear.x=%.3f angular.z=%.3f"),
+			Msg.LinearVelocity.X,
+			Msg.AngularVelocity.Z
+		);
+	}
+}
+
+void URoverCmdVelVehicleControllerComponent::RequestGear(int32 GearNum)
+{
+	if (!VehicleMovement || GearNum == 0) {
+		return;
+	}
+
+	if (LastRequestedGear == GearNum) {
+		return;
+	}
+
+	VehicleMovement->SetTargetGear(GearNum, true);
+	LastRequestedGear = GearNum;
 }
 
 void URoverCmdVelVehicleControllerComponent::UpdateVehicleInputs(float DeltaTime)
@@ -102,21 +140,21 @@ void URoverCmdVelVehicleControllerComponent::UpdateVehicleInputs(float DeltaTime
 	const float Now = GetWorld()->GetTimeSeconds();
 
 	FTwist SafeTwist = CurrentTwist;
+	const bool bTimedOut = (Now - LastCmdTime) > CmdTimeoutSec;
 
-	if ((Now - LastCmdTime) > CmdTimeoutSec) {
+	if (bTimedOut) {
 		SafeTwist.LinearVelocity = FVector::ZeroVector;
 		SafeTwist.AngularVelocity = FVector::ZeroVector;
 	}
 
-	float TargetThrottle = 0.0f;
-	float TargetBrake = 0.0f;
-	float TargetSteering = 0.0f;
-
 	const float LinearX = SafeTwist.LinearVelocity.X;
 	const float AngularZ = SafeTwist.AngularVelocity.Z;
 
+	float SignedThrottle = 0.0f;
+	float TargetSteering = 0.0f;
+
 	if (!FMath::IsNearlyZero(MaxCmdLinearMps)) {
-		TargetThrottle = FMath::Clamp(LinearX / MaxCmdLinearMps, -1.0f, 1.0f);
+		SignedThrottle = FMath::Clamp(LinearX / MaxCmdLinearMps, -1.0f, 1.0f);
 	}
 
 	if (!FMath::IsNearlyZero(MaxCmdAngularRadps)) {
@@ -124,33 +162,53 @@ void URoverCmdVelVehicleControllerComponent::UpdateVehicleInputs(float DeltaTime
 	}
 
 	if (bInvertThrottle) {
-		TargetThrottle *= -1.0f;
+		SignedThrottle *= -1.0f;
 	}
 
 	if (bInvertSteering) {
 		TargetSteering *= -1.0f;
 	}
 
-	/*
-		Important:
-		In your Blueprint, the "Break" axis is connected to SetBrakeInput.
-		But you said it behaves like reverse for this rover.
-		So for ROS:
-		  linear.x > 0  -> positive throttle
-		  linear.x < 0  -> brake/reverse input
-	*/
-	if (TargetThrottle >= 0.0f) {
+	if (FMath::Abs(SignedThrottle) < InputDeadZone) {
+		SignedThrottle = 0.0f;
+	}
+
+	if (FMath::Abs(TargetSteering) < InputDeadZone) {
+		TargetSteering = 0.0f;
+	}
+
+	float TargetThrottle = 0.0f;
+	float TargetBrake = 0.0f;
+
+	if (SignedThrottle > 0.0f) {
+		// Same idea as the Blueprint: SetTargetGear(1, true) -> SetThrottleInput(value)
+		RequestGear(1);
+		TargetThrottle = SignedThrottle;
 		TargetBrake = 0.0f;
+	} else if (SignedThrottle < 0.0f) {
+		if (bUseReverseGear) {
+			// Chaos reverse: gear -1, but throttle stays positive.
+			RequestGear(-1);
+			TargetThrottle = FMath::Abs(SignedThrottle);
+			TargetBrake = 0.0f;
+		} else if (bUseBrakeAsReverse) {
+			// Fallback for custom Blueprints that treat BrakeInput as reverse.
+			TargetThrottle = 0.0f;
+			TargetBrake = FMath::Abs(SignedThrottle);
+		} else {
+			TargetThrottle = 0.0f;
+			TargetBrake = 0.0f;
+		}
 	} else {
-		TargetBrake = FMath::Abs(TargetThrottle);
 		TargetThrottle = 0.0f;
+		TargetBrake = bBrakeWhenStopped ? FMath::Clamp(StopBrakeInput, 0.0f, 1.0f) : 0.0f;
 	}
 
 	CurrentThrottle = FMath::FInterpTo(CurrentThrottle, TargetThrottle, DeltaTime, ThrottleInterpSpeed);
 	CurrentSteering = FMath::FInterpTo(CurrentSteering, TargetSteering, DeltaTime, SteeringInterpSpeed);
 	CurrentBrake = FMath::FInterpTo(CurrentBrake, TargetBrake, DeltaTime, BrakeInterpSpeed);
 
-	VehicleMovement->SetThrottleInput(CurrentThrottle);
-	VehicleMovement->SetSteeringInput(CurrentSteering);
 	VehicleMovement->SetBrakeInput(CurrentBrake);
+	VehicleMovement->SetSteeringInput(CurrentSteering);
+	VehicleMovement->SetThrottleInput(CurrentThrottle);
 }

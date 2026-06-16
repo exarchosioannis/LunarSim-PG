@@ -118,9 +118,9 @@ private:
 	float PublishAccumulator = 0.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Camera")
-	int32 Width = 1280;
+	int32 Width = 1024;
 	UPROPERTY(EditAnywhere, Category = "Camera")
-	int32 Height = 720;
+	int32 Height = 1024;
 
 	// TF2
 	UPROPERTY()
@@ -152,7 +152,7 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Camera|Realism")
 	bool bUseGammaCorrection = true;
 	UPROPERTY(EditAnywhere, Category = "Camera|Realism", meta=(EditCondition="bUseGammaCorrection", ClampMin="0.1", ClampMax="4.0"))
-	float OutputGamma = 2.2f;
+	float OutputGamma = 3.0f;
 	UPROPERTY(EditAnywhere, Category = "Camera|Realism")
 	bool bUseFixedExposure = true;
 	UPROPERTY(EditAnywhere, Category = "Camera|Realism", meta=(EditCondition="bUseFixedExposure", ClampMin="-10.0", ClampMax="10.0"))

@@ -1,9 +1,13 @@
+/Tools
+/.agents
 /Intermediate
 /Content
 /.vscode
 /Saved
 /DerivedDataCache
+/.codex
 /bags
+/documentation
 /ros2_ws
 /.git
 /docker
