@@ -705,18 +705,21 @@ void UGTActorInfoGeneratorComponent::DrawDebug(FViewport* Viewport, FCanvas* Can
     Canvas->DrawItem(TextItem);
 }
 
+#if WITH_EDITOR
 bool UGTActorInfoGeneratorComponent::CanEditChange(const FProperty* InProperty) const
 {
-    if (InProperty->GetFName() == GET_MEMBER_NAME_CHECKED(UGTActorInfoGeneratorComponent, bOnlyTrackOnScreenActors) || InProperty->GetFName() == GET_MEMBER_NAME_CHECKED(UGTActorInfoGeneratorComponent, bAccurateBoundingBoxes))
+    if (InProperty->GetFName() == GET_MEMBER_NAME_CHECKED(UGTActorInfoGeneratorComponent, bOnlyTrackOnScreenActors) ||
+        InProperty->GetFName() == GET_MEMBER_NAME_CHECKED(UGTActorInfoGeneratorComponent, bAccurateBoundingBoxes))
     {
         if (!LinkedImageGenerator.IsSet())
         {
             return false;
         }
     }
-    
+
     return Super::CanEditChange(InProperty);
 }
+#endif
 
 void UGTActorInfoGeneratorComponent::BeginPlay()
 {
