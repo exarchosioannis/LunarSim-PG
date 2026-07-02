@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-export ROS_DOMAIN_ID=9
+export ROS_DOMAIN_ID=0
 export ROS_LOCALHOST_ONLY=0
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
