@@ -89,7 +89,7 @@ void UGTSegmentationGeneratorComponent::GenerateData(
     // BeginPlay can run before the simulator CaptureManager creates its session folder.
     // Write the metadata again on the first synchronized frame so every dataset session
     // contains its own SegmentationInfo/segmentation_info.json file.
-    const bool bShouldWriteSegmentationClasses = FrameIndex == 1 || bHadPendingRegistrations;
+    const bool bShouldWriteSegmentationClasses = FrameIndex == 0 || bHadPendingRegistrations;
     if (bShouldWriteSegmentationClasses)
     {
         FGTFileUtilities::WriteFileToSessionDirectory(

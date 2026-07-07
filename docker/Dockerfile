@@ -23,12 +23,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc && \
-    echo "if [ -f /ws/ros2_ws/install/setup.bash ]; then source /ws/ros2_ws/install/setup.bash; fi" >> /root/.bashrc
+    echo "if [ -f /ws/ros2_ws/install/setup.bash ]; then source /ws/ros2_ws/install/setup.bash; fi" >> /root/.bashrc && \
+    echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> /root/.bashrc && \
+    echo "export ROS_DOMAIN_ID=9" >> /root/.bashrc
 
 WORKDIR /ws
-
-COPY ./scripts /ws/scripts
-
-RUN chmod +x /ws/scripts/*.py
 
 CMD ["bash"]

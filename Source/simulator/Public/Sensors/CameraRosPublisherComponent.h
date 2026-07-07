@@ -29,7 +29,8 @@ public:
 	       UCameraComponent* InCamera,
 	       bool bInSubscribeToControl = true,
 	       bool bInIsRightStereoCamera = false,
-	       double InStereoBaselineMeters = 0.0
+	       double InStereoBaselineMeters = 0.0,
+	       ELunarSimRunMode InRunMode = ELunarSimRunMode::Dataset
        );
 
        void SetStereoCalibration(bool bInIsRightStereoCamera, double InStereoBaselineMeters);
@@ -73,10 +74,10 @@ private:
 	// Reusable ROS Messages
 	sensor_msgs::msg::Image ReusableImgMsg;
 	sensor_msgs::msg::CameraInfo ReusableCamInfoMsg;
-	std_msgs::msg::Int32 ReusableFrameIndexMsg;
 
 	bool bSubscribeToControl = true;
 	bool bIsRightStereoCamera = false;
 	double StereoBaselineMeters = 0.0;
+	ELunarSimRunMode RunMode = ELunarSimRunMode::Dataset;
 	bool bInitialized = false;
 };

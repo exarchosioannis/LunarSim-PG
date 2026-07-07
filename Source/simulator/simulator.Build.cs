@@ -11,7 +11,7 @@ public class simulator : ModuleRules
 		bEnableExceptions = true;
 	
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", 
-			"TempoROS", "rclcpp", "RHI", "RenderCore", "UnrealGT", "ChaosVehicles"});
+			"TempoROS", "rclcpp", "RHI", "RenderCore", "UnrealGT", "ChaosVehicles", "ImageWrapper"});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 

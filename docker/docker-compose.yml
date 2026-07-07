@@ -7,7 +7,7 @@ services:
     privileged: true
 
     environment:
-      ROS_DOMAIN_ID: "9"
+      ROS_DOMAIN_ID: "0"
       ROS_LOCALHOST_ONLY: "0"
       RMW_IMPLEMENTATION: "rmw_cyclonedds_cpp"
       DISPLAY: "${DISPLAY}"

@@ -13,22 +13,20 @@
 
 namespace
 {
-	FString CaptureModeToString(ECaptureMode CaptureMode)
+	FString CaptureOutputsToString(const FCaptureConfig& Config)
 	{
-		switch (CaptureMode) {
-		case ECaptureMode::MonoRos:
-			return TEXT("MonoRos");
-		case ECaptureMode::GroundTruth:
-			return TEXT("GroundTruth");
-		case ECaptureMode::StereoRos:
-			return TEXT("StereoRos");
-		case ECaptureMode::MonoRosGroundTruth:
-			return TEXT("MonoRosGroundTruth");
-		case ECaptureMode::StereoRosGroundTruth:
-			return TEXT("StereoRosGroundTruth");
-		default:
-			return TEXT("Unknown");
+		TArray<FString> Outputs;
+		if (Config.IsStereoRosEnabled()) {
+			Outputs.Add(TEXT("StereoRosImages"));
 		}
+		if (Config.IsGroundTruthEnabled()) {
+			Outputs.Add(TEXT("GroundTruthImages"));
+		}
+		if (Config.IsTrajectoryCsvEnabled()) {
+			Outputs.Add(TEXT("TrajectoryCsv"));
+		}
+
+		return Outputs.Num() > 0 ? FString::Join(Outputs, TEXT("+")) : TEXT("None");
 	}
 
 	FString NormalizeManifestPath(FString Path)
@@ -148,11 +146,11 @@ FCaptureFrameInfo UCaptureManager::NextFrameWithPose(double StampSeconds, const 
 		CompletePoseData.RoverBasePose = RoverPoseSource->GetWorldCapturePose();
 	}
 
-	FrameIndex++;
 	FCaptureFrameInfo FrameInfo;
 	FrameInfo.FrameIndex = FrameIndex;
 	FrameInfo.StampSeconds = StampSeconds;
 	FrameInfo.SessionId = CurrentSessionId;
+	FrameIndex++;
 
 	// Always write one canonical synchronization row for every capture frame.
 	AppendManifestRow(FrameInfo);
@@ -161,12 +159,14 @@ FCaptureFrameInfo UCaptureManager::NextFrameWithPose(double StampSeconds, const 
 	// Rover trajectory is always written when rover pose is available.
 	// Left camera trajectory is written when left/reference imagery exists: left ROS or UnrealGT.
 	// Right camera trajectory is written only for stereo ROS modes.
-	AppendTrajectoryRow(RoverGtTrajectoryFilePath, FrameInfo, CompletePoseData.RoverBasePose, TEXT("map"), TEXT("base_link"));
-	if (Config.IsLeftRosCameraEnabled() || Config.IsGroundTruthEnabled()) {
-		AppendTrajectoryRow(LeftCameraGtTrajectoryFilePath, FrameInfo, CompletePoseData.LeftCameraPose, TEXT("map"), TEXT("left_camera_link"));
-	}
-	if (Config.IsRightRosCameraEnabled()) {
-		AppendTrajectoryRow(RightCameraGtTrajectoryFilePath, FrameInfo, CompletePoseData.RightCameraPose, TEXT("map"), TEXT("right_camera_link"));
+	if (Config.IsTrajectoryCsvEnabled()) {
+		AppendTrajectoryRow(RoverGtTrajectoryFilePath, FrameInfo, CompletePoseData.RoverBasePose, TEXT("map"), TEXT("base_link"));
+		if (Config.IsLeftRosCameraEnabled() || Config.IsGroundTruthEnabled()) {
+			AppendTrajectoryRow(LeftCameraGtTrajectoryFilePath, FrameInfo, CompletePoseData.LeftCameraPose, TEXT("map"), TEXT("left_camera_link"));
+		}
+		if (Config.IsRightRosCameraEnabled()) {
+			AppendTrajectoryRow(RightCameraGtTrajectoryFilePath, FrameInfo, CompletePoseData.RightCameraPose, TEXT("map"), TEXT("right_camera_link"));
+		}
 	}
 
 	return FrameInfo;
@@ -226,9 +226,15 @@ void UCaptureManager::StartManifest()
 		"x_m,y_m,z_m,qx,qy,qz,qw\n"
 	);
 
-	FFileHelper::SaveStringToFile(TrajectoryHeader, *RoverGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
-	FFileHelper::SaveStringToFile(TrajectoryHeader, *LeftCameraGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
-	FFileHelper::SaveStringToFile(TrajectoryHeader, *RightCameraGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
+	if (Config.IsTrajectoryCsvEnabled()) {
+		FFileHelper::SaveStringToFile(TrajectoryHeader, *RoverGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
+		if (Config.IsStereoRosEnabled() || Config.IsGroundTruthEnabled()) {
+			FFileHelper::SaveStringToFile(TrajectoryHeader, *LeftCameraGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
+		}
+		if (Config.IsStereoRosEnabled()) {
+			FFileHelper::SaveStringToFile(TrajectoryHeader, *RightCameraGtTrajectoryFilePath, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_None);
+		}
+	}
 }
 
 void UCaptureManager::WriteSessionMetadata()
@@ -312,11 +318,11 @@ void UCaptureManager::WriteSessionMetadata()
 		CurrentSessionId.load(),
 		*EscapeJsonString(CurrentSessionName),
 		*EscapeJsonString(CreatedAt),
-		*EscapeJsonString(CaptureModeToString(Config.CaptureMode)),
-		Config.PublishHz,
-		Config.ImageWidth,
-		Config.ImageHeight,
-		*FString::SanitizeFloat(Config.StereoBaselineMeters),
+		*EscapeJsonString(CaptureOutputsToString(Config)),
+		Config.GetResolvedCaptureHz(),
+		Config.GetResolvedWidth(),
+		Config.GetResolvedHeight(),
+		*FString::SanitizeFloat(Config.GetStereoBaselineMeters()),
 		*EscapeJsonString(LevelName)
 	);
 
@@ -370,13 +376,16 @@ void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo)
 		? NormalizeManifestPath(FPaths::Combine(TEXT("Images"), TEXT("BoundingBoxes"), FrameFileStem + TEXT(".csv")))
 		: FString();
 
-	const FString RoverTrajectoryPath = RoverGtTrajectoryFilePath.IsEmpty()
+	const bool bTrajectoryCsvEnabled = Config.IsTrajectoryCsvEnabled();
+	const FString RoverTrajectoryPath = !bTrajectoryCsvEnabled || RoverGtTrajectoryFilePath.IsEmpty()
 		? FString()
 		: NormalizeManifestPath(FPaths::Combine(TEXT("Navigation"), TEXT("rover_gt_trajectory_ros.csv")));
-	const FString LeftCameraTrajectoryPath = LeftCameraGtTrajectoryFilePath.IsEmpty()
+	const bool bLeftCameraTrajectoryEnabled = Config.IsStereoRosEnabled() || Config.IsGroundTruthEnabled();
+	const bool bRightCameraTrajectoryEnabled = Config.IsStereoRosEnabled();
+	const FString LeftCameraTrajectoryPath = !bTrajectoryCsvEnabled || !bLeftCameraTrajectoryEnabled || LeftCameraGtTrajectoryFilePath.IsEmpty()
 		? FString()
 		: NormalizeManifestPath(FPaths::Combine(TEXT("Navigation"), TEXT("left_camera_gt_trajectory_ros.csv")));
-	const FString RightCameraTrajectoryPath = RightCameraGtTrajectoryFilePath.IsEmpty()
+	const FString RightCameraTrajectoryPath = !bTrajectoryCsvEnabled || !bRightCameraTrajectoryEnabled || RightCameraGtTrajectoryFilePath.IsEmpty()
 		? FString()
 		: NormalizeManifestPath(FPaths::Combine(TEXT("Navigation"), TEXT("right_camera_gt_trajectory_ros.csv")));
 

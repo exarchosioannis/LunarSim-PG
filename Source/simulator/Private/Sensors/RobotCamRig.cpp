@@ -20,6 +20,7 @@
 ARobotCamRig::ARobotCamRig()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	ResolveCaptureSettings();
 
 	Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
@@ -31,7 +32,7 @@ ARobotCamRig::ARobotCamRig()
 
 	RightCameraRoot = CreateDefaultSubobject<USceneComponent>(TEXT("RightCameraRoot"));
 	RightCameraRoot->SetupAttachment(Root);
-	RightCameraRoot->SetRelativeLocation(FVector(0.0f, StereoBaselineCm, 0.0f));
+	RightCameraRoot->SetRelativeLocation(FVector(0.0f, ResolvedStereoBaselineMeters * 100.0, 0.0f));
 	RightCameraRoot->SetRelativeRotation(FRotator::ZeroRotator);
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("RobotCamera"));
@@ -77,6 +78,7 @@ ARobotCamRig::ARobotCamRig()
 void ARobotCamRig::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
+	ResolveCaptureSettings();
 	ApplyStereoBaseline();
 }
 
@@ -84,6 +86,10 @@ void ARobotCamRig::BeginPlay()
 {
 	Super::BeginPlay();
 	EnforceCameraFrameIds();
+	ResolveCaptureSettings();
+	if (CaptureConfig.IsRos2LiveMode() && CaptureConfig.IsGroundTruthEnabled()) {
+		UE_LOG(LogTemp, Warning, TEXT("Ground Truth Images are enabled in ROS2 Live mode. This may reduce live experiment performance."));
+	}
 
 	//Attach RobotCamRig to the rover sensor mount first.
 	if (bAttachToRoverSensorMountOnBeginPlay && RoverActor) {
@@ -121,38 +127,35 @@ void ARobotCamRig::BeginPlay()
 
 	//Initialize RGB capture components.
 	if (RgbCaptureComponent && RGBCapture) {
-		RgbCaptureComponent->Initialize(RGBCapture,Width, Height, bUseGammaCorrection, OutputGamma, bUseFixedExposure, ExposureCompensation);
+		RgbCaptureComponent->Initialize(RGBCapture, ResolvedWidth, ResolvedHeight, bUseGammaCorrection, OutputGamma, bUseFixedExposure, ExposureCompensation);
 	}
 
 	if (RightRgbCaptureComponent && RightRGBCapture) {
-		RightRgbCaptureComponent->Initialize(RightRGBCapture, Width, Height, bUseGammaCorrection, OutputGamma, bUseFixedExposure, ExposureCompensation);
+		RightRgbCaptureComponent->Initialize(RightRGBCapture, ResolvedWidth, ResolvedHeight, bUseGammaCorrection, OutputGamma, bUseFixedExposure, ExposureCompensation);
 	}
 
-	//Initialize ROS image/camera_info/frame_index publishers.
+	//Initialize ROS image/camera_info publishers.
 	//Image and camera_info messages should use optical frames.
 	if (RosPublisherComponent && Camera) {
 		RosPublisherComponent->Initialize(
-			Width, Height,
+			ResolvedWidth, ResolvedHeight,
 			LeftCameraOpticalFrameId, TEXT("/left_camera"), Camera,
-			true, false, 0.0
+			true, false, 0.0, CaptureConfig.RunMode
 		);
 		RosPublisherComponent->OnCaptureControlReceived.AddUObject(this, &ARobotCamRig::OnCaptureControl );
 	}
 
 	if (RightRosPublisherComponent && RightCamera) {
 		RightRosPublisherComponent->Initialize(
-			Width, Height,
+			ResolvedWidth, ResolvedHeight,
 			RightCameraOpticalFrameId, TEXT("/right_camera"), RightCamera, false, true,
-			static_cast<double>(StereoBaselineCm) / 100.0
+			ResolvedStereoBaselineMeters, CaptureConfig.RunMode
 		);
 	}
 	//Initialize CaptureManager after camera components exist and are configured.
 	CaptureManager = NewObject<UCaptureManager>(this);
 
 	if (CaptureManager) {
-		CaptureConfig.ImageWidth = Width;
-		CaptureConfig.ImageHeight = Height;
-		CaptureConfig.StereoBaselineMeters = static_cast<double>(StereoBaselineCm) / 100.0;
 		CaptureManager->Initialize(CaptureConfig);
 		CaptureManager->SetLeftCameraPoseSource(Camera);
 		CaptureManager->SetRightCameraPoseSource(RightCamera);
@@ -173,7 +176,7 @@ void ARobotCamRig::BeginPlay()
 
 void ARobotCamRig::ApplyStereoBaseline()
 {
-	const float SafeBaselineCm = FMath::Clamp(StereoBaselineCm, 1.0f, 200.0f);
+	const double SafeBaselineCm = FMath::Clamp(ResolvedStereoBaselineMeters * 100.0, 1.0, 200.0);
 	// Important architecture rule:
 	// RobotCamRig actor transform is the left/reference camera pose.
 	// Therefore left camera and GT camera stay at local (0,0,0).
@@ -280,6 +283,13 @@ void ARobotCamRig::ResolveRoverGroundTruthComponents()
 	}
 }
 
+void ARobotCamRig::ResolveCaptureSettings()
+{
+	ResolvedWidth = CaptureConfig.GetResolvedWidth();
+	ResolvedHeight = CaptureConfig.GetResolvedHeight();
+	ResolvedStereoBaselineMeters = CaptureConfig.GetStereoBaselineMeters();
+}
+
 void ARobotCamRig::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -302,7 +312,7 @@ void ARobotCamRig::Tick(float DeltaSeconds)
 void ARobotCamRig::UpdatePublishTimer(float DeltaSeconds)
 {
 	PublishAccumulator += DeltaSeconds;
-	const float Hz = CaptureManager ? FMath::Clamp((float)CaptureManager->GetConfig().PublishHz, 1.0f, 24.0f) : 10.0f;
+	const float Hz = CaptureManager ? FMath::Clamp(static_cast<float>(CaptureManager->GetConfig().GetResolvedCaptureHz()), 1.0f, 60.0f) : 10.0f;
 	const float Period = 1.0f / Hz;
 	if (PublishAccumulator >= Period) {
 		PublishAccumulator -= Period;
@@ -428,34 +438,19 @@ void ARobotCamRig::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void ARobotCamRig::SetCaptureConfig(const FCaptureConfig& NewConfig)
 {
 	CaptureConfig = NewConfig;
-	CaptureConfig.ImageWidth = Width;
-	CaptureConfig.ImageHeight = Height;
-	CaptureConfig.StereoBaselineMeters = static_cast<double>(StereoBaselineCm) / 100.0;
-}
-
-FCaptureConfig ARobotCamRig::GetCaptureConfig() const
-{
-	return CaptureConfig;
-}
-
-void ARobotCamRig::SetStereoBaselineCm(float NewBaselineCm)
-{
-	StereoBaselineCm = FMath::Clamp(NewBaselineCm, 1.0f, 200.0f);
-	CaptureConfig.StereoBaselineMeters = static_cast<double>(StereoBaselineCm) / 100.0;
+	ResolveCaptureSettings();
 	ApplyStereoBaseline();
 	if (RightRosPublisherComponent) {
-		RightRosPublisherComponent->SetStereoCalibration(true, (double)StereoBaselineCm / 100.0);
+		RightRosPublisherComponent->SetStereoCalibration(true, ResolvedStereoBaselineMeters);
 	}
-	// If the baseline is changed at runtime, refresh the static camera TFs too.
 	if (CameraTfROSNode) {
 		PublishStaticCameraTransforms();
 	}
 }
 
-
-float ARobotCamRig::GetStereoBaselineCm() const
+FCaptureConfig ARobotCamRig::GetCaptureConfig() const
 {
-	return StereoBaselineCm;
+	return CaptureConfig;
 }
 
 AActor* ARobotCamRig::GetRoverActor() const

@@ -20,7 +20,8 @@ void UCameraRosPublisherComponent::Initialize(
 	UCameraComponent* InCamera,
 	bool bInSubscribeToControl,
 	bool bInIsRightStereoCamera,
-	double InStereoBaselineMeters)
+	double InStereoBaselineMeters,
+	ELunarSimRunMode InRunMode)
 {
 	Width = InWidth;
 	Height = InHeight;
@@ -29,6 +30,7 @@ void UCameraRosPublisherComponent::Initialize(
 	CameraName = InFrameId;
 	Camera = InCamera;
 	bSubscribeToControl = bInSubscribeToControl;
+	RunMode = InRunMode;
 	SetStereoCalibration(bInIsRightStereoCamera, InStereoBaselineMeters);
 
 	SetupReusableMessages();
@@ -48,10 +50,10 @@ void UCameraRosPublisherComponent::SetupReusableMessages()
 {
 	ReusableImgMsg.height = Height;
 	ReusableImgMsg.width = Width;
-	ReusableImgMsg.encoding = "bgra8";
+	ReusableImgMsg.encoding = "bgr8";
 	ReusableImgMsg.is_bigendian = false;
-	ReusableImgMsg.step = Width * 4;
-	ReusableImgMsg.data.resize((size_t)Width * (size_t)Height * 4);
+	ReusableImgMsg.step = Width * 3;
+	ReusableImgMsg.data.resize((size_t)Width * (size_t)Height * 3);
 
 	ReusableCamInfoMsg.height = Height;
 	ReusableCamInfoMsg.width = Width;
@@ -63,8 +65,12 @@ void UCameraRosPublisherComponent::SetupRos()
 {
        ROSNode = UTempoROSNode::Create(*CameraName, this);
 
+       const bool bLiveReliable = RunMode == ELunarSimRunMode::Ros2Live;
+       const int32 ImageQueueSize = bLiveReliable ? 5 : 20;
+       const TCHAR* QosModeName = bLiveReliable ? TEXT("LiveReliable") : TEXT("DatasetReliable");
+
        FROSQOSProfile ImageQOS;
-       ImageQOS.CustomQueueSize(20).Reliable();
+       ImageQOS.CustomQueueSize(ImageQueueSize).Reliable();
 
        FROSQOSProfile DefaultQOS;
        DefaultQOS.CustomQueueSize(10).Reliable();
@@ -77,12 +83,6 @@ void UCameraRosPublisherComponent::SetupRos()
 
        ROSNode->AddPublisher<sensor_msgs::msg::CameraInfo>(
 	       *(TopicBase + TEXT("/camera_info")),
-	       DefaultQOS,
-	       false
-       );
-
-       ROSNode->AddPublisher<std_msgs::msg::Int32>(
-	       *(TopicBase + TEXT("/frame_index")),
 	       DefaultQOS,
 	       false
        );
@@ -120,25 +120,32 @@ void UCameraRosPublisherComponent::PublishFrame(
 {
 	if (!ROSNode || !bInitialized) return;
 
-	//Convert pixel data to ROS message format
 	const int32 W = Width;
 	const int32 H = Height; 
-	const int32 BytesPerPixel = 4;
+	const int32 PixelCount = W * H;
+	const int32 InputBytesPerPixel = 4;
 	
-	if (PixelData.Num() != W * H * BytesPerPixel) return;
+	if (PixelData.Num() != PixelCount * InputBytesPerPixel) return;
 	
-	//Copy pixel data to reusable message
-	FMemory::Memcpy(ReusableImgMsg.data.data(), PixelData.GetData(), PixelData.Num());
+	// Unreal readback is BGRA; ROS image_raw is published as bgr8 by dropping alpha.
+	uint8* OutData = ReusableImgMsg.data.data();
+	const uint8* InData = PixelData.GetData();
+	for (int32 PixelIndex = 0; PixelIndex < PixelCount; ++PixelIndex) {
+		const int32 InOffset = PixelIndex * 4;
+		const int32 OutOffset = PixelIndex * 3;
+		OutData[OutOffset + 0] = InData[InOffset + 0];
+		OutData[OutOffset + 1] = InData[InOffset + 1];
+		OutData[OutOffset + 2] = InData[InOffset + 2];
+	}
 	
 	// Set message headers using FrameInfo
 	const builtin_interfaces::msg::Time Stamp = ToRosTime(FrameInfo.StampSeconds);
 	ReusableImgMsg.header.frame_id = TCHAR_TO_UTF8(*FrameId);
 	ReusableImgMsg.header.stamp = Stamp;
-	ReusableFrameIndexMsg.data = FrameInfo.FrameIndex;
 
-	//Publish messages
+	// Publish image and matching camera_info. FrameIndex remains internal for
+	// manifest/trajectory alignment and is not exposed as a ROS topic.
 	ROSNode->Publish<sensor_msgs::msg::Image>(*(TopicBase + TEXT("/rgb/image_raw")), ReusableImgMsg);
-	ROSNode->Publish<std_msgs::msg::Int32>(*(TopicBase + TEXT("/frame_index")), ReusableFrameIndexMsg);
 	PublishCameraInfo(Stamp);
 }
 

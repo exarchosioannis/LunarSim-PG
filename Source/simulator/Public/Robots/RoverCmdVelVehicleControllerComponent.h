@@ -2,13 +2,49 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Robots/RoverVehicleControllerComponent.h"
 
 #include "TempoROSNode.h"
 #include "TempoROSTypes.h"
 
 #include "RoverCmdVelVehicleControllerComponent.generated.h"
 
-class UChaosVehicleMovementComponent;
+UENUM(BlueprintType)
+enum class ERoverCmdVelStopMode : uint8
+{
+	RoverStop UMETA(DisplayName = "Rover stop / idle brake"),
+	EmergencyStop UMETA(DisplayName = "Full brake")
+};
+
+USTRUCT(BlueprintType)
+struct SIMULATOR_API FRoverCmdVelControllerSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ROS")
+	FString CmdVelTopic = TEXT("/cmd_vel");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Control", meta = (ClampMin = "0.01", UIMin = "0.01", Units = "m/s"))
+	float MaxCmdLinearMps = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Control", meta = (ClampMin = "0.01", UIMin = "0.01", Units = "rad/s"))
+	float MaxCmdAngularRadps = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Control", meta = (ClampMin = "0.0", UIMin = "0.0", Units = "s"))
+	float CmdTimeoutSec = 0.75f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Control", meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "0.25"))
+	float InputDeadZone = 0.02f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Control")
+	bool bInvertThrottle = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Control")
+	bool bInvertSteering = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Control")
+	ERoverCmdVelStopMode StopMode = ERoverCmdVelStopMode::RoverStop;
+};
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class SIMULATOR_API URoverCmdVelVehicleControllerComponent : public UActorComponent
@@ -17,6 +53,18 @@ class SIMULATOR_API URoverCmdVelVehicleControllerComponent : public UActorCompon
 
 public:
 	URoverCmdVelVehicleControllerComponent();
+
+	UFUNCTION(BlueprintCallable, Category = "Rover CmdVel Controller")
+	void SetSettings(const FRoverCmdVelControllerSettings& NewSettings);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Rover CmdVel Controller")
+	FRoverCmdVelControllerSettings GetSettings() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Rover CmdVel Controller")
+	void SetCmdVelTopic(const FString& NewCmdVelTopic);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Rover CmdVel Controller")
+	FString GetCmdVelTopic() const;
 
 protected:
 	virtual void BeginPlay() override;
@@ -34,94 +82,34 @@ private:
 	UTempoROSNode* ROSNode = nullptr;
 
 	UPROPERTY()
-	UChaosVehicleMovementComponent* VehicleMovement = nullptr;
+	URoverVehicleControllerComponent* RoverController = nullptr;
 
 	/*
 		Optional manual reference.
 		Use this only if this component is not placed on the same Actor/Pawn
-		as the Chaos Vehicle Movement Component.
+		as the RoverVehicleControllerComponent.
 	*/
 	UPROPERTY(EditAnywhere, Category = "Vehicle")
-	UChaosVehicleMovementComponent* VehicleMovementOverride = nullptr;
+	URoverVehicleControllerComponent* RoverControllerOverride = nullptr;
 
-	UPROPERTY(EditAnywhere, Category = "ROS")
-	FString CmdVelTopic = TEXT("/cmd_vel");
-
-	/*
-		ROS cmd_vel scaling:
-		linear.x = MaxCmdLinearMps gives full throttle.
-		angular.z = MaxCmdAngularRadps gives full steering.
-	*/
-	UPROPERTY(EditAnywhere, Category = "Control")
-	float MaxCmdLinearMps = 1.0f;
-
-	UPROPERTY(EditAnywhere, Category = "Control")
-	float MaxCmdAngularRadps = 1.0f;
-
-	UPROPERTY(EditAnywhere, Category = "Control")
-	float CmdTimeoutSec = 0.75f;
-
-	UPROPERTY(EditAnywhere, Category = "Control")
-	float InputDeadZone = 0.02f;
-
-	UPROPERTY(EditAnywhere, Category = "Control")
-	float ThrottleInterpSpeed = 3.0f;
-
-	UPROPERTY(EditAnywhere, Category = "Control")
-	float SteeringInterpSpeed = 5.0f;
-
-	UPROPERTY(EditAnywhere, Category = "Control")
-	float BrakeInterpSpeed = 8.0f;
-
-	/*
-		When cmd_vel goes to zero, ROS usually means "stop".
-		Keep this true for rover control. If the rover feels too abrupt,
-		lower StopBrakeInput or disable this.
-	*/
-	UPROPERTY(EditAnywhere, Category = "Control")
-	bool bBrakeWhenStopped = true;
-
-	UPROPERTY(EditAnywhere, Category = "Control", meta = (EditCondition = "bBrakeWhenStopped"))
-	float StopBrakeInput = 1.0f;
-
-	/*
-		Default mode for negative linear.x:
-		linear.x < 0 -> SetTargetGear(-1, true) + positive throttle.
-		This matches Chaos Vehicle better than using brake as reverse.
-	*/
-	UPROPERTY(EditAnywhere, Category = "Control")
-	bool bUseReverseGear = true;
-
-	/*
-		Fallback only. Enable this if your specific vehicle Blueprint uses
-		BrakeInput as reverse instead of Gear -1.
-	*/
-	UPROPERTY(EditAnywhere, Category = "Control", meta = (EditCondition = "!bUseReverseGear"))
-	bool bUseBrakeAsReverse = false;
-
-	UPROPERTY(EditAnywhere, Category = "Control")
-	bool bInvertSteering = false;
-
-	UPROPERTY(EditAnywhere, Category = "Control")
-	bool bInvertThrottle = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rover CmdVel Controller", meta = (AllowPrivateAccess = "true"))
+	FRoverCmdVelControllerSettings Settings;
 
 	UPROPERTY(EditAnywhere, Category = "Debug")
 	bool bLogReceivedCmdVel = false;
 
 	FTwist CurrentTwist;
 
-	float LastCmdTime = 0.0f;
-
-	float CurrentThrottle = 0.0f;
-	float CurrentSteering = 0.0f;
-	float CurrentBrake = 0.0f;
-
-	int32 LastRequestedGear = 0;
+	FString SubscribedCmdVelTopic;
+	float LastCmdTime = -1000000.0f;
+	bool bHasReceivedCommand = false;
+	bool bLoggedMissingRoverController = false;
 
 	void SetupRos();
-	void ResolveVehicleMovement();
+	void ResolveRoverController();
 	void OnCmdVel(const FTwist& Msg);
 
-	void UpdateVehicleInputs(float DeltaTime);
-	void RequestGear(int32 GearNum);
+	void UpdateRoverCommand(float DeltaTime);
+	void ApplyStopCommand();
+	FRoverCmdVelControllerSettings MakeSanitizedSettings(const FRoverCmdVelControllerSettings& InSettings) const;
 };

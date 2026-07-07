@@ -79,10 +79,11 @@ private:
 	const FString ElevationPointCloudTopic = TEXT("/gt/map/elevation_points");
 	const FString MapFrameId = TEXT("map");
 
-	// 220m x 220m at 0.40m/cell gives a 550 x 550 grid.
+	// 520m x 520m at 0.40m/cell gives a 1300 x 1300 grid.
+	// With the map publisher centered at ROS (0,0), this covers [-260,+260]m.
 	const float ResolutionMeters = 0.40f;
-	const float MapWidthMeters = 220.0f;
-	const float MapHeightMeters = 220.0f;
+	const float MapWidthMeters = 520.0f;
+	const float MapHeightMeters = 520.0f;
 
 	// Unreal uses centimeters. 2500 cm = 25m above/below the map center height.
 	const float TraceStartHeightCm = 2500.0f;

@@ -28,9 +28,6 @@ public:
 	void SetCaptureConfig(const FCaptureConfig& NewConfig);
 	FCaptureConfig GetCaptureConfig() const;
 
-	void SetStereoBaselineCm(float NewBaselineCm);
-	float GetStereoBaselineCm() const;
-
 	AActor* GetRoverActor() const;
 
 protected:
@@ -49,7 +46,7 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	USceneComponent* LeftCameraRoot = nullptr;
 
-	// RightCameraRoot is placed at local +Y * StereoBaselineCm.
+	// RightCameraRoot is placed at local +Y using the baseline resolved from CaptureConfig.
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	USceneComponent* RightCameraRoot = nullptr;
 
@@ -116,11 +113,9 @@ private:
 
 	// Camera Settings
 	float PublishAccumulator = 0.0f;
-
-	UPROPERTY(EditAnywhere, Category = "Camera")
-	int32 Width = 1024;
-	UPROPERTY(EditAnywhere, Category = "Camera")
-	int32 Height = 1024;
+	int32 ResolvedWidth = 1024;
+	int32 ResolvedHeight = 1024;
+	double ResolvedStereoBaselineMeters = 0.2;
 
 	// TF2
 	UPROPERTY()
@@ -141,12 +136,7 @@ private:
 	void SetupCameraTfNode();
 	void PublishStaticCameraTransforms();
 	void EnforceCameraFrameIds();
-
-	// Unreal uses centimeters.
-	// The left/reference camera remains at RobotCamRig local (0,0,0).
-	// The right camera is always placed at local (0, StereoBaselineCm, 0).
-	UPROPERTY(EditAnywhere, Category = "Stereo", meta = (ClampMin = "1.0", ClampMax = "200.0", UIMin = "1.0", UIMax = "100.0"))
-	float StereoBaselineCm = 20.0f;
+	void ResolveCaptureSettings();
 
 	// Camera Realism
 	UPROPERTY(EditAnywhere, Category = "Camera|Realism")
