@@ -170,4 +170,8 @@ private:
 	// Ground truth helpers
 	void ResolveGroundTruthCameraChild();
 	void ResolveRoverGroundTruthComponents();
+
+	// Runtime rover resolution helper. Keeps the old manually-assigned RoverActor workflow,
+	// but also supports RobotCamRig being spawned as a child actor inside ESA_Rover.
+	AActor* ResolveRoverActor() const;
 };

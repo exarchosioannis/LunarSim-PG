@@ -2,8 +2,10 @@
 
 #include "Editor.h"
 #include "EngineUtils.h"
+#include "Components/ChildActorComponent.h"
 #include "GameFramework/Actor.h"
 #include "Maps/OccupancyMapPublisherComponent.h"
+#include "Robots/RoverGroundTruthPublisherComponent.h"
 #include "Sensors/ImuSensorPublisherComponent.h"
 #include "Sensors/RobotCamRig.h"
 #include "Capture/CaptureTypes.h"
@@ -34,7 +36,126 @@ ERoverControlMode NormalizeEditorRoverControlMode(ERoverControlMode InMode)
 {
 	return InMode == ERoverControlMode::RosCmdVel ? ERoverControlMode::RosCmdVel : ERoverControlMode::Manual;
 }
+
+ELunarSimResolutionPreset NormalizeEditorResolutionPreset(ELunarSimResolutionPreset InPreset, int32 Width, int32 Height)
+{
+	switch (InPreset)
+	{
+	case ELunarSimResolutionPreset::R576x320:
+	case ELunarSimResolutionPreset::R640x480:
+	case ELunarSimResolutionPreset::R1024x1024:
+	case ELunarSimResolutionPreset::R1280x720:
+	case ELunarSimResolutionPreset::R1920x1080:
+		return InPreset;
+	default:
+		break;
+	}
+
+	if (Width == 576 && Height == 320) return ELunarSimResolutionPreset::R576x320;
+	if (Width == 640 && Height == 480) return ELunarSimResolutionPreset::R640x480;
+	if (Width == 1024 && Height == 1024) return ELunarSimResolutionPreset::R1024x1024;
+	if (Width == 1280 && Height == 720) return ELunarSimResolutionPreset::R1280x720;
+	if (Width == 1920 && Height == 1080) return ELunarSimResolutionPreset::R1920x1080;
+
+	return ELunarSimResolutionPreset::R1024x1024;
 }
+
+bool HasInvalidEditorFlags(const UObject* Object)
+{
+	return !Object
+		|| Object->HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject | RF_BeginDestroyed | RF_FinishDestroyed);
+}
+
+bool IsUsableEditorActor(AActor* Actor, const UWorld* ExpectedWorld)
+{
+	return IsValid(Actor)
+		&& Actor->GetWorld() == ExpectedWorld
+		&& !Actor->IsActorBeingDestroyed()
+		&& !HasInvalidEditorFlags(Actor);
+}
+
+bool IsUsableRobotCamRig(ARobotCamRig* RobotCamRig, const UWorld* ExpectedWorld)
+{
+	return IsUsableEditorActor(RobotCamRig, ExpectedWorld)
+		&& IsValid(RobotCamRig->GetRootComponent())
+		&& !HasInvalidEditorFlags(RobotCamRig->GetRootComponent());
+}
+
+bool IsUsableComponent(const UActorComponent* Component)
+{
+	return IsValid(Component) && !HasInvalidEditorFlags(Component);
+}
+
+template <typename ComponentType>
+ComponentType* FindUsableComponentByClass(AActor* Actor)
+{
+	ComponentType* Component = Actor ? Actor->FindComponentByClass<ComponentType>() : nullptr;
+	return IsUsableComponent(Component) ? Component : nullptr;
+}
+
+ARobotCamRig* FindUsableRobotCamRigChildActor(AActor* RoverActor, const UWorld* EditorWorld, UChildActorComponent*& OutChildActorComponent)
+{
+	OutChildActorComponent = nullptr;
+	if (!IsUsableEditorActor(RoverActor, EditorWorld)) {
+		return nullptr;
+	}
+
+	TArray<UChildActorComponent*> ChildActorComponents;
+	RoverActor->GetComponents<UChildActorComponent>(ChildActorComponents);
+	for (UChildActorComponent* ChildActorComponent : ChildActorComponents)
+	{
+		if (!IsUsableComponent(ChildActorComponent)) {
+			continue;
+		}
+
+		ARobotCamRig* RobotCamRig = Cast<ARobotCamRig>(ChildActorComponent->GetChildActor());
+		if (!IsUsableRobotCamRig(RobotCamRig, EditorWorld)) {
+			continue;
+		}
+
+		OutChildActorComponent = ChildActorComponent;
+		return RobotCamRig;
+	}
+
+	return nullptr;
+}
+
+bool ResolveCompleteRoverPipeline(
+	AActor* RoverActor,
+	UWorld* EditorWorld,
+	ARobotCamRig*& OutRobotCamRig,
+	UChildActorComponent*& OutRobotCamRigChildComponent,
+	URoverGroundTruthPublisherComponent*& OutGroundTruthPublisher,
+	UImuSensorPublisherComponent*& OutImuPublisher,
+	URoverVehicleControllerComponent*& OutRoverController,
+	URoverCmdVelVehicleControllerComponent*& OutCmdVelController)
+{
+	OutRobotCamRig = nullptr;
+	OutRobotCamRigChildComponent = nullptr;
+	OutGroundTruthPublisher = nullptr;
+	OutImuPublisher = nullptr;
+	OutRoverController = nullptr;
+	OutCmdVelController = nullptr;
+
+	if (!IsUsableEditorActor(RoverActor, EditorWorld)) {
+		return false;
+	}
+
+	OutGroundTruthPublisher = FindUsableComponentByClass<URoverGroundTruthPublisherComponent>(RoverActor);
+	OutImuPublisher = FindUsableComponentByClass<UImuSensorPublisherComponent>(RoverActor);
+	OutRoverController = FindUsableComponentByClass<URoverVehicleControllerComponent>(RoverActor);
+	OutCmdVelController = FindUsableComponentByClass<URoverCmdVelVehicleControllerComponent>(RoverActor);
+	OutRobotCamRig = FindUsableRobotCamRigChildActor(RoverActor, EditorWorld, OutRobotCamRigChildComponent);
+
+	return OutGroundTruthPublisher
+		&& OutImuPublisher
+		&& OutRoverController
+		&& OutCmdVelController
+		&& OutRobotCamRig
+		&& OutRobotCamRigChildComponent;
+}
+}
+
 
 void FsimulatorEditorModule::StartupModule()
 {
@@ -106,17 +227,24 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 {
 	InitRunModeOptions();
 	InitResolutionPresetOptions();
-	InitCaptureRatePresetOptions();
 	InitRoverControlOptions();
 	SelectedRunModeOption = FindRunModeOption(RunMode);
 	SelectedResolutionPresetOption = FindResolutionPresetOption(ResolutionPreset);
-	SelectedCaptureRatePresetOption = FindCaptureRatePresetOption(CaptureRatePreset);
 	SelectedRoverControlModeOption = FindRoverControlModeOption(RoverControlMode);
 
 	return SNew(SBox)
 		.Padding(12.0f)
 		[
 			SNew(SVerticalBox)
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(4.f, 0.f, 4.f, 4.f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("ModeSectionLabel", "Mode"))
+				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
+			]
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
@@ -151,8 +279,30 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 						]
 					]
 				]
+			]
 
-				+ SGridPanel::Slot(0, 1)
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 12.f, 0.f, 8.f)
+			[
+				SNew(SSeparator)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(4.f, 0.f, 4.f, 4.f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("DataOutputsSectionLabel", "Data Outputs"))
+				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			[
+				SNew(SGridPanel)
+
+				+ SGridPanel::Slot(0, 0)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Left)
 				.VAlign(VAlign_Center)
@@ -161,7 +311,7 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 					.Text(LOCTEXT("StereoRosImagesLabel", "Stereo ROS Images + CameraInfo"))
 				]
 
-				+ SGridPanel::Slot(1, 1)
+				+ SGridPanel::Slot(1, 0)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Right)
 				.VAlign(VAlign_Center)
@@ -171,7 +321,7 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 					.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnStereoRosImagesChanged)
 				]
 
-				+ SGridPanel::Slot(0, 2)
+				+ SGridPanel::Slot(0, 1)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Left)
 				.VAlign(VAlign_Center)
@@ -180,7 +330,7 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 					.Text(LOCTEXT("GroundTruthImagesLabel", "Ground Truth Images"))
 				]
 
-				+ SGridPanel::Slot(1, 2)
+				+ SGridPanel::Slot(1, 1)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Right)
 				.VAlign(VAlign_Center)
@@ -190,7 +340,7 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 					.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnGroundTruthImagesChanged)
 				]
 
-				+ SGridPanel::Slot(0, 3)
+				+ SGridPanel::Slot(0, 2)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Left)
 				.VAlign(VAlign_Center)
@@ -199,7 +349,7 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 					.Text(LOCTEXT("TrajectoryCsvLabel", "Trajectory CSV"))
 				]
 
-				+ SGridPanel::Slot(1, 3)
+				+ SGridPanel::Slot(1, 2)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Right)
 				.VAlign(VAlign_Center)
@@ -209,16 +359,58 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 					.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnTrajectoryCsvChanged)
 				]
 
-				+ SGridPanel::Slot(0, 4)
+				+ SGridPanel::Slot(0, 3)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Left)
 				.VAlign(VAlign_Center)
 				[
 					SNew(STextBlock)
-					.Text(LOCTEXT("ResolutionPresetLabel", "Resolution Preset"))
+					.Text(LOCTEXT("GroundTruthRosMapsLabel", "Ground Truth ROS Maps"))
 				]
 
-				+ SGridPanel::Slot(1, 4)
+				+ SGridPanel::Slot(1, 3)
+				.Padding(4.f, 6.f)
+				.HAlign(HAlign_Right)
+				.VAlign(VAlign_Center)
+				[
+					SNew(SCheckBox)
+					.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditGroundTruthMaps)
+					.IsChecked_Raw(this, &FsimulatorEditorModule::GetEnableGroundTruthMapsCheckState)
+					.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnEnableGroundTruthMapsChanged)
+				]
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 12.f, 0.f, 8.f)
+			[
+				SNew(SSeparator)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(4.f, 0.f, 4.f, 4.f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("CaptureSectionLabel", "Capture"))
+				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			[
+				SNew(SGridPanel)
+
+				+ SGridPanel::Slot(0, 0)
+				.Padding(4.f, 6.f)
+				.HAlign(HAlign_Left)
+				.VAlign(VAlign_Center)
+				[
+					SNew(STextBlock)
+					.Text(LOCTEXT("ResolutionLabel", "Resolution"))
+				]
+
+				+ SGridPanel::Slot(1, 0)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Right)
 				.VAlign(VAlign_Center)
@@ -238,112 +430,22 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 					]
 				]
 
-				+ SGridPanel::Slot(0, 5)
+				+ SGridPanel::Slot(0, 1)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Left)
 				.VAlign(VAlign_Center)
 				[
 					SNew(STextBlock)
-					.Text(LOCTEXT("CustomWidthLabel", "Custom Width"))
+					.Text(LOCTEXT("CaptureHzLabel", "Capture Hz"))
 				]
 
-				+ SGridPanel::Slot(1, 5)
+				+ SGridPanel::Slot(1, 1)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Right)
 				.VAlign(VAlign_Center)
 				[
 					SNew(SBox)
 					.WidthOverride(120.f)
-					.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditCustomResolution)
-					[
-						SNew(SNumericEntryBox<int32>)
-						.Value_Lambda([this]() -> TOptional<int32>
-						{
-							return CustomWidth;
-						})
-						.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnCustomWidthChanged)
-						.MinValue(1)
-						.MinSliderValue(1)
-						.AllowSpin(true)
-					]
-				]
-
-				+ SGridPanel::Slot(0, 6)
-				.Padding(4.f, 6.f)
-				.HAlign(HAlign_Left)
-				.VAlign(VAlign_Center)
-				[
-					SNew(STextBlock)
-					.Text(LOCTEXT("CustomHeightLabel", "Custom Height"))
-				]
-
-				+ SGridPanel::Slot(1, 6)
-				.Padding(4.f, 6.f)
-				.HAlign(HAlign_Right)
-				.VAlign(VAlign_Center)
-				[
-					SNew(SBox)
-					.WidthOverride(120.f)
-					.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditCustomResolution)
-					[
-						SNew(SNumericEntryBox<int32>)
-						.Value_Lambda([this]() -> TOptional<int32>
-						{
-							return CustomHeight;
-						})
-						.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnCustomHeightChanged)
-						.MinValue(1)
-						.MinSliderValue(1)
-						.AllowSpin(true)
-					]
-				]
-
-				+ SGridPanel::Slot(0, 7)
-				.Padding(4.f, 6.f)
-				.HAlign(HAlign_Left)
-				.VAlign(VAlign_Center)
-				[
-					SNew(STextBlock)
-					.Text(LOCTEXT("CaptureRatePresetLabel", "Capture Rate"))
-				]
-
-				+ SGridPanel::Slot(1, 7)
-				.Padding(4.f, 6.f)
-				.HAlign(HAlign_Right)
-				.VAlign(VAlign_Center)
-				[
-					SNew(SBox)
-					.WidthOverride(240.f)
-					[
-						SNew(SComboBox<TSharedPtr<ELunarSimCaptureRatePreset>>)
-						.OptionsSource(&CaptureRatePresetOptions)
-						.InitiallySelectedItem(SelectedCaptureRatePresetOption)
-						.OnGenerateWidget_Raw(this, &FsimulatorEditorModule::MakeCaptureRatePresetComboWidget)
-						.OnSelectionChanged_Raw(this, &FsimulatorEditorModule::OnCaptureRatePresetSelectionChanged)
-						[
-							SNew(STextBlock)
-							.Text_Raw(this, &FsimulatorEditorModule::GetCaptureRatePresetText)
-						]
-					]
-				]
-
-				+ SGridPanel::Slot(0, 8)
-				.Padding(4.f, 6.f)
-				.HAlign(HAlign_Left)
-				.VAlign(VAlign_Center)
-				[
-					SNew(STextBlock)
-					.Text(LOCTEXT("CustomCaptureHzLabel", "Custom Capture Hz"))
-				]
-
-				+ SGridPanel::Slot(1, 8)
-				.Padding(4.f, 6.f)
-				.HAlign(HAlign_Right)
-				.VAlign(VAlign_Center)
-				[
-					SNew(SBox)
-					.WidthOverride(120.f)
-					.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditCustomCaptureHz)
 					[
 						SNew(SNumericEntryBox<int32>)
 						.Value_Lambda([this]() -> TOptional<int32>
@@ -351,24 +453,24 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 							return CustomCaptureHz;
 						})
 						.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnCustomCaptureHzChanged)
-						.MinValue(1)
-						.MaxValue(60)
-						.MinSliderValue(1)
-						.MaxSliderValue(60)
+						.MinValue(0)
+						.MaxValue(24)
+						.MinSliderValue(0)
+						.MaxSliderValue(24)
 						.AllowSpin(true)
 					]
 				]
 
-				+ SGridPanel::Slot(0, 9)
+				+ SGridPanel::Slot(0, 2)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Left)
 				.VAlign(VAlign_Center)
 				[
 					SNew(STextBlock)
-					.Text(LOCTEXT("StereoBaselineCmLabel", "Stereo Baseline Cm"))
+					.Text(LOCTEXT("StereoBaselineCmLabel", "Stereo Baseline cm"))
 				]
 
-				+ SGridPanel::Slot(1, 9)
+				+ SGridPanel::Slot(1, 2)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Right)
 				.VAlign(VAlign_Center)
@@ -389,28 +491,30 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 						.AllowSpin(true)
 					]
 				]
+			]
 
-				+ SGridPanel::Slot(0, 10)
-				.Padding(4.f, 6.f)
-				.HAlign(HAlign_Left)
-				.VAlign(VAlign_Center)
-				[
-					SNew(STextBlock)
-					.Text(LOCTEXT("EnableGroundTruthMapsLabel", "Enable Ground Truth Maps"))
-				]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 12.f, 0.f, 8.f)
+			[
+				SNew(SSeparator)
+			]
 
-				+ SGridPanel::Slot(1, 10)
-				.Padding(4.f, 6.f)
-				.HAlign(HAlign_Right)
-				.VAlign(VAlign_Center)
-				[
-					SNew(SCheckBox)
-					.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditGroundTruthMaps)
-					.IsChecked_Raw(this, &FsimulatorEditorModule::GetEnableGroundTruthMapsCheckState)
-					.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnEnableGroundTruthMapsChanged)
-				]
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(4.f, 0.f, 4.f, 4.f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("SensorsSectionLabel", "Sensors"))
+				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
+			]
 
-				+ SGridPanel::Slot(0, 11)
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			[
+				SNew(SGridPanel)
+
+				+ SGridPanel::Slot(0, 0)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Left)
 				.VAlign(VAlign_Center)
@@ -419,7 +523,7 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 					.Text(LOCTEXT("ImuHzLabel", "IMU Hz"))
 				]
 
-				+ SGridPanel::Slot(1, 11)
+				+ SGridPanel::Slot(1, 0)
 				.Padding(4.f, 6.f)
 				.HAlign(HAlign_Right)
 				.VAlign(VAlign_Center)
@@ -445,7 +549,16 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(0.f, 14.f, 0.f, 8.f)
+			.Padding(4.f, 0.f, 4.f, 4.f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("ImuHzNote", "Note: Effective IMU rate is capped by simulator FPS."))
+				.AutoWrapText(true)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 12.f, 0.f, 8.f)
 			[
 				SNew(SSeparator)
 			]
@@ -547,7 +660,7 @@ FString FsimulatorEditorModule::RunModeToString(ELunarSimRunMode InMode) const
 	case ELunarSimRunMode::Dataset:
 		return TEXT("Dataset");
 	case ELunarSimRunMode::Ros2Live:
-		return TEXT("ROS2 Live");
+		return TEXT("ROS2Live");
 	default:
 		return TEXT("Dataset");
 	}
@@ -576,10 +689,11 @@ void FsimulatorEditorModule::InitResolutionPresetOptions()
 {
 	if (ResolutionPresetOptions.Num() > 0) return;
 
+	ResolutionPresetOptions.Add(MakeShared<ELunarSimResolutionPreset>(ELunarSimResolutionPreset::R576x320));
 	ResolutionPresetOptions.Add(MakeShared<ELunarSimResolutionPreset>(ELunarSimResolutionPreset::R640x480));
-	ResolutionPresetOptions.Add(MakeShared<ELunarSimResolutionPreset>(ELunarSimResolutionPreset::R1280x720));
 	ResolutionPresetOptions.Add(MakeShared<ELunarSimResolutionPreset>(ELunarSimResolutionPreset::R1024x1024));
-	ResolutionPresetOptions.Add(MakeShared<ELunarSimResolutionPreset>(ELunarSimResolutionPreset::Custom));
+	ResolutionPresetOptions.Add(MakeShared<ELunarSimResolutionPreset>(ELunarSimResolutionPreset::R1280x720));
+	ResolutionPresetOptions.Add(MakeShared<ELunarSimResolutionPreset>(ELunarSimResolutionPreset::R1920x1080));
 }
 
 TSharedPtr<ELunarSimResolutionPreset> FsimulatorEditorModule::FindResolutionPresetOption(ELunarSimResolutionPreset InPreset) const
@@ -591,21 +705,23 @@ TSharedPtr<ELunarSimResolutionPreset> FsimulatorEditorModule::FindResolutionPres
 			return Option;
 		}
 	}
-	return nullptr;
+	return ResolutionPresetOptions.Num() > 0 ? ResolutionPresetOptions[0] : nullptr;
 }
 
 FString FsimulatorEditorModule::ResolutionPresetToString(ELunarSimResolutionPreset InPreset) const
 {
 	switch (InPreset)
 	{
+	case ELunarSimResolutionPreset::R576x320:
+		return TEXT("576x320");
 	case ELunarSimResolutionPreset::R640x480:
 		return TEXT("640x480");
-	case ELunarSimResolutionPreset::R1280x720:
-		return TEXT("1280x720");
 	case ELunarSimResolutionPreset::R1024x1024:
 		return TEXT("1024x1024");
-	case ELunarSimResolutionPreset::Custom:
-		return TEXT("Custom");
+	case ELunarSimResolutionPreset::R1280x720:
+		return TEXT("1280x720");
+	case ELunarSimResolutionPreset::R1920x1080:
+		return TEXT("1920x1080");
 	default:
 		return TEXT("1024x1024");
 	}
@@ -712,7 +828,7 @@ FString FsimulatorEditorModule::RoverControlModeToString(ERoverControlMode InMod
 	case ERoverControlMode::Manual:
 		return TEXT("Manual");
 	case ERoverControlMode::RosCmdVel:
-		return TEXT("ROS cmd_vel");
+		return TEXT("cmd_vel");
 	default:
 		return TEXT("Manual");
 	}
@@ -737,19 +853,9 @@ void FsimulatorEditorModule::OnRoverControlModeSelectionChanged(TSharedPtr<ERove
 	RoverControlMode = NormalizeEditorRoverControlMode(*NewSelection);
 }
 
-void FsimulatorEditorModule::OnCustomWidthChanged(int32 NewValue)
-{
-	CustomWidth = FMath::Max(1, NewValue);
-}
-
-void FsimulatorEditorModule::OnCustomHeightChanged(int32 NewValue)
-{
-	CustomHeight = FMath::Max(1, NewValue);
-}
-
 void FsimulatorEditorModule::OnCustomCaptureHzChanged(int32 NewValue)
 {
-	CustomCaptureHz = FMath::Clamp(NewValue, 1, 60);
+	CustomCaptureHz = FMath::Clamp(NewValue, 0, 24);
 }
 
 void FsimulatorEditorModule::OnStereoBaselineCmChanged(float NewValue)
@@ -811,6 +917,7 @@ UWorld* FsimulatorEditorModule::GetEditorWorld() const
 void FsimulatorEditorModule::RefreshTargetsFromEditorWorld()
 {
 	TargetRobotCamRig.Reset();
+	TargetRobotCamRigChildComponent.Reset();
 	TargetRoverActor.Reset();
 	TargetImuPublisher.Reset();
 	TargetRoverController.Reset();
@@ -826,23 +933,54 @@ void FsimulatorEditorModule::RefreshTargetsFromEditorWorld()
 		return;
 	}
 
-	for (TActorIterator<ARobotCamRig> It(EditorWorld); It; ++It)
+	for (TActorIterator<AActor> It(EditorWorld); It; ++It)
 	{
-		ARobotCamRig* RobotCamRig = *It;
-		if (!RobotCamRig) continue;
+		AActor* CandidateRoverActor = *It;
+		if (!IsUsableEditorActor(CandidateRoverActor, EditorWorld)) {
+			continue;
+		}
+
+		URoverGroundTruthPublisherComponent* GroundTruthPublisher = nullptr;
+		UImuSensorPublisherComponent* ImuPublisher = nullptr;
+		URoverVehicleControllerComponent* RoverController = nullptr;
+		URoverCmdVelVehicleControllerComponent* CmdVelController = nullptr;
+		UChildActorComponent* RobotCamRigChildComponent = nullptr;
+		ARobotCamRig* RobotCamRig = nullptr;
+		if (!ResolveCompleteRoverPipeline(
+			CandidateRoverActor,
+			EditorWorld,
+			RobotCamRig,
+			RobotCamRigChildComponent,
+			GroundTruthPublisher,
+			ImuPublisher,
+			RoverController,
+			CmdVelController)) {
+			continue;
+		}
 
 		++RobotCamRigCount;
-		if (!TargetRobotCamRig.IsValid()) {
+		if (!TargetRoverActor.IsValid()) {
+			TargetRoverActor = CandidateRoverActor;
 			TargetRobotCamRig = RobotCamRig;
+			TargetRobotCamRigChildComponent = RobotCamRigChildComponent;
+			TargetImuPublisher = ImuPublisher;
+			TargetRoverController = RoverController;
+			TargetCmdVelController = CmdVelController;
 		}
 	}
 
 	if (TargetRobotCamRig.IsValid()) {
 		LoadConfigFromRobotCamRig();
+		LoadConfigFromRoverControl();
+		if (UImuSensorPublisherComponent* ImuPublisher = TargetImuPublisher.Get()) {
+			ImuPublishHz = ImuPublisher->GetImuPublishHz();
+		}
+	}
+	else {
+		LastApplyStatus = LOCTEXT("NoCompleteRoverPipelineStatus", "No complete ESA_Rover pipeline found in the level. Place an ESA_Rover with RobotCamRigChildActor in the level.");
 	}
 
 	RefreshMapPublisherTargets(EditorWorld);
-	RefreshImuTarget();
 }
 
 void FsimulatorEditorModule::RefreshMapPublisherTargets(UWorld* EditorWorld)
@@ -855,13 +993,13 @@ void FsimulatorEditorModule::RefreshMapPublisherTargets(UWorld* EditorWorld)
 	for (TActorIterator<AActor> It(EditorWorld); It; ++It)
 	{
 		AActor* Actor = *It;
-		if (!Actor) continue;
+		if (!IsUsableEditorActor(Actor, EditorWorld)) continue;
 
 		TArray<UOccupancyMapPublisherComponent*> MapPublishers;
 		Actor->GetComponents<UOccupancyMapPublisherComponent>(MapPublishers);
 		for (UOccupancyMapPublisherComponent* MapPublisher : MapPublishers)
 		{
-			if (!MapPublisher) continue;
+			if (!IsUsableComponent(MapPublisher)) continue;
 
 			++GroundTruthMapPublisherCount;
 			TargetMapPublishers.Add(MapPublisher);
@@ -875,39 +1013,31 @@ void FsimulatorEditorModule::RefreshMapPublisherTargets(UWorld* EditorWorld)
 	}
 }
 
-void FsimulatorEditorModule::RefreshImuTarget()
-{
-	TargetRoverActor.Reset();
-	TargetImuPublisher.Reset();
-	TargetRoverController.Reset();
-	TargetCmdVelController.Reset();
-
-	ARobotCamRig* RobotCamRig = TargetRobotCamRig.Get();
-	if (!RobotCamRig) return;
-
-	AActor* RoverActor = RobotCamRig->GetRoverActor();
-	if (!RoverActor) return;
-
-	TargetRoverActor = RoverActor;
-	TargetRoverController = RoverActor->FindComponentByClass<URoverVehicleControllerComponent>();
-	TargetCmdVelController = RoverActor->FindComponentByClass<URoverCmdVelVehicleControllerComponent>();
-	LoadConfigFromRoverControl();
-
-	UImuSensorPublisherComponent* ImuPublisher = RoverActor->FindComponentByClass<UImuSensorPublisherComponent>();
-	if (ImuPublisher) {
-		TargetImuPublisher = ImuPublisher;
-		ImuPublishHz = ImuPublisher->GetImuPublishHz();
-	}
-}
-
 bool FsimulatorEditorModule::CanApplySettings() const
 {
-	return TargetRobotCamRig.IsValid();
+	UWorld* EditorWorld = GetEditorWorld();
+	AActor* RoverActor = TargetRoverActor.Get();
+	ARobotCamRig* RobotCamRig = nullptr;
+	UChildActorComponent* RobotCamRigChildComponent = nullptr;
+	URoverGroundTruthPublisherComponent* GroundTruthPublisher = nullptr;
+	UImuSensorPublisherComponent* ImuPublisher = nullptr;
+	URoverVehicleControllerComponent* RoverController = nullptr;
+	URoverCmdVelVehicleControllerComponent* CmdVelController = nullptr;
+
+	return ResolveCompleteRoverPipeline(
+		RoverActor,
+		EditorWorld,
+		RobotCamRig,
+		RobotCamRigChildComponent,
+		GroundTruthPublisher,
+		ImuPublisher,
+		RoverController,
+		CmdVelController);
 }
 
 bool FsimulatorEditorModule::CanSelectTargetRobotCamRig() const
 {
-	return TargetRobotCamRig.IsValid();
+	return TargetRoverActor.IsValid();
 }
 
 bool FsimulatorEditorModule::CanEditGroundTruthMaps() const
@@ -917,17 +1047,12 @@ bool FsimulatorEditorModule::CanEditGroundTruthMaps() const
 
 bool FsimulatorEditorModule::CanEditImuHz() const
 {
-	return TargetImuPublisher.IsValid();
+	return FindUsableComponentByClass<UImuSensorPublisherComponent>(TargetRoverActor.Get()) != nullptr;
 }
 
 bool FsimulatorEditorModule::CanEditRoverControl() const
 {
-	return TargetRoverController.IsValid();
-}
-
-bool FsimulatorEditorModule::CanEditCustomResolution() const
-{
-	return ResolutionPreset == ELunarSimResolutionPreset::Custom;
+	return FindUsableComponentByClass<URoverVehicleControllerComponent>(TargetRoverActor.Get()) != nullptr;
 }
 
 bool FsimulatorEditorModule::CanEditCustomCaptureHz() const
@@ -938,27 +1063,27 @@ bool FsimulatorEditorModule::CanEditCustomCaptureHz() const
 FText FsimulatorEditorModule::GetTargetStatusText() const
 {
 	if (RobotCamRigCount <= 0) {
-		return LOCTEXT("NoRobotCamRigFoundStatus", "No RobotCamRig found.");
+		return LOCTEXT("NoRoverPipelineFoundStatus", "No complete ESA_Rover pipeline found in the level.");
 	}
 
 	if (RobotCamRigCount == 1) {
-		return LOCTEXT("OneRobotCamRigFoundStatus", "One RobotCamRig found.");
+		return LOCTEXT("OneRoverPipelineFoundStatus", "One complete ESA_Rover pipeline found.");
 	}
 
 	return FText::Format(
-		LOCTEXT("MultipleRobotCamRigsFoundStatus", "Multiple RobotCamRigs found ({0}); using the first one for now."),
+		LOCTEXT("MultipleRoverPipelinesFoundStatus", "Multiple ESA_Rover pipelines found ({0}); using the first one."),
 		FText::AsNumber(RobotCamRigCount)
 	);
 }
 
 FText FsimulatorEditorModule::GetTargetActorText() const
 {
-	const ARobotCamRig* RobotCamRig = TargetRobotCamRig.Get();
-	if (!RobotCamRig) {
-		return LOCTEXT("NoTargetActorText", "Target RobotCamRig: none");
+	const AActor* RoverActor = TargetRoverActor.Get();
+	if (!RoverActor) {
+		return LOCTEXT("NoTargetRoverActorText", "Target ESA_Rover pipeline: none");
 	}
 
-	return FText::FromString(FString::Printf(TEXT("Target RobotCamRig: %s"), *RobotCamRig->GetActorLabel()));
+	return FText::FromString(FString::Printf(TEXT("Target ESA_Rover pipeline: %s"), *RoverActor->GetActorLabel()));
 }
 
 FText FsimulatorEditorModule::GetMapStatusText() const
@@ -979,16 +1104,12 @@ FText FsimulatorEditorModule::GetMapStatusText() const
 
 FText FsimulatorEditorModule::GetImuStatusText() const
 {
-	if (!TargetRobotCamRig.IsValid()) {
-		return LOCTEXT("NoImuRobotCamRigTargetStatus", "IMU: no RobotCamRig target.");
-	}
-
-	const AActor* RoverActor = TargetRoverActor.Get();
+	AActor* RoverActor = TargetRoverActor.Get();
 	if (!RoverActor) {
-		return LOCTEXT("NoRoverActorStatus", "IMU: target RobotCamRig has no RoverActor assigned; IMU Hz will not be applied.");
+		return LOCTEXT("NoImuRoverPipelineStatus", "IMU: no complete ESA_Rover pipeline target.");
 	}
 
-	if (!TargetImuPublisher.IsValid()) {
+	if (!FindUsableComponentByClass<UImuSensorPublisherComponent>(RoverActor)) {
 		return FText::FromString(FString::Printf(
 			TEXT("IMU: rover actor %s has no ImuSensorPublisherComponent; IMU Hz will not be applied."),
 			*RoverActor->GetActorLabel()
@@ -1005,11 +1126,11 @@ FText FsimulatorEditorModule::GetApplyStatusText() const
 	}
 
 	if (RobotCamRigCount <= 0) {
-		return LOCTEXT("SimpleNoRobotCamRigStatus", "No RobotCamRig found.");
+		return LOCTEXT("SimpleNoRoverPipelineStatus", "No complete ESA_Rover pipeline found in the level.");
 	}
 
 	if (RobotCamRigCount > 1) {
-		return LOCTEXT("SimpleMultipleRobotCamRigsStatus", "Multiple RobotCamRigs found; using the first.");
+		return LOCTEXT("SimpleMultipleRoverPipelinesStatus", "Multiple ESA_Rover pipelines found; using the first.");
 	}
 
 	return LOCTEXT("SimpleReadyStatus", "Ready.");
@@ -1017,24 +1138,47 @@ FText FsimulatorEditorModule::GetApplyStatusText() const
 
 void FsimulatorEditorModule::SelectTargetRobotCamRig()
 {
-	if (!GEditor || !TargetRobotCamRig.IsValid()) return;
+	if (!GEditor || !TargetRoverActor.IsValid()) return;
 
-	ARobotCamRig* RobotCamRig = TargetRobotCamRig.Get();
+	AActor* RoverActor = TargetRoverActor.Get();
 	GEditor->SelectNone(false, true, false);
-	GEditor->SelectActor(RobotCamRig, true, true, true);
-	GEditor->MoveViewportCamerasToActor(*RobotCamRig, false);
+	GEditor->SelectActor(RoverActor, true, true, true);
+	GEditor->MoveViewportCamerasToActor(*RoverActor, false);
 
-	LastApplyStatus = FText::FromString(FString::Printf(TEXT("Selected target RobotCamRig: %s"), *RobotCamRig->GetActorLabel()));
+	LastApplyStatus = FText::FromString(FString::Printf(TEXT("Selected target ESA_Rover pipeline: %s"), *RoverActor->GetActorLabel()));
 }
 
 void FsimulatorEditorModule::OnApplyClicked()
 {
-	ARobotCamRig* RobotCamRig = TargetRobotCamRig.Get();
-	if (!RobotCamRig) {
-		LastApplyStatus = LOCTEXT("ApplyNoRobotCamRigStatus", "Settings were not applied because no RobotCamRig was found.");
-		UE_LOG(LogTemp, Warning, TEXT("Simulator config was not applied because no RobotCamRig was found in the editor world."));
+	UWorld* EditorWorld = GetEditorWorld();
+	AActor* RoverActor = TargetRoverActor.Get();
+	ARobotCamRig* RobotCamRig = nullptr;
+	UChildActorComponent* ChildActorComponent = nullptr;
+	URoverGroundTruthPublisherComponent* GroundTruthPublisher = nullptr;
+	UImuSensorPublisherComponent* ImuPublisher = nullptr;
+	URoverVehicleControllerComponent* RoverController = nullptr;
+	URoverCmdVelVehicleControllerComponent* CmdVelController = nullptr;
+
+	if (!ResolveCompleteRoverPipeline(
+		RoverActor,
+		EditorWorld,
+		RobotCamRig,
+		ChildActorComponent,
+		GroundTruthPublisher,
+		ImuPublisher,
+		RoverController,
+		CmdVelController)) {
+		LastApplyStatus = LOCTEXT("ApplyNoRoverPipelineStatus", "Settings were not applied because no complete ESA_Rover pipeline was found.");
+		UE_LOG(LogTemp, Warning, TEXT("Simulator config was not applied because no complete ESA_Rover pipeline was found in the editor world."));
 		return;
 	}
+
+	TargetRoverActor = RoverActor;
+	TargetRobotCamRig = RobotCamRig;
+	TargetRobotCamRigChildComponent = ChildActorComponent;
+	TargetImuPublisher = ImuPublisher;
+	TargetRoverController = RoverController;
+	TargetCmdVelController = CmdVelController;
 
 	FCaptureConfig NewConfig = RobotCamRig->GetCaptureConfig();
 	NewConfig.RunMode = RunMode;
@@ -1042,27 +1186,36 @@ void FsimulatorEditorModule::OnApplyClicked()
 	NewConfig.bGroundTruthImages = bGroundTruthImages;
 	NewConfig.bTrajectoryCsv = bTrajectoryCsv;
 	NewConfig.ResolutionPreset = ResolutionPreset;
-	NewConfig.CustomWidth = FMath::Max(1, CustomWidth);
-	NewConfig.CustomHeight = FMath::Max(1, CustomHeight);
-	NewConfig.CaptureRatePreset = CaptureRatePreset;
-	NewConfig.CustomCaptureHz = FMath::Clamp(CustomCaptureHz, 1, 60);
+	NewConfig.CaptureRatePreset = ELunarSimCaptureRatePreset::Custom;
+	NewConfig.CustomCaptureHz = FMath::Clamp(CustomCaptureHz, 0, 24);
 	NewConfig.StereoBaselineCm = FMath::Clamp(StereoBaselineCm, 1.0f, 200.0f);
+
+	RoverActor->Modify();
+	RoverActor->MarkPackageDirty();
+
+	ChildActorComponent->Modify();
+	ChildActorComponent->MarkPackageDirty();
+
+	if (ARobotCamRig* TemplateRobotCamRig = Cast<ARobotCamRig>(ChildActorComponent->GetChildActorTemplate())) {
+		TemplateRobotCamRig->Modify();
+		TemplateRobotCamRig->SetCaptureConfig(NewConfig);
+		TemplateRobotCamRig->MarkPackageDirty();
+	}
 
 	RobotCamRig->Modify();
 	RobotCamRig->SetCaptureConfig(NewConfig);
-	RobotCamRig->PostEditChange();
 	RobotCamRig->MarkPackageDirty();
 
 	if (GEditor) {
 		GEditor->SelectNone(false, true, false);
-		GEditor->SelectActor(RobotCamRig, true, true, true);
+		GEditor->SelectActor(RoverActor, true, true, true);
 	}
 
 	int32 MapsApplied = 0;
 	for (TWeakObjectPtr<UOccupancyMapPublisherComponent>& MapPublisherPtr : TargetMapPublishers)
 	{
 		UOccupancyMapPublisherComponent* MapPublisher = MapPublisherPtr.Get();
-		if (!MapPublisher) continue;
+		if (!IsUsableComponent(MapPublisher)) continue;
 
 		if (AActor* Owner = MapPublisher->GetOwner()) {
 			Owner->Modify();
@@ -1076,7 +1229,8 @@ void FsimulatorEditorModule::OnApplyClicked()
 	}
 
 	bool bImuApplied = false;
-	if (UImuSensorPublisherComponent* ImuPublisher = TargetImuPublisher.Get()) {
+	ImuPublisher = FindUsableComponentByClass<UImuSensorPublisherComponent>(RoverActor);
+	if (ImuPublisher) {
 		if (AActor* Owner = ImuPublisher->GetOwner()) {
 			Owner->Modify();
 			Owner->MarkPackageDirty();
@@ -1089,7 +1243,8 @@ void FsimulatorEditorModule::OnApplyClicked()
 	}
 
 	bool bRoverModeApplied = false;
-	if (URoverVehicleControllerComponent* RoverController = TargetRoverController.Get()) {
+	RoverController = FindUsableComponentByClass<URoverVehicleControllerComponent>(RoverActor);
+	if (RoverController) {
 		if (AActor* Owner = RoverController->GetOwner()) {
 			Owner->Modify();
 			Owner->MarkPackageDirty();
@@ -1101,7 +1256,8 @@ void FsimulatorEditorModule::OnApplyClicked()
 		bRoverModeApplied = true;
 	}
 
-	if (URoverCmdVelVehicleControllerComponent* CmdVelController = TargetCmdVelController.Get()) {
+	CmdVelController = FindUsableComponentByClass<URoverCmdVelVehicleControllerComponent>(RoverActor);
+	if (CmdVelController) {
 		if (AActor* Owner = CmdVelController->GetOwner()) {
 			Owner->Modify();
 			Owner->MarkPackageDirty();
@@ -1115,7 +1271,8 @@ void FsimulatorEditorModule::OnApplyClicked()
 	FString Status = TEXT("Applied settings.");
 
 	UE_LOG(LogTemp, Display,
-		TEXT("Simulator config applied to %s: RunMode=%s, StereoRosImages=%s, GroundTruthImages=%s, TrajectoryCsv=%s, Resolution=%s (%dx%d), CaptureRate=%s (%d Hz), StereoBaselineCm=%.2f, GroundTruthMaps=%s, MapPublishers=%d, ImuHz=%s, RoverControlMode=%s"),
+		TEXT("Simulator config applied to ESA_Rover pipeline %s / %s: RunMode=%s, StereoRosImages=%s, GroundTruthImages=%s, TrajectoryCsv=%s, Resolution=%s (%dx%d), CaptureHz=%d, StereoBaselineCm=%.2f, GroundTruthMaps=%s, MapPublishers=%d, ImuHz=%s, RoverControlMode=%s"),
+		*RoverActor->GetActorLabel(),
 		*RobotCamRig->GetActorLabel(),
 		*RunModeToString(NewConfig.RunMode),
 		NewConfig.bStereoRosImages ? TEXT("true") : TEXT("false"),
@@ -1124,7 +1281,6 @@ void FsimulatorEditorModule::OnApplyClicked()
 		*ResolutionPresetToString(NewConfig.ResolutionPreset),
 		NewConfig.GetResolvedWidth(),
 		NewConfig.GetResolvedHeight(),
-		*CaptureRatePresetToString(NewConfig.CaptureRatePreset),
 		NewConfig.GetResolvedCaptureHz(),
 		NewConfig.StereoBaselineCm,
 		bEnableGroundTruthMaps ? TEXT("true") : TEXT("false"),
@@ -1134,13 +1290,13 @@ void FsimulatorEditorModule::OnApplyClicked()
 	);
 
 	TArray<FString> SkippedSettings;
-	if (!bImuApplied && TargetRoverActor.IsValid()) {
+	if (!bImuApplied) {
 		SkippedSettings.Add(TEXT("IMU Hz"));
 	}
-	if (!bRoverModeApplied && TargetRoverActor.IsValid()) {
+	if (!bRoverModeApplied) {
 		SkippedSettings.Add(TEXT("rover control mode"));
 	}
-	if (MapsApplied == 0 && GroundTruthMapPublisherCount == 0) {
+	if (MapsApplied == 0 && GroundTruthMapPublisherCount == 0 && bEnableGroundTruthMaps) {
 		SkippedSettings.Add(TEXT("map setting"));
 	}
 
@@ -1148,12 +1304,14 @@ void FsimulatorEditorModule::OnApplyClicked()
 		Status = FString::Printf(TEXT("Applied settings. Skipped %s."), *FString::Join(SkippedSettings, TEXT(", ")));
 	}
 	else if (RobotCamRigCount > 1) {
-		Status = TEXT("Applied settings to first RobotCamRig.");
+		Status = TEXT("Applied settings to first ESA_Rover pipeline.");
 	}
 
-	LastApplyStatus = FText::FromString(Status);
-
 	UE_LOG(LogTemp, Display, TEXT("%s"), *Status);
+
+	const FText StatusText = FText::FromString(Status);
+	RefreshTargetsFromEditorWorld();
+	LastApplyStatus = StatusText;
 }
 
 void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
@@ -1170,11 +1328,11 @@ void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
 	bStereoRosImages = CurrentConfig.bStereoRosImages;
 	bGroundTruthImages = CurrentConfig.bGroundTruthImages;
 	bTrajectoryCsv = CurrentConfig.bTrajectoryCsv;
-	ResolutionPreset = CurrentConfig.ResolutionPreset;
-	CustomWidth = FMath::Max(1, CurrentConfig.CustomWidth);
-	CustomHeight = FMath::Max(1, CurrentConfig.CustomHeight);
-	CaptureRatePreset = CurrentConfig.CaptureRatePreset;
-	CustomCaptureHz = FMath::Clamp(CurrentConfig.CustomCaptureHz, 1, 60);
+	const int32 ResolvedWidth = CurrentConfig.GetResolvedWidth();
+	const int32 ResolvedHeight = CurrentConfig.GetResolvedHeight();
+	ResolutionPreset = NormalizeEditorResolutionPreset(CurrentConfig.ResolutionPreset, ResolvedWidth, ResolvedHeight);
+	CaptureRatePreset = ELunarSimCaptureRatePreset::Custom;
+	CustomCaptureHz = FMath::Clamp(CurrentConfig.GetResolvedCaptureHz(), 0, 24);
 	StereoBaselineCm = FMath::Clamp(CurrentConfig.StereoBaselineCm, 1.0f, 200.0f);
 	SelectedRunModeOption = FindRunModeOption(RunMode);
 	SelectedResolutionPresetOption = FindResolutionPresetOption(ResolutionPreset);

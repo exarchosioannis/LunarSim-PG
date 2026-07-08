@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "Capture/CaptureTypes.h"
 #include "Modules/ModuleManager.h"
+#include "Robots/RoverCmdVelVehicleControllerComponent.h"
+#include "Robots/RoverVehicleControllerComponent.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SComboBox.h"
 
@@ -10,8 +12,12 @@ class AActor;
 class ARobotCamRig;
 class SDockTab;
 class FSpawnTabArgs;
+class UChildActorComponent;
 class UImuSensorPublisherComponent;
 class UOccupancyMapPublisherComponent;
+class URoverGroundTruthPublisherComponent;
+class URoverCmdVelVehicleControllerComponent;
+class URoverVehicleControllerComponent;
 class UWorld;
 
 class FsimulatorEditorModule : public IModuleInterface
@@ -26,16 +32,43 @@ private:
 	TSharedRef<SDockTab> OnSpawnSimulatorConfigTab(const FSpawnTabArgs& SpawnTabArgs);
 	TSharedRef<class SWidget> BuildSimulatorConfigPanel();
 
-	void InitCaptureModeOptions();
-	TSharedPtr<ECaptureMode> FindCaptureModeOption(ECaptureMode InMode) const;
-	FText GetCaptureModeText() const;
-	TSharedRef<SWidget> MakeCaptureModeComboWidget(TSharedPtr<ECaptureMode> InOption) const;
-	void OnCaptureModeSelectionChanged(TSharedPtr<ECaptureMode> NewSelection, ESelectInfo::Type SelectInfo);
-	FString CaptureModeToString(ECaptureMode InMode) const;
+	void InitRunModeOptions();
+	TSharedPtr<ELunarSimRunMode> FindRunModeOption(ELunarSimRunMode InMode) const;
+	FText GetRunModeText() const;
+	TSharedRef<SWidget> MakeRunModeComboWidget(TSharedPtr<ELunarSimRunMode> InOption) const;
+	void OnRunModeSelectionChanged(TSharedPtr<ELunarSimRunMode> NewSelection, ESelectInfo::Type SelectInfo);
+	FString RunModeToString(ELunarSimRunMode InMode) const;
 
+	void InitResolutionPresetOptions();
+	TSharedPtr<ELunarSimResolutionPreset> FindResolutionPresetOption(ELunarSimResolutionPreset InPreset) const;
+	FText GetResolutionPresetText() const;
+	TSharedRef<SWidget> MakeResolutionPresetComboWidget(TSharedPtr<ELunarSimResolutionPreset> InOption) const;
+	void OnResolutionPresetSelectionChanged(TSharedPtr<ELunarSimResolutionPreset> NewSelection, ESelectInfo::Type SelectInfo);
+	FString ResolutionPresetToString(ELunarSimResolutionPreset InPreset) const;
+
+	void InitCaptureRatePresetOptions();
+	TSharedPtr<ELunarSimCaptureRatePreset> FindCaptureRatePresetOption(ELunarSimCaptureRatePreset InPreset) const;
+	FText GetCaptureRatePresetText() const;
+	TSharedRef<SWidget> MakeCaptureRatePresetComboWidget(TSharedPtr<ELunarSimCaptureRatePreset> InOption) const;
+	void OnCaptureRatePresetSelectionChanged(TSharedPtr<ELunarSimCaptureRatePreset> NewSelection, ESelectInfo::Type SelectInfo);
+	FString CaptureRatePresetToString(ELunarSimCaptureRatePreset InPreset) const;
+
+	void InitRoverControlOptions();
+	TSharedPtr<ERoverControlMode> FindRoverControlModeOption(ERoverControlMode InMode) const;
+	FText GetRoverControlModeText() const;
+	TSharedRef<SWidget> MakeRoverControlModeComboWidget(TSharedPtr<ERoverControlMode> InOption) const;
+	void OnRoverControlModeSelectionChanged(TSharedPtr<ERoverControlMode> NewSelection, ESelectInfo::Type SelectInfo);
+	FString RoverControlModeToString(ERoverControlMode InMode) const;
+
+	ECheckBoxState GetStereoRosImagesCheckState() const;
+	void OnStereoRosImagesChanged(ECheckBoxState NewState);
+	ECheckBoxState GetGroundTruthImagesCheckState() const;
+	void OnGroundTruthImagesChanged(ECheckBoxState NewState);
+	ECheckBoxState GetTrajectoryCsvCheckState() const;
+	void OnTrajectoryCsvChanged(ECheckBoxState NewState);
 	ECheckBoxState GetEnableGroundTruthMapsCheckState() const;
 	void OnEnableGroundTruthMapsChanged(ECheckBoxState NewState);
-	void OnPublishHzChanged(int32 NewValue);
+	void OnCustomCaptureHzChanged(int32 NewValue);
 	void OnStereoBaselineCmChanged(float NewValue);
 	void OnImuHzChanged(float NewValue);
 
@@ -45,6 +78,8 @@ private:
 	bool CanSelectTargetRobotCamRig() const;
 	bool CanEditGroundTruthMaps() const;
 	bool CanEditImuHz() const;
+	bool CanEditRoverControl() const;
+	bool CanEditCustomCaptureHz() const;
 	FText GetTargetStatusText() const;
 	FText GetTargetActorText() const;
 	FText GetMapStatusText() const;
@@ -53,24 +88,40 @@ private:
 
 	void OnApplyClicked();
 	void LoadConfigFromRobotCamRig();
+	void LoadConfigFromRoverControl();
 	UWorld* GetEditorWorld() const;
 	void RefreshMapPublisherTargets(UWorld* EditorWorld);
-	void RefreshImuTarget();
 
 private:
 	static const FName SimulatorConfigTabName;
 
-	TArray<TSharedPtr<ECaptureMode>> CaptureModeOptions;
-	TSharedPtr<ECaptureMode> SelectedCaptureModeOption;
+	TArray<TSharedPtr<ELunarSimRunMode>> RunModeOptions;
+	TSharedPtr<ELunarSimRunMode> SelectedRunModeOption;
+	TArray<TSharedPtr<ELunarSimResolutionPreset>> ResolutionPresetOptions;
+	TSharedPtr<ELunarSimResolutionPreset> SelectedResolutionPresetOption;
+	TArray<TSharedPtr<ELunarSimCaptureRatePreset>> CaptureRatePresetOptions;
+	TSharedPtr<ELunarSimCaptureRatePreset> SelectedCaptureRatePresetOption;
+	TArray<TSharedPtr<ERoverControlMode>> RoverControlModeOptions;
+	TSharedPtr<ERoverControlMode> SelectedRoverControlModeOption;
 
 	TWeakObjectPtr<ARobotCamRig> TargetRobotCamRig;
+	TWeakObjectPtr<UChildActorComponent> TargetRobotCamRigChildComponent;
 	TWeakObjectPtr<AActor> TargetRoverActor;
 	TWeakObjectPtr<UImuSensorPublisherComponent> TargetImuPublisher;
+	TWeakObjectPtr<URoverVehicleControllerComponent> TargetRoverController;
+	TWeakObjectPtr<URoverCmdVelVehicleControllerComponent> TargetCmdVelController;
 	TArray<TWeakObjectPtr<UOccupancyMapPublisherComponent>> TargetMapPublishers;
 
-	ECaptureMode CaptureMode = ECaptureMode::MonoRosGroundTruth;
-	int32 PublishHz = 6;
+	ELunarSimRunMode RunMode = ELunarSimRunMode::Dataset;
+	ELunarSimResolutionPreset ResolutionPreset = ELunarSimResolutionPreset::R1024x1024;
+	ELunarSimCaptureRatePreset CaptureRatePreset = ELunarSimCaptureRatePreset::Hz6;
+	ERoverControlMode RoverControlMode = ERoverControlMode::Manual;
+	FRoverCmdVelControllerSettings CmdVelSettings;
+	int32 CustomCaptureHz = 6;
 	float StereoBaselineCm = 20.0f;
+	bool bStereoRosImages = true;
+	bool bGroundTruthImages = true;
+	bool bTrajectoryCsv = true;
 	bool bEnableGroundTruthMaps = true;
 	float ImuPublishHz = 100.0f;
 	int32 RobotCamRigCount = 0;

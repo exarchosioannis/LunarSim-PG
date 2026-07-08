@@ -13,10 +13,11 @@ enum class ELunarSimRunMode : uint8
 UENUM(BlueprintType)
 enum class ELunarSimResolutionPreset : uint8
 {
-	R640x480   UMETA(DisplayName = "640x480"),
-	R1280x720  UMETA(DisplayName = "1280x720"),
-	R1024x1024 UMETA(DisplayName = "1024x1024"),
-	Custom     UMETA(DisplayName = "Custom")
+	R576x320   = 4 UMETA(DisplayName = "576x320"),
+	R640x480   = 0 UMETA(DisplayName = "640x480"),
+	R1024x1024 = 2 UMETA(DisplayName = "1024x1024"),
+	R1280x720  = 1 UMETA(DisplayName = "1280x720"),
+	R1920x1080 = 5 UMETA(DisplayName = "1920x1080")
 };
 
 UENUM(BlueprintType)
@@ -47,12 +48,6 @@ struct SIMULATOR_API FCaptureConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
 	ELunarSimResolutionPreset ResolutionPreset = ELunarSimResolutionPreset::R1024x1024;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "1", UIMin = "1"))
-	int32 CustomWidth = 1024;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "1", UIMin = "1"))
-	int32 CustomHeight = 1024;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
 	ELunarSimCaptureRatePreset CaptureRatePreset = ELunarSimCaptureRatePreset::Hz6;
 
@@ -66,15 +61,18 @@ struct SIMULATOR_API FCaptureConfig
 	{
 		switch (ResolutionPreset)
 		{
+			case ELunarSimResolutionPreset::R576x320:
+				return 576;
 			case ELunarSimResolutionPreset::R640x480:
 				return 640;
-			case ELunarSimResolutionPreset::R1280x720:
-				return 1280;
 			case ELunarSimResolutionPreset::R1024x1024:
 				return 1024;
-			case ELunarSimResolutionPreset::Custom:
+			case ELunarSimResolutionPreset::R1280x720:
+				return 1280;
+			case ELunarSimResolutionPreset::R1920x1080:
+				return 1920;
 			default:
-				return CustomWidth;
+				return 1024;
 		}
 	}
 
@@ -82,15 +80,18 @@ struct SIMULATOR_API FCaptureConfig
 	{
 		switch (ResolutionPreset) 
 		{
+			case ELunarSimResolutionPreset::R576x320:
+				return 320;
 			case ELunarSimResolutionPreset::R640x480:
 				return 480;
-			case ELunarSimResolutionPreset::R1280x720:
-				return 720;
 			case ELunarSimResolutionPreset::R1024x1024:
 				return 1024;
-			case ELunarSimResolutionPreset::Custom:
+			case ELunarSimResolutionPreset::R1280x720:
+				return 720;
+			case ELunarSimResolutionPreset::R1920x1080:
+				return 1080;
 			default:
-				return CustomHeight;
+				return 1024;
 		}
 	}
 

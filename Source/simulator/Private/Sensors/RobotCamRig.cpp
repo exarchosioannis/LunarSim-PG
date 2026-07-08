@@ -82,20 +82,56 @@ void ARobotCamRig::OnConstruction(const FTransform& Transform)
 	ApplyStereoBaseline();
 }
 
+AActor* ARobotCamRig::ResolveRoverActor() const
+{
+	if (IsValid(RoverActor) && RoverActor != this) {
+		return RoverActor;
+	}
+
+	//RobotCamRig rig is attached under the rover hierarchy.
+	if (AActor* ParentActor = GetAttachParentActor()) {
+		if (ParentActor != this) {
+			return ParentActor;
+		}
+	}
+
+	if (AActor* OwnerActor = GetOwner()) {
+		if (OwnerActor != this) {
+			return OwnerActor;
+		}
+	}
+	//fallback
+	if (const USceneComponent* RootComponent = GetRootComponent()) {
+		if (const USceneComponent* ParentComponent = RootComponent->GetAttachParent()) {
+			if (AActor* ParentOwner = ParentComponent->GetOwner()) {
+				if (ParentOwner != this) {
+					return ParentOwner;
+				}
+			}
+		}
+	}
+
+	return nullptr;
+}
+
 void ARobotCamRig::BeginPlay()
 {
 	Super::BeginPlay();
 	EnforceCameraFrameIds();
 	ResolveCaptureSettings();
+	if (!IsValid(RoverActor)) {
+		RoverActor = ResolveRoverActor();
+	}
 	if (CaptureConfig.IsRos2LiveMode() && CaptureConfig.IsGroundTruthEnabled()) {
 		UE_LOG(LogTemp, Warning, TEXT("Ground Truth Images are enabled in ROS2 Live mode. This may reduce live experiment performance."));
 	}
 
 	//Attach RobotCamRig to the rover sensor mount first.
-	if (bAttachToRoverSensorMountOnBeginPlay && RoverActor) {
+	AActor* ResolvedRoverActor = GetRoverActor();
+	if (bAttachToRoverSensorMountOnBeginPlay && ResolvedRoverActor) {
 		USceneComponent* MountComponent = nullptr;
 		TArray<USceneComponent*> SceneComponents;
-		RoverActor->GetComponents<USceneComponent>(SceneComponents);
+		ResolvedRoverActor->GetComponents<USceneComponent>(SceneComponents);
 		for (USceneComponent* SceneComponent : SceneComponents) {
 			if (SceneComponent && SceneComponent->GetFName() == RoverSensorMountComponentName) {
 				MountComponent = SceneComponent;
@@ -248,13 +284,21 @@ void ARobotCamRig::ResolveRoverGroundTruthComponents()
 {
 	RoverGroundTruthPublisher = nullptr;
 	RoverPoseSource = nullptr;
-	if (RoverActor) {
-		RoverGroundTruthPublisher = RoverActor->FindComponentByClass<URoverGroundTruthPublisherComponent>();
-		RoverPoseSource = RoverActor->FindComponentByClass<UCapturePoseSourceComponent>();
+
+	AActor* ResolvedRoverActor = GetRoverActor();
+	if (ResolvedRoverActor && RoverActor != ResolvedRoverActor) {
+		RoverActor = ResolvedRoverActor;
 	}
-	// If RoverActor is not assigned, auto-find the first reusable GT publisher.
-	// Explicit assignment is still preferred when more than one robot exists.
-	if (!RoverGroundTruthPublisher) {
+
+	if (ResolvedRoverActor) {
+		RoverGroundTruthPublisher = ResolvedRoverActor->FindComponentByClass<URoverGroundTruthPublisherComponent>();
+		RoverPoseSource = ResolvedRoverActor->FindComponentByClass<UCapturePoseSourceComponent>();
+	}
+
+	// If no usable rover actor was resolved, keep the old fallback: auto-find the first reusable GT publisher.
+	// Once a rover actor has been resolved explicitly/through parent ownership, do not silently
+	// switch to a different actor just because the expected component is missing.
+	if (!ResolvedRoverActor && !RoverGroundTruthPublisher) {
 		UWorld* World = GetWorld();
 		if (World) {
 			for (TActorIterator<AActor> ActorIt(World); ActorIt; ++ActorIt) {
@@ -264,6 +308,7 @@ void ARobotCamRig::ResolveRoverGroundTruthComponents()
 				URoverGroundTruthPublisherComponent* Candidate = Actor->FindComponentByClass<URoverGroundTruthPublisherComponent>();
 				if (Candidate) {
 					RoverActor = Actor;
+					ResolvedRoverActor = Actor;
 					RoverGroundTruthPublisher = Candidate;
 					RoverPoseSource = Candidate;
 					break;
@@ -274,12 +319,12 @@ void ARobotCamRig::ResolveRoverGroundTruthComponents()
 
 	// Fallback: if the actor has only the old CapturePoseSourceComponent, CaptureManager can still
 	// write synchronized CSV trajectory rows, even though ROS /gt topics need the new publisher.
-	if (!RoverPoseSource && RoverActor) {
-		RoverPoseSource = RoverActor->FindComponentByClass<UCapturePoseSourceComponent>();
+	if (!RoverPoseSource && ResolvedRoverActor) {
+		RoverPoseSource = ResolvedRoverActor->FindComponentByClass<UCapturePoseSourceComponent>();
 	}
 
-	if (RoverActor && !RoverGroundTruthPublisher) {
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: RoverActor '%s' has no RoverGroundTruthPublisherComponent. CSV pose may work if it has CapturePoseSourceComponent, but /gt/rover/pose, /gt/rover/odom, /tf and /gt/rover/path will not publish."), *RoverActor->GetName());
+	if (ResolvedRoverActor && !RoverGroundTruthPublisher) {
+		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: RoverActor '%s' has no RoverGroundTruthPublisherComponent. CSV pose may work if it has CapturePoseSourceComponent, but /gt/rover/pose, /gt/rover/odom, /tf and /gt/rover/path will not publish."), *ResolvedRoverActor->GetName());
 	}
 }
 
@@ -311,8 +356,15 @@ void ARobotCamRig::Tick(float DeltaSeconds)
 
 void ARobotCamRig::UpdatePublishTimer(float DeltaSeconds)
 {
+	if (!CaptureManager) return;
+
+	const int32 ResolvedCaptureHz = CaptureManager->GetConfig().GetResolvedCaptureHz();
+	if (ResolvedCaptureHz <= 0) {
+		return;
+	}
+
 	PublishAccumulator += DeltaSeconds;
-	const float Hz = CaptureManager ? FMath::Clamp(static_cast<float>(CaptureManager->GetConfig().GetResolvedCaptureHz()), 1.0f, 60.0f) : 10.0f;
+	const float Hz = FMath::Clamp(static_cast<float>(ResolvedCaptureHz), 1.0f, 24.0f);
 	const float Period = 1.0f / Hz;
 	if (PublishAccumulator >= Period) {
 		PublishAccumulator -= Period;
@@ -455,7 +507,7 @@ FCaptureConfig ARobotCamRig::GetCaptureConfig() const
 
 AActor* ARobotCamRig::GetRoverActor() const
 {
-	return RoverActor;
+	return ResolveRoverActor();
 }
 
 // TF2
@@ -486,7 +538,8 @@ void ARobotCamRig::PublishStaticCameraTransforms()
 		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: cannot publish camera TFs because CameraTfROSNode is null."));
 		return;
 	}
-	if (!RoverActor) {
+	AActor* ResolvedRoverActor = GetRoverActor();
+	if (!ResolvedRoverActor) {
 		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: cannot publish camera TFs because RoverActor is null."));
 		return;
 	}
@@ -495,7 +548,7 @@ void ARobotCamRig::PublishStaticCameraTransforms()
 		return;
 	}
 
-	const FTransform BaseWorldTransform = RoverActor->GetActorTransform();
+	const FTransform BaseWorldTransform = ResolvedRoverActor->GetActorTransform();
 
 	const FTransform LeftCameraRelativeTransform =Camera->GetComponentTransform().GetRelativeTransform(BaseWorldTransform);
 	const FTransform RightCameraRelativeTransform = RightCamera->GetComponentTransform().GetRelativeTransform(BaseWorldTransform);
