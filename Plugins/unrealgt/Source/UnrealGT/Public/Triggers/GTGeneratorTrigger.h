@@ -31,11 +31,26 @@ public:
       int32 SessionId,
       UObject* CaptureManager);
 
+  UFUNCTION(BlueprintCallable, Category = TriggerSettings)
+  void SetEnabledGeneratorComponentProperties(const TArray<FName>& InEnabledGeneratorComponentProperties);
+
+  UFUNCTION(BlueprintCallable, Category = TriggerSettings)
+  void ClearEnabledGeneratorComponentProperties();
+
 protected:
   // Called when the game starts
   virtual void BeginPlay() override;
 
   UPROPERTY(EditAnywhere, Category = TriggerSettings, meta = (EditCondition = "!bTriggerAllGeneratorComponents"))
   TArray<FGTGeneratorReference> DataGenerators;
+
+private:
+  bool IsGeneratorReferenceEnabled(const FGTGeneratorReference& GeneratorReference) const;
+
+  UPROPERTY(Transient)
+  bool bUseGeneratorComponentFilter = false;
+
+  UPROPERTY(Transient)
+  TArray<FName> EnabledGeneratorComponentProperties;
 
 };

@@ -169,6 +169,7 @@ private:
 
 	// Ground truth helpers
 	void ResolveGroundTruthCameraChild();
+	void ApplyGroundTruthConfig();
 	void ResolveRoverGroundTruthComponents();
 
 	// Runtime rover resolution helper. Keeps the old manually-assigned RoverActor workflow,

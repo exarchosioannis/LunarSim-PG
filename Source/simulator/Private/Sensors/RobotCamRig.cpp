@@ -155,6 +155,7 @@ void ARobotCamRig::BeginPlay()
 
 	//Resolve actor/component references.
 	ResolveGroundTruthCameraChild();
+	ApplyGroundTruthConfig();
 	ResolveRoverGroundTruthComponents();
 
 	//Create TempoROS TF node and publish static camera transforms.
@@ -276,7 +277,22 @@ void ARobotCamRig::ResolveGroundTruthCameraChild()
 
 	if (GroundTruthCamera && Camera) {
 		GroundTruthCamera->SetActorTransform(Camera->GetComponentTransform());
+		ApplyGroundTruthConfig();
 	}
+}
+
+void ARobotCamRig::ApplyGroundTruthConfig()
+{
+	if (!GroundTruthCamera) {
+		return;
+	}
+
+	GroundTruthCamera->SetGroundTruthResolution(ResolvedWidth, ResolvedHeight);
+	GroundTruthCamera->SetGroundTruthOutputs(
+		CaptureConfig.IsGroundTruthRgbEnabled(),
+		CaptureConfig.IsGroundTruthDepthEnabled(),
+		CaptureConfig.IsGroundTruthSegmentationEnabled(),
+		CaptureConfig.IsGroundTruthBoundingBoxesEnabled());
 }
 
 
@@ -397,6 +413,7 @@ void ARobotCamRig::StartRgbCaptureAndPublish()
 	if (Config.IsGroundTruthEnabled()) {
 		if (GroundTruthCamera) {
 			if (Camera) GroundTruthCamera->SetActorTransform(Camera->GetComponentTransform());
+			ApplyGroundTruthConfig();
 			GroundTruthCamera->CaptureGroundTruthNow(FrameInfo.FrameIndex, FrameInfo.StampSeconds, FrameInfo.SessionId, CaptureManager);
 		} else if (!bWarnedMissingGroundTruthCamera) {
 			bWarnedMissingGroundTruthCamera = true;
@@ -492,6 +509,7 @@ void ARobotCamRig::SetCaptureConfig(const FCaptureConfig& NewConfig)
 	CaptureConfig = NewConfig;
 	ResolveCaptureSettings();
 	ApplyStereoBaseline();
+	ApplyGroundTruthConfig();
 	if (RightRosPublisherComponent) {
 		RightRosPublisherComponent->SetStereoCalibration(true, ResolvedStereoBaselineMeters);
 	}

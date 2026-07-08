@@ -20,7 +20,20 @@ namespace
 			Outputs.Add(TEXT("StereoRosImages"));
 		}
 		if (Config.IsGroundTruthEnabled()) {
-			Outputs.Add(TEXT("GroundTruthImages"));
+			TArray<FString> GroundTruthOutputs;
+			if (Config.IsGroundTruthRgbEnabled()) {
+				GroundTruthOutputs.Add(TEXT("RGB"));
+			}
+			if (Config.IsGroundTruthDepthEnabled()) {
+				GroundTruthOutputs.Add(TEXT("Depth"));
+			}
+			if (Config.IsGroundTruthSegmentationEnabled()) {
+				GroundTruthOutputs.Add(TEXT("Segmentation"));
+			}
+			if (Config.IsGroundTruthBoundingBoxesEnabled()) {
+				GroundTruthOutputs.Add(TEXT("BoundingBoxes"));
+			}
+			Outputs.Add(FString::Printf(TEXT("GroundTruthImages(%s)"), *FString::Join(GroundTruthOutputs, TEXT("|"))));
 		}
 		if (Config.IsTrajectoryCsvEnabled()) {
 			Outputs.Add(TEXT("TrajectoryCsv"));
@@ -311,6 +324,13 @@ void UCaptureManager::WriteSessionMetadata()
 		TEXT("    \"elevation_csv\": \"Maps/elevation_map.csv\",\n")
 		TEXT("    \"elevation_preview\": \"Maps/elevation_map_preview.pgm\"\n")
 		TEXT("  },\n")
+		TEXT("  \"ground_truth_outputs\": {\n")
+		TEXT("    \"enabled\": %s,\n")
+		TEXT("    \"rgb\": %s,\n")
+		TEXT("    \"depth\": %s,\n")
+		TEXT("    \"segmentation\": %s,\n")
+		TEXT("    \"bounding_boxes\": %s\n")
+		TEXT("  },\n")
 		TEXT("  \"scene\": {\n")
 		TEXT("    \"level_name\": \"%s\"\n")
 		TEXT("  }\n")
@@ -323,6 +343,11 @@ void UCaptureManager::WriteSessionMetadata()
 		Config.GetResolvedWidth(),
 		Config.GetResolvedHeight(),
 		*FString::SanitizeFloat(Config.GetStereoBaselineMeters()),
+		Config.IsGroundTruthEnabled() ? TEXT("true") : TEXT("false"),
+		Config.IsGroundTruthRgbEnabled() ? TEXT("true") : TEXT("false"),
+		Config.IsGroundTruthDepthEnabled() ? TEXT("true") : TEXT("false"),
+		Config.IsGroundTruthSegmentationEnabled() ? TEXT("true") : TEXT("false"),
+		Config.IsGroundTruthBoundingBoxesEnabled() ? TEXT("true") : TEXT("false"),
 		*EscapeJsonString(LevelName)
 	);
 
@@ -361,18 +386,17 @@ void UCaptureManager::EnsureDatasetRunDirectory()
 void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo)
 {
 	const FString FrameFileStem = FString::FromInt(FrameInfo.FrameIndex);
-	const bool bGroundTruthEnabled = Config.IsGroundTruthEnabled();
 
-	const FString RgbPath = bGroundTruthEnabled
+	const FString RgbPath = Config.IsGroundTruthRgbEnabled()
 		? NormalizeManifestPath(FPaths::Combine(TEXT("Images"), TEXT("RGB"), FrameFileStem + TEXT(".png")))
 		: FString();
-	const FString DepthPath = bGroundTruthEnabled
+	const FString DepthPath = Config.IsGroundTruthDepthEnabled()
 		? NormalizeManifestPath(FPaths::Combine(TEXT("Images"), TEXT("Depth"), FrameFileStem + TEXT(".png")))
 		: FString();
-	const FString SegmentationPath = bGroundTruthEnabled
+	const FString SegmentationPath = Config.IsGroundTruthSegmentationEnabled()
 		? NormalizeManifestPath(FPaths::Combine(TEXT("Images"), TEXT("Segmentation"), FrameFileStem + TEXT(".png")))
 		: FString();
-	const FString BoundingBoxesPath = bGroundTruthEnabled
+	const FString BoundingBoxesPath = Config.IsGroundTruthBoundingBoxesEnabled()
 		? NormalizeManifestPath(FPaths::Combine(TEXT("Images"), TEXT("BoundingBoxes"), FrameFileStem + TEXT(".csv")))
 		: FString();
 

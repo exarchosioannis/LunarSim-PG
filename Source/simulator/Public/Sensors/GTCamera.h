@@ -22,6 +22,12 @@ public:
     UFUNCTION(BlueprintImplementableEvent, Category = "GroundTruth")
     void CaptureGroundTruthNow(int32 FrameIndex, double StampSeconds, int32 SessionId, UObject* CaptureManager);
 
+    UFUNCTION(BlueprintCallable, Category = "GroundTruth")
+    void SetGroundTruthResolution(int32 Width, int32 Height);
+
+    UFUNCTION(BlueprintCallable, Category = "GroundTruth")
+    void SetGroundTruthOutputs(bool bRGB, bool bDepth, bool bSegmentation, bool bBoundingBoxes);
+
     
     // Called to trigger GT generators with frame synchronization
     UFUNCTION(BlueprintCallable, Category = "GroundTruth")

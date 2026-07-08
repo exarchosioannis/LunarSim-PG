@@ -64,6 +64,14 @@ private:
 	void OnStereoRosImagesChanged(ECheckBoxState NewState);
 	ECheckBoxState GetGroundTruthImagesCheckState() const;
 	void OnGroundTruthImagesChanged(ECheckBoxState NewState);
+	ECheckBoxState GetGroundTruthRgbCheckState() const;
+	void OnGroundTruthRgbChanged(ECheckBoxState NewState);
+	ECheckBoxState GetGroundTruthDepthCheckState() const;
+	void OnGroundTruthDepthChanged(ECheckBoxState NewState);
+	ECheckBoxState GetGroundTruthSegmentationCheckState() const;
+	void OnGroundTruthSegmentationChanged(ECheckBoxState NewState);
+	ECheckBoxState GetGroundTruthBoundingBoxesCheckState() const;
+	void OnGroundTruthBoundingBoxesChanged(ECheckBoxState NewState);
 	ECheckBoxState GetTrajectoryCsvCheckState() const;
 	void OnTrajectoryCsvChanged(ECheckBoxState NewState);
 	ECheckBoxState GetEnableGroundTruthMapsCheckState() const;
@@ -80,6 +88,7 @@ private:
 	bool CanEditImuHz() const;
 	bool CanEditRoverControl() const;
 	bool CanEditCustomCaptureHz() const;
+	bool CanEditGroundTruthOutput() const;
 	FText GetTargetStatusText() const;
 	FText GetTargetActorText() const;
 	FText GetMapStatusText() const;
@@ -121,6 +130,10 @@ private:
 	float StereoBaselineCm = 20.0f;
 	bool bStereoRosImages = true;
 	bool bGroundTruthImages = true;
+	bool bGroundTruthRgb = true;
+	bool bGroundTruthDepth = true;
+	bool bGroundTruthSegmentation = true;
+	bool bGroundTruthBoundingBoxes = true;
 	bool bTrajectoryCsv = true;
 	bool bEnableGroundTruthMaps = true;
 	float ImuPublishHz = 100.0f;

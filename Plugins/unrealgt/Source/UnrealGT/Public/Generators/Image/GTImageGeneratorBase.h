@@ -39,6 +39,9 @@ public:
 
     virtual UGTSceneCaptureComponent2D* GetSceneCaptureComponent() const;
 
+    UFUNCTION(BlueprintCallable, Category = Image)
+    void SetResolution(const FIntPoint& NewResolution);
+
     bool GetCalibrationParameters(FVector2D& OutFocalLength, FVector2D& OutPrincipalPoint) const;
 
     bool GetStereoCalibrationParameters(

@@ -53,6 +53,11 @@ void UGTGeneratorTrigger::Trigger()
     FDateTime TimeStamp = FDateTime::Now();
     for (const FGTGeneratorReference& GeneratorReference : DataGenerators)
     {
+        if (!IsGeneratorReferenceEnabled(GeneratorReference))
+        {
+            continue;
+        }
+
         UGTDataGeneratorComponent* GeneratorComponent = GeneratorReference.GetComponent(GetOwner());
         if (GeneratorComponent)
         {
@@ -104,6 +109,11 @@ void UGTGeneratorTrigger::TriggerWithSession(int32 SessionId, UObject* CaptureMa
     FDateTime TimeStamp = FDateTime::Now();
     for (const FGTGeneratorReference& GeneratorReference : DataGenerators)
     {
+        if (!IsGeneratorReferenceEnabled(GeneratorReference))
+        {
+            continue;
+        }
+
         UGTDataGeneratorComponent* GeneratorComponent = GeneratorReference.GetComponent(GetOwner());
         if (GeneratorComponent)
         {
@@ -160,6 +170,11 @@ void UGTGeneratorTrigger::TriggerWithFrame(
     FDateTime TimeStamp = FDateTime::Now();
     for (const FGTGeneratorReference& GeneratorReference : DataGenerators)
     {
+        if (!IsGeneratorReferenceEnabled(GeneratorReference))
+        {
+            continue;
+        }
+
         UGTDataGeneratorComponent* GeneratorComponent = GeneratorReference.GetComponent(GetOwner());
         if (GeneratorComponent)
         {
@@ -169,10 +184,29 @@ void UGTGeneratorTrigger::TriggerWithFrame(
     }
 }
 
+void UGTGeneratorTrigger::SetEnabledGeneratorComponentProperties(
+    const TArray<FName>& InEnabledGeneratorComponentProperties)
+{
+    bUseGeneratorComponentFilter = true;
+    EnabledGeneratorComponentProperties = InEnabledGeneratorComponentProperties;
+}
+
+void UGTGeneratorTrigger::ClearEnabledGeneratorComponentProperties()
+{
+    bUseGeneratorComponentFilter = false;
+    EnabledGeneratorComponentProperties.Empty();
+}
+
+bool UGTGeneratorTrigger::IsGeneratorReferenceEnabled(
+    const FGTGeneratorReference& GeneratorReference) const
+{
+    return !bUseGeneratorComponentFilter ||
+           EnabledGeneratorComponentProperties.Contains(GeneratorReference.ComponentProperty);
+}
+
 
 // Called when the game starts
 void UGTGeneratorTrigger::BeginPlay()
 {
     Super::BeginPlay();
 }
-

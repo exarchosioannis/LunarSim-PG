@@ -13,11 +13,12 @@ enum class ELunarSimRunMode : uint8
 UENUM(BlueprintType)
 enum class ELunarSimResolutionPreset : uint8
 {
-	R576x320   = 4 UMETA(DisplayName = "576x320"),
-	R640x480   = 0 UMETA(DisplayName = "640x480"),
-	R1024x1024 = 2 UMETA(DisplayName = "1024x1024"),
-	R1280x720  = 1 UMETA(DisplayName = "1280x720"),
-	R1920x1080 = 5 UMETA(DisplayName = "1920x1080")
+	R640x360   = 10 UMETA(DisplayName = "640x360"),
+	R1024x576  = 11 UMETA(DisplayName = "1024x576"),
+	R1280x720  = 12 UMETA(DisplayName = "1280x720"),
+	R1920x1080 = 13 UMETA(DisplayName = "1920x1080"),
+	R640x640   = 14 UMETA(DisplayName = "640x640"),
+	R1024x1024 = 0 UMETA(DisplayName = "1024x1024")
 };
 
 UENUM(BlueprintType)
@@ -42,6 +43,18 @@ struct SIMULATOR_API FCaptureConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Outputs")
 	bool bGroundTruthImages = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Outputs|Ground Truth")
+	bool bGroundTruthRgb = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Outputs|Ground Truth")
+	bool bGroundTruthDepth = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Outputs|Ground Truth")
+	bool bGroundTruthSegmentation = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Outputs|Ground Truth")
+	bool bGroundTruthBoundingBoxes = true;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Outputs")
 	bool bTrajectoryCsv = true;
 
@@ -61,16 +74,18 @@ struct SIMULATOR_API FCaptureConfig
 	{
 		switch (ResolutionPreset)
 		{
-			case ELunarSimResolutionPreset::R576x320:
-				return 576;
-			case ELunarSimResolutionPreset::R640x480:
+			case ELunarSimResolutionPreset::R640x360:
 				return 640;
-			case ELunarSimResolutionPreset::R1024x1024:
+			case ELunarSimResolutionPreset::R1024x576:
 				return 1024;
 			case ELunarSimResolutionPreset::R1280x720:
 				return 1280;
 			case ELunarSimResolutionPreset::R1920x1080:
 				return 1920;
+			case ELunarSimResolutionPreset::R640x640:
+				return 640;
+			case ELunarSimResolutionPreset::R1024x1024:
+				return 1024;
 			default:
 				return 1024;
 		}
@@ -80,16 +95,18 @@ struct SIMULATOR_API FCaptureConfig
 	{
 		switch (ResolutionPreset) 
 		{
-			case ELunarSimResolutionPreset::R576x320:
-				return 320;
-			case ELunarSimResolutionPreset::R640x480:
-				return 480;
-			case ELunarSimResolutionPreset::R1024x1024:
-				return 1024;
+			case ELunarSimResolutionPreset::R640x360:
+				return 360;
+			case ELunarSimResolutionPreset::R1024x576:
+				return 576;
 			case ELunarSimResolutionPreset::R1280x720:
 				return 720;
 			case ELunarSimResolutionPreset::R1920x1080:
 				return 1080;
+			case ELunarSimResolutionPreset::R640x640:
+				return 640;
+			case ELunarSimResolutionPreset::R1024x1024:
+				return 1024;
 			default:
 				return 1024;
 		}
@@ -141,7 +158,37 @@ struct SIMULATOR_API FCaptureConfig
 
 	bool IsGroundTruthEnabled() const
 	{
+		return bGroundTruthImages && HasAnyGroundTruthOutputType();
+	}
+
+	bool IsGroundTruthMasterEnabled() const
+	{
 		return bGroundTruthImages;
+	}
+
+	bool HasAnyGroundTruthOutputType() const
+	{
+		return bGroundTruthRgb || bGroundTruthDepth || bGroundTruthSegmentation || bGroundTruthBoundingBoxes;
+	}
+
+	bool IsGroundTruthRgbEnabled() const
+	{
+		return bGroundTruthImages && bGroundTruthRgb;
+	}
+
+	bool IsGroundTruthDepthEnabled() const
+	{
+		return bGroundTruthImages && bGroundTruthDepth;
+	}
+
+	bool IsGroundTruthSegmentationEnabled() const
+	{
+		return bGroundTruthImages && bGroundTruthSegmentation;
+	}
+
+	bool IsGroundTruthBoundingBoxesEnabled() const
+	{
+		return bGroundTruthImages && bGroundTruthBoundingBoxes;
 	}
 
 	bool IsTrajectoryCsvEnabled() const
@@ -151,7 +198,7 @@ struct SIMULATOR_API FCaptureConfig
 
 	bool HasAnyCaptureOutput() const
 	{
-		return bStereoRosImages || bGroundTruthImages || bTrajectoryCsv;
+		return bStereoRosImages || IsGroundTruthEnabled() || bTrajectoryCsv;
 	}
 };
 

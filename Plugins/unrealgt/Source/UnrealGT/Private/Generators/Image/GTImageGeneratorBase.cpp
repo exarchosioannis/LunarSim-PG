@@ -147,6 +147,20 @@ UGTSceneCaptureComponent2D* UGTImageGeneratorBase::GetSceneCaptureComponent() co
     return SceneCaptureComponent;
 }
 
+void UGTImageGeneratorBase::SetResolution(const FIntPoint& NewResolution)
+{
+    Resolution = FIntPoint(
+        FMath::Max(1, NewResolution.X),
+        FMath::Max(1, NewResolution.Y));
+    bRandomResolution = false;
+
+    if (SceneCaptureComponent)
+    {
+        SceneCaptureComponent->SetResolution(Resolution);
+        SceneCaptureComponent->UpdateTextureTarget();
+    }
+}
+
 void UGTImageGeneratorBase::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -244,7 +258,7 @@ void UGTImageGeneratorBase::BeginPlay()
     SceneCaptureComponent->AttachToComponent(
         this, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 
-    SceneCaptureComponent->Resolution = Resolution;
+    SceneCaptureComponent->SetResolution(Resolution);
     SceneCaptureComponent->FOVAngle = FOVAngle;
     SceneCaptureComponent->ShowFlags.AntiAliasing = bAntiAliasing;
     SceneCaptureComponent->ShowFlags.TemporalAA = bAntiAliasing;

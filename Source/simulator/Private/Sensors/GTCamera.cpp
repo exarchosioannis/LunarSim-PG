@@ -2,6 +2,17 @@
 #include "Capture/CaptureManager.h"
 #include "Components/ActorComponent.h"
 #include "Engine/Engine.h"
+#include "Generators/Image/GTImageGeneratorBase.h"
+#include "Triggers/GTGeneratorTrigger.h"
+
+namespace
+{
+	void AddGeneratorPropertyName(TArray<FName>& OutNames, const TCHAR* BaseName)
+	{
+		OutNames.Add(FName(BaseName));
+		OutNames.Add(FName(*(FString(BaseName) + TEXT("_GEN_VARIABLE"))));
+	}
+}
 
 AGTCamera::AGTCamera()
 {
@@ -16,6 +27,56 @@ void AGTCamera::BeginPlay()
 void AGTCamera::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+}
+
+void AGTCamera::SetGroundTruthResolution(int32 Width, int32 Height)
+{
+	const FIntPoint Resolution(FMath::Max(1, Width), FMath::Max(1, Height));
+
+	TArray<UGTImageGeneratorBase*> ImageGenerators;
+	GetComponents<UGTImageGeneratorBase>(ImageGenerators);
+	for (UGTImageGeneratorBase* ImageGenerator : ImageGenerators)
+	{
+		if (ImageGenerator)
+		{
+			ImageGenerator->SetResolution(Resolution);
+		}
+	}
+}
+
+void AGTCamera::SetGroundTruthOutputs(
+	bool bRGB,
+	bool bDepth,
+	bool bSegmentation,
+	bool bBoundingBoxes)
+{
+	TArray<FName> EnabledGeneratorComponentProperties;
+	if (bRGB)
+	{
+		AddGeneratorPropertyName(EnabledGeneratorComponentProperties, TEXT("RGBGenerator"));
+	}
+	if (bDepth)
+	{
+		AddGeneratorPropertyName(EnabledGeneratorComponentProperties, TEXT("GTDepthImageGenerator"));
+	}
+	if (bSegmentation)
+	{
+		AddGeneratorPropertyName(EnabledGeneratorComponentProperties, TEXT("GTSegmentationGenerator"));
+	}
+	if (bBoundingBoxes)
+	{
+		AddGeneratorPropertyName(EnabledGeneratorComponentProperties, TEXT("GTActorInfoGenerator"));
+	}
+
+	TArray<UGTGeneratorTrigger*> GeneratorTriggers;
+	GetComponents<UGTGeneratorTrigger>(GeneratorTriggers);
+	for (UGTGeneratorTrigger* GeneratorTrigger : GeneratorTriggers)
+	{
+		if (GeneratorTrigger)
+		{
+			GeneratorTrigger->SetEnabledGeneratorComponentProperties(EnabledGeneratorComponentProperties);
+		}
+	}
 }
 
 
