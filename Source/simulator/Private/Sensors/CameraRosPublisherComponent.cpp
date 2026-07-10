@@ -43,7 +43,23 @@ void UCameraRosPublisherComponent::Initialize(
 void UCameraRosPublisherComponent::SetStereoCalibration(bool bInIsRightStereoCamera, double InStereoBaselineMeters)
 {
 	bIsRightStereoCamera = bInIsRightStereoCamera;
-	StereoBaselineMeters = FMath::Max(0.0, InStereoBaselineMeters);
+	if (!bIsRightStereoCamera) {
+		StereoBaselineMeters = FMath::IsFinite(InStereoBaselineMeters)
+			? FMath::Max(0.0, InStereoBaselineMeters)
+			: 0.0;
+		return;
+	}
+
+	if (!FMath::IsFinite(InStereoBaselineMeters) || InStereoBaselineMeters <= 0.0) {
+		StereoBaselineMeters = FCaptureConfig::GetDefaultStereoBaselineCm() / 100.0;
+		UE_LOG(LogTemp, Warning,
+			TEXT("CameraRosPublisherComponent: invalid right stereo baseline %.6f m; using %.6f m for camera_info."),
+			InStereoBaselineMeters,
+			StereoBaselineMeters);
+		return;
+	}
+
+	StereoBaselineMeters = InStereoBaselineMeters;
 }
 
 void UCameraRosPublisherComponent::SetupReusableMessages()

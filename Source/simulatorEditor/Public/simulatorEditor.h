@@ -76,7 +76,7 @@ private:
 	void OnTrajectoryCsvChanged(ECheckBoxState NewState);
 	ECheckBoxState GetEnableGroundTruthMapsCheckState() const;
 	void OnEnableGroundTruthMapsChanged(ECheckBoxState NewState);
-	void OnCustomCaptureHzChanged(int32 NewValue);
+	void OnCustomCaptureHzChanged(float NewValue);
 	void OnStereoBaselineCmChanged(float NewValue);
 	void OnImuHzChanged(float NewValue);
 
@@ -126,7 +126,7 @@ private:
 	ELunarSimCaptureRatePreset CaptureRatePreset = ELunarSimCaptureRatePreset::Hz6;
 	ERoverControlMode RoverControlMode = ERoverControlMode::Manual;
 	FRoverCmdVelControllerSettings CmdVelSettings;
-	int32 CustomCaptureHz = 6;
+	float CustomCaptureHz = 6.0f;
 	float StereoBaselineCm = 20.0f;
 	bool bStereoRosImages = true;
 	bool bGroundTruthImages = true;

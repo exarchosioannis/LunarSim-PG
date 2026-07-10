@@ -64,6 +64,7 @@ private:
 	
 	UCapturePoseSourceComponent* FindPoseSourceByName(FName SourceName) const;
 
+	bool bConfigInitialized = false;
 	bool bCaptureEnabled = false;
 
 	int32 FrameIndex = 0;

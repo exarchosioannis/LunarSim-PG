@@ -213,7 +213,8 @@ void ARobotCamRig::BeginPlay()
 
 void ARobotCamRig::ApplyStereoBaseline()
 {
-	const double SafeBaselineCm = FMath::Clamp(ResolvedStereoBaselineMeters * 100.0, 1.0, 200.0);
+	const double SafeBaselineCm = FCaptureConfig::SanitizeStereoBaselineCm(static_cast<float>(ResolvedStereoBaselineMeters * 100.0));
+	ResolvedStereoBaselineMeters = SafeBaselineCm / 100.0;
 	// Important architecture rule:
 	// RobotCamRig actor transform is the left/reference camera pose.
 	// Therefore left camera and GT camera stay at local (0,0,0).
@@ -346,6 +347,12 @@ void ARobotCamRig::ResolveRoverGroundTruthComponents()
 
 void ARobotCamRig::ResolveCaptureSettings()
 {
+	if (CaptureConfig.Sanitize()) {
+		UE_LOG(LogTemp, Warning,
+			TEXT("RobotCamRig: invalid capture config values were normalized to CaptureHz=%.3f, StereoBaselineCm=%.2f."),
+			CaptureConfig.GetResolvedCaptureHz(),
+			CaptureConfig.StereoBaselineCm);
+	}
 	ResolvedWidth = CaptureConfig.GetResolvedWidth();
 	ResolvedHeight = CaptureConfig.GetResolvedHeight();
 	ResolvedStereoBaselineMeters = CaptureConfig.GetStereoBaselineMeters();
@@ -374,14 +381,14 @@ void ARobotCamRig::UpdatePublishTimer(float DeltaSeconds)
 {
 	if (!CaptureManager) return;
 
-	const int32 ResolvedCaptureHz = CaptureManager->GetConfig().GetResolvedCaptureHz();
-	if (ResolvedCaptureHz <= 0) {
+	const float ResolvedCaptureHz = CaptureManager->GetConfig().GetResolvedCaptureHz();
+	if (!FCaptureConfig::IsValidCameraCaptureHz(ResolvedCaptureHz)) {
+		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: invalid capture Hz %.3f; skipping capture tick."), ResolvedCaptureHz);
 		return;
 	}
 
 	PublishAccumulator += DeltaSeconds;
-	const float Hz = FMath::Clamp(static_cast<float>(ResolvedCaptureHz), 1.0f, 24.0f);
-	const float Period = 1.0f / Hz;
+	const float Period = 1.0f / ResolvedCaptureHz;
 	if (PublishAccumulator >= Period) {
 		PublishAccumulator -= Period;
 		PublishRgb();
@@ -506,10 +513,19 @@ void ARobotCamRig::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void ARobotCamRig::SetCaptureConfig(const FCaptureConfig& NewConfig)
 {
+	const UWorld* World = GetWorld();
+	if ((World && World->IsGameWorld()) || HasActorBegunPlay() || (CaptureManager && CaptureManager->IsCaptureEnabled())) {
+		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: SetCaptureConfig ignored. Capture configuration is editor/design-time only and is frozen once PIE/gameplay begins."));
+		return;
+	}
+
 	CaptureConfig = NewConfig;
 	ResolveCaptureSettings();
 	ApplyStereoBaseline();
 	ApplyGroundTruthConfig();
+	if (RosPublisherComponent) {
+		RosPublisherComponent->SetStereoCalibration(false, 0.0);
+	}
 	if (RightRosPublisherComponent) {
 		RightRosPublisherComponent->SetStereoCalibration(true, ResolvedStereoBaselineMeters);
 	}

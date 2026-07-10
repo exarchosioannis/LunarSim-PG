@@ -64,8 +64,8 @@ struct SIMULATOR_API FCaptureConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
 	ELunarSimCaptureRatePreset CaptureRatePreset = ELunarSimCaptureRatePreset::Hz6;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "1", ClampMax = "60", UIMin = "1", UIMax = "60"))
-	int32 CustomCaptureHz = 6;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "0.001", ClampMax = "60", UIMin = "1", UIMax = "60", Units = "Hz"))
+	float CustomCaptureHz = 6.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stereo", meta = (ClampMin = "1.0", ClampMax = "200.0", UIMin = "1.0", UIMax = "200.0", Units = "cm"))
 	float StereoBaselineCm = 20.0f;
@@ -112,23 +112,82 @@ struct SIMULATOR_API FCaptureConfig
 		}
 	}
 
-	int32 GetResolvedCaptureHz() const
+	static float GetDefaultCameraCaptureHz()
+	{
+		return 6.0f;
+	}
+
+	static float GetMinCameraCaptureHz()
+	{
+		return 0.001f;
+	}
+
+	static float GetMaxCameraCaptureHz()
+	{
+		return 60.0f;
+	}
+
+	static float GetDefaultStereoBaselineCm()
+	{
+		return 20.0f;
+	}
+
+	static float GetMinStereoBaselineCm()
+	{
+		return 1.0f;
+	}
+
+	static float GetMaxStereoBaselineCm()
+	{
+		return 200.0f;
+	}
+
+	static bool IsValidCameraCaptureHz(float InHz)
+	{
+		return FMath::IsFinite(InHz) && InHz > 0.0f;
+	}
+
+	static float SanitizeCameraCaptureHz(float InHz)
+	{
+		return IsValidCameraCaptureHz(InHz) ? InHz : GetDefaultCameraCaptureHz();
+	}
+
+	static float SanitizeStereoBaselineCm(float InBaselineCm)
+	{
+		if (!FMath::IsFinite(InBaselineCm)) {
+			return GetDefaultStereoBaselineCm();
+		}
+
+		return FMath::Clamp(InBaselineCm, GetMinStereoBaselineCm(), GetMaxStereoBaselineCm());
+	}
+
+	bool Sanitize()
+	{
+		const float SafeCustomCaptureHz = SanitizeCameraCaptureHz(CustomCaptureHz);
+		const float SafeStereoBaselineCm = SanitizeStereoBaselineCm(StereoBaselineCm);
+		const bool bChanged = CustomCaptureHz != SafeCustomCaptureHz || StereoBaselineCm != SafeStereoBaselineCm;
+		CustomCaptureHz = SafeCustomCaptureHz;
+		StereoBaselineCm = SafeStereoBaselineCm;
+		return bChanged;
+	}
+
+	float GetResolvedCaptureHz() const
 	{
 		switch (CaptureRatePreset)
 		{
 			case ELunarSimCaptureRatePreset::Hz6:
-				return 6;
+				return 6.0f;
 			case ELunarSimCaptureRatePreset::Hz10:
-				return 10;
+				return 10.0f;
 			case ELunarSimCaptureRatePreset::Custom:
 			default:
-				return CustomCaptureHz;
+				return SanitizeCameraCaptureHz(CustomCaptureHz);
 		}
 	}
 
 	float GetStereoBaselineMeters() const
 	{
-		return StereoBaselineCm / 100.0f;
+		return SanitizeStereoBaselineCm(StereoBaselineCm) / 100.0f;
 	}
 
 	bool IsDatasetMode() const

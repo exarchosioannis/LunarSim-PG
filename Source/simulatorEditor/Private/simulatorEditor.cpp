@@ -64,6 +64,19 @@ ELunarSimResolutionPreset NormalizeEditorResolutionPreset(ELunarSimResolutionPre
 	return ELunarSimResolutionPreset::R1024x1024;
 }
 
+float NormalizeEditorCaptureHz(float InCaptureHz)
+{
+	return FMath::Clamp(
+		FCaptureConfig::SanitizeCameraCaptureHz(InCaptureHz),
+		FCaptureConfig::GetMinCameraCaptureHz(),
+		FCaptureConfig::GetMaxCameraCaptureHz());
+}
+
+bool IsEditorPlaySessionRunning()
+{
+	return GEditor && GEditor->IsPlaySessionInProgress();
+}
+
 bool HasInvalidEditorFlags(const UObject* Object)
 {
 	return !Object
@@ -513,16 +526,16 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 								SNew(SBox)
 								.WidthOverride(120.f)
 								[
-									SNew(SNumericEntryBox<int32>)
-									.Value_Lambda([this]() -> TOptional<int32>
+									SNew(SNumericEntryBox<float>)
+									.Value_Lambda([this]() -> TOptional<float>
 									{
 										return CustomCaptureHz;
 									})
 									.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnCustomCaptureHzChanged)
-									.MinValue(0)
-									.MaxValue(24)
-									.MinSliderValue(0)
-									.MaxSliderValue(24)
+									.MinValue(FCaptureConfig::GetMinCameraCaptureHz())
+									.MaxValue(FCaptureConfig::GetMaxCameraCaptureHz())
+									.MinSliderValue(1.0f)
+									.MaxSliderValue(FCaptureConfig::GetMaxCameraCaptureHz())
 									.AllowSpin(true)
 								])
 						]
@@ -541,9 +554,9 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 										return StereoBaselineCm;
 									})
 									.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnStereoBaselineCmChanged)
-									.MinValue(1.0f)
-									.MaxValue(200.0f)
-									.MinSliderValue(1.0f)
+									.MinValue(FCaptureConfig::GetMinStereoBaselineCm())
+									.MaxValue(FCaptureConfig::GetMaxStereoBaselineCm())
+									.MinSliderValue(FCaptureConfig::GetMinStereoBaselineCm())
 									.MaxSliderValue(100.0f)
 									.AllowSpin(true)
 								])
@@ -866,14 +879,14 @@ void FsimulatorEditorModule::OnRoverControlModeSelectionChanged(TSharedPtr<ERove
 	RoverControlMode = NormalizeEditorRoverControlMode(*NewSelection);
 }
 
-void FsimulatorEditorModule::OnCustomCaptureHzChanged(int32 NewValue)
+void FsimulatorEditorModule::OnCustomCaptureHzChanged(float NewValue)
 {
-	CustomCaptureHz = FMath::Clamp(NewValue, 0, 24);
+	CustomCaptureHz = NormalizeEditorCaptureHz(NewValue);
 }
 
 void FsimulatorEditorModule::OnStereoBaselineCmChanged(float NewValue)
 {
-	StereoBaselineCm = FMath::Clamp(NewValue, 1.0f, 200.0f);
+	StereoBaselineCm = FCaptureConfig::SanitizeStereoBaselineCm(NewValue);
 }
 
 ECheckBoxState FsimulatorEditorModule::GetStereoRosImagesCheckState() const
@@ -1068,6 +1081,10 @@ void FsimulatorEditorModule::RefreshMapPublisherTargets(UWorld* EditorWorld)
 
 bool FsimulatorEditorModule::CanApplySettings() const
 {
+	if (IsEditorPlaySessionRunning()) {
+		return false;
+	}
+
 	UWorld* EditorWorld = GetEditorWorld();
 	AActor* RoverActor = TargetRoverActor.Get();
 	ARobotCamRig* RobotCamRig = nullptr;
@@ -1179,6 +1196,10 @@ FText FsimulatorEditorModule::GetImuStatusText() const
 
 FText FsimulatorEditorModule::GetApplyStatusText() const
 {
+	if (IsEditorPlaySessionRunning()) {
+		return LOCTEXT("ApplyDisabledDuringPlayStatus", "Settings are locked while PIE/simulation is running.");
+	}
+
 	if (!LastApplyStatus.IsEmpty()) {
 		return LastApplyStatus;
 	}
@@ -1208,6 +1229,12 @@ void FsimulatorEditorModule::SelectTargetRobotCamRig()
 
 void FsimulatorEditorModule::OnApplyClicked()
 {
+	if (IsEditorPlaySessionRunning()) {
+		LastApplyStatus = LOCTEXT("ApplyDuringPlayStatus", "Settings were not applied because PIE/simulation is running.");
+		UE_LOG(LogTemp, Warning, TEXT("Simulator config was not applied because capture configuration is locked while PIE/simulation is running."));
+		return;
+	}
+
 	UWorld* EditorWorld = GetEditorWorld();
 	AActor* RoverActor = TargetRoverActor.Get();
 	ARobotCamRig* RobotCamRig = nullptr;
@@ -1249,8 +1276,8 @@ void FsimulatorEditorModule::OnApplyClicked()
 	NewConfig.bTrajectoryCsv = bTrajectoryCsv;
 	NewConfig.ResolutionPreset = ResolutionPreset;
 	NewConfig.CaptureRatePreset = ELunarSimCaptureRatePreset::Custom;
-	NewConfig.CustomCaptureHz = FMath::Clamp(CustomCaptureHz, 0, 24);
-	NewConfig.StereoBaselineCm = FMath::Clamp(StereoBaselineCm, 1.0f, 200.0f);
+	NewConfig.CustomCaptureHz = NormalizeEditorCaptureHz(CustomCaptureHz);
+	NewConfig.StereoBaselineCm = FCaptureConfig::SanitizeStereoBaselineCm(StereoBaselineCm);
 
 	RoverActor->Modify();
 	RoverActor->MarkPackageDirty();
@@ -1333,7 +1360,7 @@ void FsimulatorEditorModule::OnApplyClicked()
 	FString Status = TEXT("Applied settings.");
 
 	UE_LOG(LogTemp, Display,
-		TEXT("Simulator config applied to ESA_Rover pipeline %s / %s: RunMode=%s, StereoRosImages=%s, GroundTruthImages=%s, GroundTruthRGB=%s, GroundTruthDepth=%s, GroundTruthSegmentation=%s, GroundTruthBoundingBoxes=%s, TrajectoryCsv=%s, Resolution=%s (%dx%d), CaptureHz=%d, StereoBaselineCm=%.2f, GroundTruthMaps=%s, MapPublishers=%d, ImuHz=%s, RoverControlMode=%s"),
+		TEXT("Simulator config applied to ESA_Rover pipeline %s / %s: RunMode=%s, StereoRosImages=%s, GroundTruthImages=%s, GroundTruthRGB=%s, GroundTruthDepth=%s, GroundTruthSegmentation=%s, GroundTruthBoundingBoxes=%s, TrajectoryCsv=%s, Resolution=%s (%dx%d), CaptureHz=%.3f, StereoBaselineCm=%.2f, GroundTruthMaps=%s, MapPublishers=%d, ImuHz=%s, RoverControlMode=%s"),
 		*RoverActor->GetActorLabel(),
 		*RobotCamRig->GetActorLabel(),
 		*RunModeToString(NewConfig.RunMode),
@@ -1405,8 +1432,8 @@ void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
 	const int32 ResolvedHeight = CurrentConfig.GetResolvedHeight();
 	ResolutionPreset = NormalizeEditorResolutionPreset(CurrentConfig.ResolutionPreset, ResolvedWidth, ResolvedHeight);
 	CaptureRatePreset = ELunarSimCaptureRatePreset::Custom;
-	CustomCaptureHz = FMath::Clamp(CurrentConfig.GetResolvedCaptureHz(), 0, 24);
-	StereoBaselineCm = FMath::Clamp(CurrentConfig.StereoBaselineCm, 1.0f, 200.0f);
+	CustomCaptureHz = NormalizeEditorCaptureHz(CurrentConfig.GetResolvedCaptureHz());
+	StereoBaselineCm = FCaptureConfig::SanitizeStereoBaselineCm(CurrentConfig.StereoBaselineCm);
 	SelectedRunModeOption = FindRunModeOption(RunMode);
 	SelectedResolutionPresetOption = FindResolutionPresetOption(ResolutionPreset);
 	SelectedCaptureRatePresetOption = FindCaptureRatePresetOption(CaptureRatePreset);

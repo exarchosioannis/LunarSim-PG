@@ -52,7 +52,19 @@ namespace
 
 void UCaptureManager::Initialize(const FCaptureConfig& InConfig)
 {
+	if (bConfigInitialized) {
+		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: Initialize ignored because capture config is already initialized for this run."));
+		return;
+	}
+
 	Config = InConfig;
+	if (Config.Sanitize()) {
+		UE_LOG(LogTemp, Warning,
+			TEXT("CaptureManager: invalid capture config values were normalized to CaptureHz=%.3f, StereoBaselineCm=%.2f."),
+			Config.GetResolvedCaptureHz(),
+			Config.StereoBaselineCm);
+	}
+	bConfigInitialized = true;
 }
 
 UWorld* UCaptureManager::GetWorld() const
@@ -301,7 +313,7 @@ void UCaptureManager::WriteSessionMetadata()
 		TEXT("  \"session_name\": \"%s\",\n")
 		TEXT("  \"created_at\": \"%s\",\n")
 		TEXT("  \"capture_mode\": \"%s\",\n")
-		TEXT("  \"publish_hz\": %d,\n")
+		TEXT("  \"publish_hz\": %s,\n")
 		TEXT("  \"camera\": {\n")
 		TEXT("    \"image_width\": %d,\n")
 		TEXT("    \"image_height\": %d,\n")
@@ -339,7 +351,7 @@ void UCaptureManager::WriteSessionMetadata()
 		*EscapeJsonString(CurrentSessionName),
 		*EscapeJsonString(CreatedAt),
 		*EscapeJsonString(CaptureOutputsToString(Config)),
-		Config.GetResolvedCaptureHz(),
+		*FString::SanitizeFloat(Config.GetResolvedCaptureHz()),
 		Config.GetResolvedWidth(),
 		Config.GetResolvedHeight(),
 		*FString::SanitizeFloat(Config.GetStereoBaselineMeters()),
