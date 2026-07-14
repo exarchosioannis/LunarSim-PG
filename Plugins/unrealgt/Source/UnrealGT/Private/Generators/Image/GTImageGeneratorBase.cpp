@@ -161,6 +161,20 @@ void UGTImageGeneratorBase::SetResolution(const FIntPoint& NewResolution)
     }
 }
 
+void UGTImageGeneratorBase::SetHorizontalFOV(float NewHorizontalFovDeg)
+{
+    FOVAngle = FMath::Clamp(NewHorizontalFovDeg, 0.001f, 179.0f);
+
+    if (SceneCaptureComponent)
+    {
+        SceneCaptureComponent->ProjectionType = ECameraProjectionMode::Perspective;
+        SceneCaptureComponent->FOVAngle = FOVAngle;
+        SceneCaptureComponent->Overscan = 0.0f;
+        SceneCaptureComponent->bUseCustomProjectionMatrix = false;
+        SceneCaptureComponent->CustomProjectionMatrix.SetIdentity();
+    }
+}
+
 void UGTImageGeneratorBase::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -259,7 +273,7 @@ void UGTImageGeneratorBase::BeginPlay()
         this, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 
     SceneCaptureComponent->SetResolution(Resolution);
-    SceneCaptureComponent->FOVAngle = FOVAngle;
+    SetHorizontalFOV(FOVAngle);
     SceneCaptureComponent->ShowFlags.AntiAliasing = bAntiAliasing;
     SceneCaptureComponent->ShowFlags.TemporalAA = bAntiAliasing;
     SceneCaptureComponent->ShowFlags.MotionBlur = bMotionBlur;

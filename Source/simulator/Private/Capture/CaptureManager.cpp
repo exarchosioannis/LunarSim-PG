@@ -50,7 +50,7 @@ namespace
 }
 
 
-void UCaptureManager::Initialize(const FCaptureConfig& InConfig)
+void UCaptureManager::Initialize(const FCaptureConfig& InConfig, const FResolvedCameraCalibration& InCameraCalibration)
 {
 	if (bConfigInitialized) {
 		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: Initialize ignored because capture config is already initialized for this run."));
@@ -60,9 +60,20 @@ void UCaptureManager::Initialize(const FCaptureConfig& InConfig)
 	Config = InConfig;
 	if (Config.Sanitize()) {
 		UE_LOG(LogTemp, Warning,
-			TEXT("CaptureManager: invalid capture config values were normalized to CaptureHz=%.3f, StereoBaselineCm=%.2f."),
+			TEXT("CaptureManager: invalid capture config values were normalized to CaptureHz=%.3f, HorizontalFovDeg=%.2f, StereoBaselineCm=%.2f."),
 			Config.GetResolvedCaptureHz(),
+			Config.GetResolvedHorizontalFovDeg(),
 			Config.StereoBaselineCm);
+	}
+	CameraCalibration = InCameraCalibration;
+	const FResolvedCameraCalibration ConfigCalibration = Config.GetResolvedCameraCalibration();
+	if (!CameraCalibration.IsValid()
+		|| CameraCalibration.ImageWidth != ConfigCalibration.ImageWidth
+		|| CameraCalibration.ImageHeight != ConfigCalibration.ImageHeight
+		|| !FMath::IsNearlyEqual(CameraCalibration.HorizontalFovDeg, ConfigCalibration.HorizontalFovDeg)) {
+		UE_LOG(LogTemp, Warning,
+			TEXT("CaptureManager: supplied camera calibration did not match sanitized config; using the config-resolved calibration."));
+		CameraCalibration = ConfigCalibration;
 	}
 	bConfigInitialized = true;
 }
@@ -306,6 +317,25 @@ void UCaptureManager::WriteSessionMetadata()
 		}
 		return Escaped;
 	};
+	const auto JsonNumber = [](double Value) -> FString
+	{
+		return FString::SanitizeFloat(Value);
+	};
+	const double StereoBaselineMeters = Config.GetStereoBaselineMeters();
+	const double RightTx = -CameraCalibration.Fx * StereoBaselineMeters;
+	const FString LeftProjectionMatrix = FString::Printf(
+		TEXT("[%s, 0.0, %s, 0.0, 0.0, %s, %s, 0.0, 0.0, 0.0, 1.0, 0.0]"),
+		*JsonNumber(CameraCalibration.Fx),
+		*JsonNumber(CameraCalibration.Cx),
+		*JsonNumber(CameraCalibration.Fy),
+		*JsonNumber(CameraCalibration.Cy));
+	const FString RightProjectionMatrix = FString::Printf(
+		TEXT("[%s, 0.0, %s, %s, 0.0, %s, %s, 0.0, 0.0, 0.0, 1.0, 0.0]"),
+		*JsonNumber(CameraCalibration.Fx),
+		*JsonNumber(CameraCalibration.Cx),
+		*JsonNumber(RightTx),
+		*JsonNumber(CameraCalibration.Fy),
+		*JsonNumber(CameraCalibration.Cy));
 
 	const FString Json = FString::Printf(
 		TEXT("{\n")
@@ -317,8 +347,16 @@ void UCaptureManager::WriteSessionMetadata()
 		TEXT("  \"camera\": {\n")
 		TEXT("    \"image_width\": %d,\n")
 		TEXT("    \"image_height\": %d,\n")
-		TEXT("    \"fov_deg\": 90.0,\n")
-		TEXT("    \"stereo_baseline_m\": %s\n")
+		TEXT("    \"fov_deg\": %s,\n")
+		TEXT("    \"fx\": %s,\n")
+		TEXT("    \"fy\": %s,\n")
+		TEXT("    \"cx\": %s,\n")
+		TEXT("    \"cy\": %s,\n")
+		TEXT("    \"distortion_model\": \"plumb_bob\",\n")
+		TEXT("    \"distortion_coefficients\": [0.0, 0.0, 0.0, 0.0, 0.0],\n")
+		TEXT("    \"stereo_baseline_m\": %s,\n")
+		TEXT("    \"left_projection_matrix\": %s,\n")
+		TEXT("    \"right_projection_matrix\": %s\n")
 		TEXT("  },\n")
 		TEXT("  \"frames\": {\n")
 		TEXT("    \"map\": \"map\",\n")
@@ -352,9 +390,16 @@ void UCaptureManager::WriteSessionMetadata()
 		*EscapeJsonString(CreatedAt),
 		*EscapeJsonString(CaptureOutputsToString(Config)),
 		*FString::SanitizeFloat(Config.GetResolvedCaptureHz()),
-		Config.GetResolvedWidth(),
-		Config.GetResolvedHeight(),
-		*FString::SanitizeFloat(Config.GetStereoBaselineMeters()),
+		CameraCalibration.ImageWidth,
+		CameraCalibration.ImageHeight,
+		*JsonNumber(CameraCalibration.HorizontalFovDeg),
+		*JsonNumber(CameraCalibration.Fx),
+		*JsonNumber(CameraCalibration.Fy),
+		*JsonNumber(CameraCalibration.Cx),
+		*JsonNumber(CameraCalibration.Cy),
+		*JsonNumber(StereoBaselineMeters),
+		*LeftProjectionMatrix,
+		*RightProjectionMatrix,
 		Config.IsGroundTruthEnabled() ? TEXT("true") : TEXT("false"),
 		Config.IsGroundTruthRgbEnabled() ? TEXT("true") : TEXT("false"),
 		Config.IsGroundTruthDepthEnabled() ? TEXT("true") : TEXT("false"),

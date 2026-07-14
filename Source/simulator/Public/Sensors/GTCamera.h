@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Capture/CaptureTypes.h"
 #include "GameFramework/Actor.h"
 #include "GTCamera.generated.h"
 
@@ -24,6 +25,9 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "GroundTruth")
     void SetGroundTruthResolution(int32 Width, int32 Height);
+
+    UFUNCTION(BlueprintCallable, Category = "GroundTruth")
+    void SetGroundTruthCalibration(const FResolvedCameraCalibration& CameraCalibration);
 
     UFUNCTION(BlueprintCallable, Category = "GroundTruth")
     void SetGroundTruthOutputs(bool bRGB, bool bDepth, bool bSegmentation, bool bBoundingBoxes);

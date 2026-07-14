@@ -18,7 +18,7 @@ class SIMULATOR_API UCaptureManager : public UObject
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Capture")
-	void Initialize(const FCaptureConfig& InConfig);
+	void Initialize(const FCaptureConfig& InConfig, const FResolvedCameraCalibration& InCameraCalibration);
 
 	virtual UWorld* GetWorld() const override;
 
@@ -72,6 +72,7 @@ private:
 	std::atomic<int32> CurrentSessionId{0};
 
 	FCaptureConfig Config;
+	FResolvedCameraCalibration CameraCalibration;
 
 	FString ManifestFilePath;
 	FString RoverGtTrajectoryFilePath;

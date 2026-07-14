@@ -77,6 +77,7 @@ private:
 	ECheckBoxState GetEnableGroundTruthMapsCheckState() const;
 	void OnEnableGroundTruthMapsChanged(ECheckBoxState NewState);
 	void OnCustomCaptureHzChanged(float NewValue);
+	void OnCameraHorizontalFovDegChanged(float NewValue);
 	void OnStereoBaselineCmChanged(float NewValue);
 	void OnImuHzChanged(float NewValue);
 
@@ -127,6 +128,7 @@ private:
 	ERoverControlMode RoverControlMode = ERoverControlMode::Manual;
 	FRoverCmdVelControllerSettings CmdVelSettings;
 	float CustomCaptureHz = 6.0f;
+	float CameraHorizontalFovDeg = 90.0f;
 	float StereoBaselineCm = 20.0f;
 	bool bStereoRosImages = true;
 	bool bGroundTruthImages = true;

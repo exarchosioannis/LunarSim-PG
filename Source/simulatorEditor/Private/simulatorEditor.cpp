@@ -522,6 +522,28 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 						.AutoHeight()
 						[
 							MakeSimulatorConfigFormRow(
+								LOCTEXT("CameraHorizontalFovDegLabel", "Horizontal FOV deg"),
+								SNew(SBox)
+								.WidthOverride(120.f)
+								[
+									SNew(SNumericEntryBox<float>)
+									.Value_Lambda([this]() -> TOptional<float>
+									{
+										return CameraHorizontalFovDeg;
+									})
+									.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnCameraHorizontalFovDegChanged)
+									.MinValue(FCaptureConfig::GetMinHorizontalFovDeg())
+									.MaxValue(FCaptureConfig::GetMaxHorizontalFovDeg())
+									.MinSliderValue(FCaptureConfig::GetMinHorizontalFovDeg())
+									.MaxSliderValue(FCaptureConfig::GetMaxHorizontalFovDeg())
+									.AllowSpin(true)
+								])
+						]
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						[
+							MakeSimulatorConfigFormRow(
 								LOCTEXT("CaptureHzLabel", "Capture Hz"),
 								SNew(SBox)
 								.WidthOverride(120.f)
@@ -882,6 +904,11 @@ void FsimulatorEditorModule::OnRoverControlModeSelectionChanged(TSharedPtr<ERove
 void FsimulatorEditorModule::OnCustomCaptureHzChanged(float NewValue)
 {
 	CustomCaptureHz = NormalizeEditorCaptureHz(NewValue);
+}
+
+void FsimulatorEditorModule::OnCameraHorizontalFovDegChanged(float NewValue)
+{
+	CameraHorizontalFovDeg = FCaptureConfig::SanitizeHorizontalFovDeg(NewValue);
 }
 
 void FsimulatorEditorModule::OnStereoBaselineCmChanged(float NewValue)
@@ -1275,6 +1302,7 @@ void FsimulatorEditorModule::OnApplyClicked()
 	NewConfig.bGroundTruthBoundingBoxes = bGroundTruthBoundingBoxes;
 	NewConfig.bTrajectoryCsv = bTrajectoryCsv;
 	NewConfig.ResolutionPreset = ResolutionPreset;
+	NewConfig.HorizontalFovDeg = FCaptureConfig::SanitizeHorizontalFovDeg(CameraHorizontalFovDeg);
 	NewConfig.CaptureRatePreset = ELunarSimCaptureRatePreset::Custom;
 	NewConfig.CustomCaptureHz = NormalizeEditorCaptureHz(CustomCaptureHz);
 	NewConfig.StereoBaselineCm = FCaptureConfig::SanitizeStereoBaselineCm(StereoBaselineCm);
@@ -1360,7 +1388,7 @@ void FsimulatorEditorModule::OnApplyClicked()
 	FString Status = TEXT("Applied settings.");
 
 	UE_LOG(LogTemp, Display,
-		TEXT("Simulator config applied to ESA_Rover pipeline %s / %s: RunMode=%s, StereoRosImages=%s, GroundTruthImages=%s, GroundTruthRGB=%s, GroundTruthDepth=%s, GroundTruthSegmentation=%s, GroundTruthBoundingBoxes=%s, TrajectoryCsv=%s, Resolution=%s (%dx%d), CaptureHz=%.3f, StereoBaselineCm=%.2f, GroundTruthMaps=%s, MapPublishers=%d, ImuHz=%s, RoverControlMode=%s"),
+		TEXT("Simulator config applied to ESA_Rover pipeline %s / %s: RunMode=%s, StereoRosImages=%s, GroundTruthImages=%s, GroundTruthRGB=%s, GroundTruthDepth=%s, GroundTruthSegmentation=%s, GroundTruthBoundingBoxes=%s, TrajectoryCsv=%s, Resolution=%s (%dx%d), HorizontalFovDeg=%.2f, CaptureHz=%.3f, StereoBaselineCm=%.2f, GroundTruthMaps=%s, MapPublishers=%d, ImuHz=%s, RoverControlMode=%s"),
 		*RoverActor->GetActorLabel(),
 		*RobotCamRig->GetActorLabel(),
 		*RunModeToString(NewConfig.RunMode),
@@ -1374,6 +1402,7 @@ void FsimulatorEditorModule::OnApplyClicked()
 		*ResolutionPresetToString(NewConfig.ResolutionPreset),
 		NewConfig.GetResolvedWidth(),
 		NewConfig.GetResolvedHeight(),
+		NewConfig.GetResolvedHorizontalFovDeg(),
 		NewConfig.GetResolvedCaptureHz(),
 		NewConfig.StereoBaselineCm,
 		bEnableGroundTruthMaps ? TEXT("true") : TEXT("false"),
@@ -1431,6 +1460,7 @@ void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
 	const int32 ResolvedWidth = CurrentConfig.GetResolvedWidth();
 	const int32 ResolvedHeight = CurrentConfig.GetResolvedHeight();
 	ResolutionPreset = NormalizeEditorResolutionPreset(CurrentConfig.ResolutionPreset, ResolvedWidth, ResolvedHeight);
+	CameraHorizontalFovDeg = CurrentConfig.GetResolvedHorizontalFovDeg();
 	CaptureRatePreset = ELunarSimCaptureRatePreset::Custom;
 	CustomCaptureHz = NormalizeEditorCaptureHz(CurrentConfig.GetResolvedCaptureHz());
 	StereoBaselineCm = FCaptureConfig::SanitizeStereoBaselineCm(CurrentConfig.StereoBaselineCm);

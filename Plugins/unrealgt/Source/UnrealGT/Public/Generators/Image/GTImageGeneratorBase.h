@@ -42,6 +42,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = Image)
     void SetResolution(const FIntPoint& NewResolution);
 
+    UFUNCTION(BlueprintCallable, Category = Projection)
+    void SetHorizontalFOV(float NewHorizontalFovDeg);
+
     bool GetCalibrationParameters(FVector2D& OutFocalLength, FVector2D& OutPrincipalPoint) const;
 
     bool GetStereoCalibrationParameters(

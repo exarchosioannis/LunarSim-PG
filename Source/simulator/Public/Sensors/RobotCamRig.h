@@ -113,8 +113,7 @@ private:
 
 	// Camera Settings
 	float PublishAccumulator = 0.0f;
-	int32 ResolvedWidth = 1024;
-	int32 ResolvedHeight = 1024;
+	FResolvedCameraCalibration ResolvedCameraCalibration;
 	double ResolvedStereoBaselineMeters = 0.2;
 
 	// TF2
@@ -137,6 +136,7 @@ private:
 	void PublishStaticCameraTransforms();
 	void EnforceCameraFrameIds();
 	void ResolveCaptureSettings();
+	void ApplyCameraCalibration();
 
 	// Camera Realism
 	UPROPERTY(EditAnywhere, Category = "Camera|Realism")

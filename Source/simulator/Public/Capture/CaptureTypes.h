@@ -30,6 +30,63 @@ enum class ELunarSimCaptureRatePreset : uint8
 };
 
 USTRUCT(BlueprintType)
+struct SIMULATOR_API FResolvedCameraCalibration
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Camera")
+	int32 ImageWidth = 1024;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Camera")
+	int32 ImageHeight = 1024;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Camera")
+	float HorizontalFovDeg = 90.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Camera")
+	double Fx = 512.0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Camera")
+	double Fy = 512.0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Camera")
+	double Cx = 512.0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Camera")
+	double Cy = 512.0;
+
+	static FResolvedCameraCalibration Resolve(int32 InWidth, int32 InHeight, float InHorizontalFovDeg)
+	{
+		FResolvedCameraCalibration Result;
+		Result.ImageWidth = FMath::Max(1, InWidth);
+		Result.ImageHeight = FMath::Max(1, InHeight);
+		Result.HorizontalFovDeg = InHorizontalFovDeg;
+
+		const double HalfFovRadians = FMath::DegreesToRadians(static_cast<double>(InHorizontalFovDeg)) * 0.5;
+		Result.Fx = static_cast<double>(Result.ImageWidth) / (2.0 * FMath::Tan(HalfFovRadians));
+		Result.Fy = Result.Fx;
+		Result.Cx = static_cast<double>(Result.ImageWidth) * 0.5;
+		Result.Cy = static_cast<double>(Result.ImageHeight) * 0.5;
+		return Result;
+	}
+
+	bool IsValid() const
+	{
+		return ImageWidth > 0
+			&& ImageHeight > 0
+			&& FMath::IsFinite(HorizontalFovDeg)
+			&& HorizontalFovDeg > 0.0f
+			&& HorizontalFovDeg < 180.0f
+			&& FMath::IsFinite(Fx)
+			&& Fx > 0.0
+			&& FMath::IsFinite(Fy)
+			&& Fy > 0.0
+			&& FMath::IsFinite(Cx)
+			&& FMath::IsFinite(Cy);
+	}
+};
+
+USTRUCT(BlueprintType)
 struct SIMULATOR_API FCaptureConfig
 {
 	GENERATED_BODY()
@@ -60,6 +117,9 @@ struct SIMULATOR_API FCaptureConfig
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
 	ELunarSimResolutionPreset ResolutionPreset = ELunarSimResolutionPreset::R1024x1024;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "5.0", ClampMax = "170.0", UIMin = "5.0", UIMax = "170.0", Units = "deg"))
+	float HorizontalFovDeg = 90.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
 	ELunarSimCaptureRatePreset CaptureRatePreset = ELunarSimCaptureRatePreset::Hz6;
@@ -132,6 +192,21 @@ struct SIMULATOR_API FCaptureConfig
 		return 20.0f;
 	}
 
+	static float GetDefaultHorizontalFovDeg()
+	{
+		return 90.0f;
+	}
+
+	static float GetMinHorizontalFovDeg()
+	{
+		return 5.0f;
+	}
+
+	static float GetMaxHorizontalFovDeg()
+	{
+		return 170.0f;
+	}
+
 	static float GetMinStereoBaselineCm()
 	{
 		return 1.0f;
@@ -161,13 +236,26 @@ struct SIMULATOR_API FCaptureConfig
 		return FMath::Clamp(InBaselineCm, GetMinStereoBaselineCm(), GetMaxStereoBaselineCm());
 	}
 
+	static float SanitizeHorizontalFovDeg(float InHorizontalFovDeg)
+	{
+		if (!FMath::IsFinite(InHorizontalFovDeg) || InHorizontalFovDeg <= 0.0f) {
+			return GetDefaultHorizontalFovDeg();
+		}
+
+		return FMath::Clamp(InHorizontalFovDeg, GetMinHorizontalFovDeg(), GetMaxHorizontalFovDeg());
+	}
+
 	bool Sanitize()
 	{
 		const float SafeCustomCaptureHz = SanitizeCameraCaptureHz(CustomCaptureHz);
 		const float SafeStereoBaselineCm = SanitizeStereoBaselineCm(StereoBaselineCm);
-		const bool bChanged = CustomCaptureHz != SafeCustomCaptureHz || StereoBaselineCm != SafeStereoBaselineCm;
+		const float SafeHorizontalFovDeg = SanitizeHorizontalFovDeg(HorizontalFovDeg);
+		const bool bChanged = CustomCaptureHz != SafeCustomCaptureHz
+			|| StereoBaselineCm != SafeStereoBaselineCm
+			|| HorizontalFovDeg != SafeHorizontalFovDeg;
 		CustomCaptureHz = SafeCustomCaptureHz;
 		StereoBaselineCm = SafeStereoBaselineCm;
+		HorizontalFovDeg = SafeHorizontalFovDeg;
 		return bChanged;
 	}
 
@@ -188,6 +276,19 @@ struct SIMULATOR_API FCaptureConfig
 	float GetStereoBaselineMeters() const
 	{
 		return SanitizeStereoBaselineCm(StereoBaselineCm) / 100.0f;
+	}
+
+	float GetResolvedHorizontalFovDeg() const
+	{
+		return SanitizeHorizontalFovDeg(HorizontalFovDeg);
+	}
+
+	FResolvedCameraCalibration GetResolvedCameraCalibration() const
+	{
+		return FResolvedCameraCalibration::Resolve(
+			GetResolvedWidth(),
+			GetResolvedHeight(),
+			GetResolvedHorizontalFovDeg());
 	}
 
 	bool IsDatasetMode() const

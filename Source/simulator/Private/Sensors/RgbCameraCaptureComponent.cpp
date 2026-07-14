@@ -11,16 +11,16 @@ URgbCameraCaptureComponent::URgbCameraCaptureComponent()
 
 void URgbCameraCaptureComponent::Initialize(
 	USceneCaptureComponent2D* InSceneCapture,
-	int32 InWidth,
-	int32 InHeight,
+	const FResolvedCameraCalibration& InCalibration,
 	bool bInUseGammaCorrection,
 	float InOutputGamma,
 	bool bInUseFixedExposure,
 	float InExposureCompensation)
 {
 	SceneCapture = InSceneCapture;
-	Width = InWidth;
-	Height = InHeight;
+	Calibration = InCalibration;
+	Width = Calibration.ImageWidth;
+	Height = Calibration.ImageHeight;
 	bUseGammaCorrection = bInUseGammaCorrection;
 	OutputGamma = InOutputGamma;
 	bUseFixedExposure = bInUseFixedExposure;
@@ -59,6 +59,18 @@ void URgbCameraCaptureComponent::SetupRenderTarget()
 void URgbCameraCaptureComponent::ApplyCameraLook()
 {
 	if (!SceneCapture) return;
+	if (!Calibration.IsValid()) {
+		UE_LOG(LogTemp, Error, TEXT("RgbCameraCaptureComponent: invalid resolved camera calibration; RGB capture projection was not applied."));
+		return;
+	}
+
+	// ROS RGB is an ideal pinhole camera. Keep projection state aligned with the
+	// same immutable calibration used by CameraInfo and session metadata.
+	SceneCapture->ProjectionType = ECameraProjectionMode::Perspective;
+	SceneCapture->FOVAngle = Calibration.HorizontalFovDeg;
+	SceneCapture->Overscan = 0.0f;
+	SceneCapture->bUseCustomProjectionMatrix = false;
+	SceneCapture->CustomProjectionMatrix.SetIdentity();
 
 	// Keep this false for dataset capture. We manually capture when FrameInfo is created.
 	SceneCapture->bCaptureEveryFrame = false;

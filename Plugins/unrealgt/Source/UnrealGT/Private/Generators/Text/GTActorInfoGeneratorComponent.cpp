@@ -17,6 +17,26 @@
 #include "Generators/Image/GTImageGeneratorBase.h"
 #include "Generators/Image/GTSceneCaptureComponent2D.h"
 
+namespace
+{
+void ApplyLinkedCameraCalibration(
+    UGTSceneCaptureComponent2D* TargetCapture,
+    const UGTSceneCaptureComponent2D* SourceCapture)
+{
+    if (!TargetCapture || !SourceCapture)
+    {
+        return;
+    }
+
+    TargetCapture->SetResolution(SourceCapture->Resolution);
+    TargetCapture->ProjectionType = ECameraProjectionMode::Perspective;
+    TargetCapture->FOVAngle = SourceCapture->FOVAngle;
+    TargetCapture->Overscan = 0.0f;
+    TargetCapture->bUseCustomProjectionMatrix = false;
+    TargetCapture->CustomProjectionMatrix.SetIdentity();
+}
+}
+
 UGTActorInfoGeneratorComponent::UGTActorInfoGeneratorComponent()
     : Super()
     , MinimalRequiredBoundingBoxSize(0, 0)
@@ -71,10 +91,11 @@ void UGTActorInfoGeneratorComponent::GenerateDataInternal(
     UGTImageGeneratorBase* LinkedImageGeneratorComponent =
         Cast<UGTImageGeneratorBase>(LinkedImageGenerator.GetComponent(GetOwner()));
 
-    if (bAccurateBoundingBoxes && LinkedImageGenerator.GetComponent(GetOwner()))
+    if (bAccurateBoundingBoxes && LinkedImageGeneratorComponent)
     {
-        SegmentationSceneCapture->SetResolution(
-            LinkedImageGeneratorComponent->GetSceneCaptureComponent()->Resolution);
+        ApplyLinkedCameraCalibration(
+            SegmentationSceneCapture,
+            LinkedImageGeneratorComponent->GetSceneCaptureComponent());
         SegmentationSceneCapture->CaptureImage(CachedSegmentation);
     }
 
@@ -747,15 +768,19 @@ void UGTActorInfoGeneratorComponent::BeginPlay()
                 "or turn Accurate Bounding Boxes off."));
     }
 
-    if (bAccurateBoundingBoxes && LinkedImageGenerator.GetComponent(GetOwner()))
+    if (bAccurateBoundingBoxes)
     {
         UGTImageGeneratorBase* LinkedImageGeneratorComponent =
             Cast<UGTImageGeneratorBase>(LinkedImageGenerator.GetComponent(GetOwner()));
 
-        SegmentationSceneCapture->SetResolution(
-            LinkedImageGeneratorComponent->GetSceneCaptureComponent()->Resolution);
-        SegmentationSceneCapture->SetupSegmentationPostProccess(
-            TrackActorsThatMatchFilter, bShouldApplyCloseMorph);
+        if (LinkedImageGeneratorComponent)
+        {
+            ApplyLinkedCameraCalibration(
+                SegmentationSceneCapture,
+                LinkedImageGeneratorComponent->GetSceneCaptureComponent());
+            SegmentationSceneCapture->SetupSegmentationPostProccess(
+                TrackActorsThatMatchFilter, bShouldApplyCloseMorph);
+        }
     }
 }
 

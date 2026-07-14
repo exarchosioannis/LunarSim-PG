@@ -19,8 +19,7 @@ public:
 
 	void Initialize(
 		USceneCaptureComponent2D* InSceneCapture,
-		int32 InWidth,
-		int32 InHeight,
+		const FResolvedCameraCalibration& InCalibration,
 		bool bInUseGammaCorrection,
 		float InOutputGamma,
 		bool bInUseFixedExposure,
@@ -55,6 +54,7 @@ private:
 	bool bWaitingToEnqueueReadback = false;
 
 	FCaptureFrameInfo PendingFrameInfo;
+	FResolvedCameraCalibration Calibration;
 
 	int32 Width = 1280;
 	int32 Height = 720;

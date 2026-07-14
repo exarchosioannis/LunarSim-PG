@@ -11,29 +11,25 @@
 
 #include "CameraRosPublisherComponent.generated.h"
 
-class UCameraComponent;
-
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class SIMULATOR_API UCameraRosPublisherComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
-       UCameraRosPublisherComponent();
+	UCameraRosPublisherComponent();
 
-       void Initialize(
-	       int32 InWidth,
-	       int32 InHeight,
-	       const FString& InFrameId,
-	       const FString& InTopicBase,
-	       UCameraComponent* InCamera,
-	       bool bInSubscribeToControl = true,
-	       bool bInIsRightStereoCamera = false,
-	       double InStereoBaselineMeters = 0.0,
-	       ELunarSimRunMode InRunMode = ELunarSimRunMode::Dataset
-       );
+	void Initialize(
+		const FResolvedCameraCalibration& InCalibration,
+		const FString& InFrameId,
+		const FString& InTopicBase,
+		bool bInSubscribeToControl = true,
+		bool bInIsRightStereoCamera = false,
+		double InStereoBaselineMeters = 0.0,
+		ELunarSimRunMode InRunMode = ELunarSimRunMode::Dataset
+	);
 
-       void SetStereoCalibration(bool bInIsRightStereoCamera, double InStereoBaselineMeters);
+	void SetStereoCalibration(bool bInIsRightStereoCamera, double InStereoBaselineMeters);
 
 	void TickRos(float DeltaTime);
 
@@ -62,11 +58,7 @@ private:
 	UPROPERTY()
 	UTempoROSNode* ROSNode = nullptr;
 
-	UPROPERTY()
-	UCameraComponent* Camera = nullptr;
-
-	int32 Width = 1280;
-	int32 Height = 720;
+	FResolvedCameraCalibration Calibration;
 	FString CameraName = TEXT("left_camera");
 	FString TopicBase = TEXT("/left_camera");
 	FString FrameId = TEXT("left_camera");

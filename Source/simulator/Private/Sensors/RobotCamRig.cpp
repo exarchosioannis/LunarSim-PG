@@ -73,12 +73,16 @@ ARobotCamRig::ARobotCamRig()
 
 	RosPublisherComponent = CreateDefaultSubobject<UCameraRosPublisherComponent>(TEXT("RosPublisherComponent"));
 	RightRosPublisherComponent = CreateDefaultSubobject<UCameraRosPublisherComponent>(TEXT("RightRosPublisherComponent"));
+
+	ApplyCameraCalibration();
+	ApplyStereoBaseline();
 }
 
 void ARobotCamRig::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	ResolveCaptureSettings();
+	ApplyCameraCalibration();
 	ApplyStereoBaseline();
 }
 
@@ -151,6 +155,7 @@ void ARobotCamRig::BeginPlay()
 	}
 
 	//Finalize camera component transforms before publishing TF.
+	ApplyCameraCalibration();
 	ApplyStereoBaseline();
 
 	//Resolve actor/component references.
@@ -164,19 +169,19 @@ void ARobotCamRig::BeginPlay()
 
 	//Initialize RGB capture components.
 	if (RgbCaptureComponent && RGBCapture) {
-		RgbCaptureComponent->Initialize(RGBCapture, ResolvedWidth, ResolvedHeight, bUseGammaCorrection, OutputGamma, bUseFixedExposure, ExposureCompensation);
+		RgbCaptureComponent->Initialize(RGBCapture, ResolvedCameraCalibration, bUseGammaCorrection, OutputGamma, bUseFixedExposure, ExposureCompensation);
 	}
 
 	if (RightRgbCaptureComponent && RightRGBCapture) {
-		RightRgbCaptureComponent->Initialize(RightRGBCapture, ResolvedWidth, ResolvedHeight, bUseGammaCorrection, OutputGamma, bUseFixedExposure, ExposureCompensation);
+		RightRgbCaptureComponent->Initialize(RightRGBCapture, ResolvedCameraCalibration, bUseGammaCorrection, OutputGamma, bUseFixedExposure, ExposureCompensation);
 	}
 
 	//Initialize ROS image/camera_info publishers.
 	//Image and camera_info messages should use optical frames.
 	if (RosPublisherComponent && Camera) {
 		RosPublisherComponent->Initialize(
-			ResolvedWidth, ResolvedHeight,
-			LeftCameraOpticalFrameId, TEXT("/left_camera"), Camera,
+			ResolvedCameraCalibration,
+			LeftCameraOpticalFrameId, TEXT("/left_camera"),
 			true, false, 0.0, CaptureConfig.RunMode
 		);
 		RosPublisherComponent->OnCaptureControlReceived.AddUObject(this, &ARobotCamRig::OnCaptureControl );
@@ -184,8 +189,8 @@ void ARobotCamRig::BeginPlay()
 
 	if (RightRosPublisherComponent && RightCamera) {
 		RightRosPublisherComponent->Initialize(
-			ResolvedWidth, ResolvedHeight,
-			RightCameraOpticalFrameId, TEXT("/right_camera"), RightCamera, false, true,
+			ResolvedCameraCalibration,
+			RightCameraOpticalFrameId, TEXT("/right_camera"), false, true,
 			ResolvedStereoBaselineMeters, CaptureConfig.RunMode
 		);
 	}
@@ -193,7 +198,7 @@ void ARobotCamRig::BeginPlay()
 	CaptureManager = NewObject<UCaptureManager>(this);
 
 	if (CaptureManager) {
-		CaptureManager->Initialize(CaptureConfig);
+		CaptureManager->Initialize(CaptureConfig, ResolvedCameraCalibration);
 		CaptureManager->SetLeftCameraPoseSource(Camera);
 		CaptureManager->SetRightCameraPoseSource(RightCamera);
 		if (RoverPoseSource) {
@@ -209,6 +214,47 @@ void ARobotCamRig::BeginPlay()
 			UE_LOG(LogTemp, Log, TEXT("RobotCamRig: keyboard capture toggle bound to C."));
 		}
 	}
+}
+
+void ARobotCamRig::ApplyCameraCalibration()
+{
+	if (!ResolvedCameraCalibration.IsValid()) {
+		UE_LOG(LogTemp, Error, TEXT("RobotCamRig: resolved camera calibration is invalid; camera projection was not applied."));
+		return;
+	}
+
+	const float ResolvedAspectRatio = static_cast<float>(ResolvedCameraCalibration.ImageWidth)
+		/ static_cast<float>(ResolvedCameraCalibration.ImageHeight);
+	const auto ConfigureCamera = [this, ResolvedAspectRatio](UCameraComponent* CameraComponent)
+	{
+		if (!CameraComponent) return;
+		CameraComponent->ProjectionMode = ECameraProjectionMode::Perspective;
+		CameraComponent->SetFieldOfView(ResolvedCameraCalibration.HorizontalFovDeg);
+		CameraComponent->SetAspectRatio(ResolvedAspectRatio);
+	};
+	const auto ConfigureSceneCapture = [this](USceneCaptureComponent2D* SceneCapture)
+	{
+		if (!SceneCapture) return;
+		SceneCapture->ProjectionType = ECameraProjectionMode::Perspective;
+		SceneCapture->FOVAngle = ResolvedCameraCalibration.HorizontalFovDeg;
+		SceneCapture->Overscan = 0.0f;
+		SceneCapture->bUseCustomProjectionMatrix = false;
+		SceneCapture->CustomProjectionMatrix.SetIdentity();
+
+		if (SceneCapture->ProjectionType != ECameraProjectionMode::Perspective
+			|| !FMath::IsNearlyEqual(SceneCapture->FOVAngle, ResolvedCameraCalibration.HorizontalFovDeg)
+			|| !FMath::IsNearlyZero(SceneCapture->Overscan)
+			|| SceneCapture->bUseCustomProjectionMatrix) {
+			UE_LOG(LogTemp, Error,
+				TEXT("RobotCamRig: SceneCapture %s does not match the resolved ideal pinhole calibration."),
+				*SceneCapture->GetName());
+		}
+	};
+
+	ConfigureCamera(Camera);
+	ConfigureCamera(RightCamera);
+	ConfigureSceneCapture(RGBCapture);
+	ConfigureSceneCapture(RightRGBCapture);
 }
 
 void ARobotCamRig::ApplyStereoBaseline()
@@ -242,21 +288,11 @@ void ARobotCamRig::ApplyStereoBaseline()
 	if (RightCamera) {
 		RightCamera->SetRelativeLocation(FVector::ZeroVector);
 		RightCamera->SetRelativeRotation(FRotator::ZeroRotator);
-		if (Camera) {
-			RightCamera->SetFieldOfView(Camera->FieldOfView);
-			RightCamera->SetAspectRatio(Camera->AspectRatio);
-			RightCamera->SetConstraintAspectRatio(Camera->bConstrainAspectRatio);
-		}
 	}
 
 	if (RightRGBCapture) {
 		RightRGBCapture->SetRelativeLocation(FVector::ZeroVector);
 		RightRGBCapture->SetRelativeRotation(FRotator::ZeroRotator);
-		if (RGBCapture) {
-			RightRGBCapture->FOVAngle = RGBCapture->FOVAngle;
-			RightRGBCapture->ProjectionType = RGBCapture->ProjectionType;
-			RightRGBCapture->OrthoWidth = RGBCapture->OrthoWidth;
-		}
 	}
 
 	if (GroundTruthCameraChild) {
@@ -288,7 +324,7 @@ void ARobotCamRig::ApplyGroundTruthConfig()
 		return;
 	}
 
-	GroundTruthCamera->SetGroundTruthResolution(ResolvedWidth, ResolvedHeight);
+	GroundTruthCamera->SetGroundTruthCalibration(ResolvedCameraCalibration);
 	GroundTruthCamera->SetGroundTruthOutputs(
 		CaptureConfig.IsGroundTruthRgbEnabled(),
 		CaptureConfig.IsGroundTruthDepthEnabled(),
@@ -349,12 +385,12 @@ void ARobotCamRig::ResolveCaptureSettings()
 {
 	if (CaptureConfig.Sanitize()) {
 		UE_LOG(LogTemp, Warning,
-			TEXT("RobotCamRig: invalid capture config values were normalized to CaptureHz=%.3f, StereoBaselineCm=%.2f."),
+			TEXT("RobotCamRig: invalid capture config values were normalized to CaptureHz=%.3f, HorizontalFovDeg=%.2f, StereoBaselineCm=%.2f."),
 			CaptureConfig.GetResolvedCaptureHz(),
+			CaptureConfig.GetResolvedHorizontalFovDeg(),
 			CaptureConfig.StereoBaselineCm);
 	}
-	ResolvedWidth = CaptureConfig.GetResolvedWidth();
-	ResolvedHeight = CaptureConfig.GetResolvedHeight();
+	ResolvedCameraCalibration = CaptureConfig.GetResolvedCameraCalibration();
 	ResolvedStereoBaselineMeters = CaptureConfig.GetStereoBaselineMeters();
 }
 
@@ -521,6 +557,7 @@ void ARobotCamRig::SetCaptureConfig(const FCaptureConfig& NewConfig)
 
 	CaptureConfig = NewConfig;
 	ResolveCaptureSettings();
+	ApplyCameraCalibration();
 	ApplyStereoBaseline();
 	ApplyGroundTruthConfig();
 	if (RosPublisherComponent) {

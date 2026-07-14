@@ -1,6 +1,5 @@
 #include "Sensors/CameraRosPublisherComponent.h"
 #include "TempoROSTypes.h"
-#include "Camera/CameraComponent.h"
 
 //TempoROS message traits
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(sensor_msgs::msg::Image);
@@ -13,22 +12,22 @@ UCameraRosPublisherComponent::UCameraRosPublisherComponent()
 }
 
 void UCameraRosPublisherComponent::Initialize(
-	int32 InWidth,
-	int32 InHeight,
+	const FResolvedCameraCalibration& InCalibration,
 	const FString& InFrameId,
 	const FString& InTopicBase,
-	UCameraComponent* InCamera,
 	bool bInSubscribeToControl,
 	bool bInIsRightStereoCamera,
 	double InStereoBaselineMeters,
 	ELunarSimRunMode InRunMode)
 {
-	Width = InWidth;
-	Height = InHeight;
+	Calibration = InCalibration;
+	if (!Calibration.IsValid()) {
+		UE_LOG(LogTemp, Error, TEXT("CameraRosPublisherComponent: invalid resolved calibration; using the default 1024x1024, 90 degree calibration."));
+		Calibration = FCaptureConfig().GetResolvedCameraCalibration();
+	}
 	FrameId = InFrameId;
 	TopicBase = InTopicBase;
 	CameraName = InFrameId;
-	Camera = InCamera;
 	bSubscribeToControl = bInSubscribeToControl;
 	RunMode = InRunMode;
 	SetStereoCalibration(bInIsRightStereoCamera, InStereoBaselineMeters);
@@ -64,15 +63,15 @@ void UCameraRosPublisherComponent::SetStereoCalibration(bool bInIsRightStereoCam
 
 void UCameraRosPublisherComponent::SetupReusableMessages()
 {
-	ReusableImgMsg.height = Height;
-	ReusableImgMsg.width = Width;
+	ReusableImgMsg.height = Calibration.ImageHeight;
+	ReusableImgMsg.width = Calibration.ImageWidth;
 	ReusableImgMsg.encoding = "bgr8";
 	ReusableImgMsg.is_bigendian = false;
-	ReusableImgMsg.step = Width * 3;
-	ReusableImgMsg.data.resize((size_t)Width * (size_t)Height * 3);
+	ReusableImgMsg.step = Calibration.ImageWidth * 3;
+	ReusableImgMsg.data.resize((size_t)Calibration.ImageWidth * (size_t)Calibration.ImageHeight * 3);
 
-	ReusableCamInfoMsg.height = Height;
-	ReusableCamInfoMsg.width = Width;
+	ReusableCamInfoMsg.height = Calibration.ImageHeight;
+	ReusableCamInfoMsg.width = Calibration.ImageWidth;
 	ReusableCamInfoMsg.distortion_model = "plumb_bob";
 	ReusableCamInfoMsg.d = {0.0, 0.0, 0.0, 0.0, 0.0};
 }
@@ -136,8 +135,8 @@ void UCameraRosPublisherComponent::PublishFrame(
 {
 	if (!ROSNode || !bInitialized) return;
 
-	const int32 W = Width;
-	const int32 H = Height; 
+	const int32 W = Calibration.ImageWidth;
+	const int32 H = Calibration.ImageHeight;
 	const int32 PixelCount = W * H;
 	const int32 InputBytesPerPixel = 4;
 	
@@ -167,12 +166,12 @@ void UCameraRosPublisherComponent::PublishFrame(
 
 void UCameraRosPublisherComponent::PublishCameraInfo(const builtin_interfaces::msg::Time& Stamp)
 {
-	if (!ROSNode || !Camera) return;
+	if (!ROSNode || !Calibration.IsValid()) return;
 
-	const double Fx = (double)Width / (2.0 * FMath::Tan(FMath::DegreesToRadians((double)Camera->FieldOfView) * 0.5));
-	const double Fy = Fx;
-	const double Cx = (double)Width * 0.5;
-	const double Cy = (double)Height * 0.5;
+	const double Fx = Calibration.Fx;
+	const double Fy = Calibration.Fy;
+	const double Cx = Calibration.Cx;
+	const double Cy = Calibration.Cy;
 
 	ReusableCamInfoMsg.header.frame_id = TCHAR_TO_UTF8(*FrameId);
 	ReusableCamInfoMsg.header.stamp = Stamp;

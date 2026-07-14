@@ -3,6 +3,7 @@
 #include "Components/ActorComponent.h"
 #include "Engine/Engine.h"
 #include "Generators/Image/GTImageGeneratorBase.h"
+#include "Generators/Image/GTSceneCaptureComponent2D.h"
 #include "Triggers/GTGeneratorTrigger.h"
 
 namespace
@@ -40,6 +41,42 @@ void AGTCamera::SetGroundTruthResolution(int32 Width, int32 Height)
 		if (ImageGenerator)
 		{
 			ImageGenerator->SetResolution(Resolution);
+		}
+	}
+}
+
+void AGTCamera::SetGroundTruthCalibration(const FResolvedCameraCalibration& CameraCalibration)
+{
+	if (!CameraCalibration.IsValid()) {
+		UE_LOG(LogTemp, Error, TEXT("GTCamera: invalid resolved camera calibration; UnrealGT projection was not applied."));
+		return;
+	}
+
+	const FIntPoint Resolution(CameraCalibration.ImageWidth, CameraCalibration.ImageHeight);
+	TArray<UGTImageGeneratorBase*> ImageGenerators;
+	GetComponents<UGTImageGeneratorBase>(ImageGenerators);
+	for (UGTImageGeneratorBase* ImageGenerator : ImageGenerators) {
+		if (!ImageGenerator) continue;
+		ImageGenerator->SetResolution(Resolution);
+		ImageGenerator->SetHorizontalFOV(CameraCalibration.HorizontalFovDeg);
+	}
+	TArray<UGTSceneCaptureComponent2D*> SceneCaptures;
+	GetComponents<UGTSceneCaptureComponent2D>(SceneCaptures);
+	for (UGTSceneCaptureComponent2D* SceneCapture : SceneCaptures) {
+		if (!SceneCapture) continue;
+		SceneCapture->SetResolution(Resolution);
+		SceneCapture->ProjectionType = ECameraProjectionMode::Perspective;
+		SceneCapture->FOVAngle = CameraCalibration.HorizontalFovDeg;
+		SceneCapture->Overscan = 0.0f;
+		SceneCapture->bUseCustomProjectionMatrix = false;
+		SceneCapture->CustomProjectionMatrix.SetIdentity();
+
+		if (!FMath::IsNearlyEqual(SceneCapture->FOVAngle, CameraCalibration.HorizontalFovDeg)
+			|| !FMath::IsNearlyZero(SceneCapture->Overscan)
+			|| SceneCapture->bUseCustomProjectionMatrix) {
+			UE_LOG(LogTemp, Error,
+				TEXT("GTCamera: UnrealGT SceneCapture %s does not match the resolved calibration."),
+				*SceneCapture->GetName());
 		}
 	}
 }
