@@ -3,6 +3,11 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 
+namespace
+{
+constexpr float MetersPerCentimeter = 0.01f;
+}
+
 URoverCmdVelVehicleControllerComponent::URoverCmdVelVehicleControllerComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -141,7 +146,7 @@ void URoverCmdVelVehicleControllerComponent::SetupRos()
 
 void URoverCmdVelVehicleControllerComponent::OnCmdVel(const FTwist& Msg)
 {
-	CurrentTwist = Msg;
+	CurrentUnrealTwist = Msg;
 	bHasReceivedCommand = true;
 
 	if (GetWorld()) {
@@ -149,12 +154,14 @@ void URoverCmdVelVehicleControllerComponent::OnCmdVel(const FTwist& Msg)
 	}
 
 	if (bLogReceivedCmdVel) {
+		const float RosLinearMps = Msg.LinearVelocity.X * MetersPerCentimeter;
+		const float RosAngularRadps = -FMath::DegreesToRadians(Msg.AngularVelocity.Z);
 		UE_LOG(
 			LogTemp,
 			Log,
-			TEXT("cmd_vel received: linear.x=%.3f angular.z=%.3f"),
-			Msg.LinearVelocity.X,
-			Msg.AngularVelocity.Z
+			TEXT("cmd_vel received (ROS SI): linear.x=%.3f m/s angular.z=%.3f rad/s"),
+			RosLinearMps,
+			RosAngularRadps
 		);
 	}
 }
@@ -192,12 +199,15 @@ void URoverCmdVelVehicleControllerComponent::UpdateRoverCommand(float DeltaTime)
 	float ForwardReverseInput = 0.0f;
 	float SteeringInput = 0.0f;
 
+	const float LinearMps = CurrentUnrealTwist.LinearVelocity.X * MetersPerCentimeter;
+	const float UnrealAngularRadps = FMath::DegreesToRadians(CurrentUnrealTwist.AngularVelocity.Z);
+
 	if (!FMath::IsNearlyZero(Settings.MaxCmdLinearMps)) {
-		ForwardReverseInput = FMath::Clamp(CurrentTwist.LinearVelocity.X / Settings.MaxCmdLinearMps, -1.0f, 1.0f);
+		ForwardReverseInput = FMath::Clamp(LinearMps / Settings.MaxCmdLinearMps, -1.0f, 1.0f);
 	}
 
 	if (!FMath::IsNearlyZero(Settings.MaxCmdAngularRadps)) {
-		SteeringInput = FMath::Clamp(CurrentTwist.AngularVelocity.Z / Settings.MaxCmdAngularRadps, -1.0f, 1.0f);
+		SteeringInput = FMath::Clamp(UnrealAngularRadps / Settings.MaxCmdAngularRadps, -1.0f, 1.0f);
 	}
 
 	if (Settings.bInvertThrottle) {

@@ -1,16 +1,20 @@
 teleop_twist_joy:
   ros__parameters:
+    # Logitech F710 in XInput mode: hold RB while commanding motion.
     enable_button: 5
     require_enable_button: true
 
+    # Left-stick Y. Full travel commands 1.0 m/s; partial travel remains gentle.
     axis_linear:
       x: 1
     scale_linear:
       x: 1.0
 
+    # Left-stick X. Full travel commands 1.0 rad/s.
     axis_angular:
       yaw: 0
     scale_angular:
       yaw: 1.0
 
+    # LunarSim-PG subscribes to geometry_msgs/msg/Twist, not TwistStamped.
     publish_stamped_twist: false

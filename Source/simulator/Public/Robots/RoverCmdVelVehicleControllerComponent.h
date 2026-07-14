@@ -84,11 +84,6 @@ private:
 	UPROPERTY()
 	URoverVehicleControllerComponent* RoverController = nullptr;
 
-	/*
-		Optional manual reference.
-		Use this only if this component is not placed on the same Actor/Pawn
-		as the RoverVehicleControllerComponent.
-	*/
 	UPROPERTY(EditAnywhere, Category = "Vehicle")
 	URoverVehicleControllerComponent* RoverControllerOverride = nullptr;
 
@@ -98,7 +93,7 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Debug")
 	bool bLogReceivedCmdVel = false;
 
-	FTwist CurrentTwist;
+	FTwist CurrentUnrealTwist;
 
 	FString SubscribedCmdVelTopic;
 	float LastCmdTime = -1000000.0f;

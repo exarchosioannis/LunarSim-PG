@@ -2,6 +2,9 @@ FROM ros:humble-ros-base
 
 SHELL ["/bin/bash", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
+ENV ROS_DOMAIN_ID=9 \
+    ROS_LOCALHOST_ONLY=0 \
+    RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nano \
@@ -23,9 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc && \
-    echo "if [ -f /ws/ros2_ws/install/setup.bash ]; then source /ws/ros2_ws/install/setup.bash; fi" >> /root/.bashrc && \
-    echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> /root/.bashrc && \
-    echo "export ROS_DOMAIN_ID=9" >> /root/.bashrc
+    echo "if [ -f /ws/ros2_ws/install/setup.bash ]; then source /ws/ros2_ws/install/setup.bash; fi" >> /root/.bashrc
 
 WORKDIR /ws
 
