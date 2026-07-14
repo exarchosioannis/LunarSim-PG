@@ -1,9 +1,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Capture/CaptureTypes.h"
 #include "Components/ActorComponent.h"
 #include "TempoROSNode.h"
-#include "Maps/GroundTruthMapFileExporter.h"
 
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
@@ -36,9 +36,6 @@ class SIMULATOR_API UOccupancyMapPublisherComponent : public UActorComponent
 public:
 	UOccupancyMapPublisherComponent();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ground Truth Map")
-	bool bEnableGroundTruthMaps = true;
-
 	UFUNCTION(BlueprintCallable, Category = "Ground Truth Map")
 	void RegenerateAndPublishMap();
 
@@ -54,6 +51,8 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	bool TryInitializeFromRunCaptureConfig();
+	bool IsGroundTruthMapsEnabledForRun() const;
 	void SetupRos();
 	void GenerateOccupancyMap();
 	void BuildElevationPointCloud();
@@ -105,6 +104,8 @@ private:
 	TArray<float> ElevationDataMeters;
 
 	bool bMapGenerated = false;
+	bool bRunCaptureConfigResolved = false;
+	FCaptureConfig RunCaptureConfig;
 	float PublishAccumulator = 0.0f;
 	float ComputedOriginXMapMeters = 0.0f;
 	float ComputedOriginYMapMeters = 0.0f;

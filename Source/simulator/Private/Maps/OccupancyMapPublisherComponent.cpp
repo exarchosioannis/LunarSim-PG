@@ -22,17 +22,7 @@ UOccupancyMapPublisherComponent::UOccupancyMapPublisherComponent()
 void UOccupancyMapPublisherComponent::BeginPlay()
 {
 	Super::BeginPlay();
-
-	if (!bEnableGroundTruthMaps) {
-		UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: ground truth maps are disabled."));
-		return;
-	}
-
-	SetupRos();
-
-	//Maps are environment-level ground truth, so they are generated/exported when the level starts,
-	RegenerateAndPublishMap();
-	ExportMapToDefaultDatasetDirectory();
+	TryInitializeFromRunCaptureConfig();
 }
 
 //END
@@ -47,7 +37,10 @@ void UOccupancyMapPublisherComponent::TickComponent(float DeltaTime, ELevelTick 
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (!bEnableGroundTruthMaps) return;
+	// Actor BeginPlay order is not guaranteed. Wait until CaptureManager has
+	// frozen the sanitized dataset-run config, then initialize exactly once.
+	if (!bRunCaptureConfigResolved && !TryInitializeFromRunCaptureConfig()) return;
+	if (!IsGroundTruthMapsEnabledForRun()) return;
 
 	if (ROSNode) {
 		ROSNode->Tick(DeltaTime);
@@ -60,6 +53,36 @@ void UOccupancyMapPublisherComponent::TickComponent(float DeltaTime, ELevelTick 
 		PublishAccumulator = 0.0f;
 		PublishMap();
 	}
+}
+
+bool UOccupancyMapPublisherComponent::TryInitializeFromRunCaptureConfig()
+{
+	if (bRunCaptureConfigResolved) return true;
+
+	UWorld* World = GetWorld();
+	UDatasetRunSubsystem* DatasetRunSubsystem = World ? World->GetSubsystem<UDatasetRunSubsystem>() : nullptr;
+	if (!DatasetRunSubsystem || !DatasetRunSubsystem->TryGetCaptureConfigForRun(RunCaptureConfig)) {
+		return false;
+	}
+
+	bRunCaptureConfigResolved = true;
+	if (!IsGroundTruthMapsEnabledForRun()) {
+		UE_LOG(LogTemp, Log,
+			TEXT("OccupancyMapPublisherComponent: ground truth maps are disabled in the frozen run capture config."));
+		return true;
+	}
+
+	SetupRos();
+	// Maps are environment-level ground truth, generated/exported once per run.
+	GenerateOccupancyMap();
+	PublishMap();
+	ExportMapToDefaultDatasetDirectory();
+	return true;
+}
+
+bool UOccupancyMapPublisherComponent::IsGroundTruthMapsEnabledForRun() const
+{
+	return bRunCaptureConfigResolved && RunCaptureConfig.IsGroundTruthMapsEnabled();
 }
 
 // creates the ROS node and registers map publishers.
@@ -96,7 +119,7 @@ builtin_interfaces::msg::Time UOccupancyMapPublisherComponent::ToRosTime(double 
 // Regenerates the occupancy/elevation map layers and immediately republishes them to ROS.
 void UOccupancyMapPublisherComponent::RegenerateAndPublishMap()
 {
-	if (!bEnableGroundTruthMaps) {
+	if (!IsGroundTruthMapsEnabledForRun()) {
 		UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: map generation skipped because ground truth maps are disabled."));
 		return;
 	}
@@ -327,7 +350,7 @@ bool UOccupancyMapPublisherComponent::HitHasIgnoreTag(const FHitResult& Hit) con
 
 bool UOccupancyMapPublisherComponent::ExportMapToDefaultDatasetDirectory()
 {
-	if (!bEnableGroundTruthMaps) {
+	if (!IsGroundTruthMapsEnabledForRun()) {
 		UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: map export skipped because ground truth maps are disabled."));
 		return false;
 	}
@@ -340,13 +363,13 @@ bool UOccupancyMapPublisherComponent::ExportMapToDefaultDatasetDirectory()
 	}
 
 	const FString MapsDirectory = DatasetRunSubsystem->GetMapsDirectory();
-	return ExportMapToDirectory(MapsDirectory, TEXT("occupancy_map"));
+	return ExportMapToDirectory(MapsDirectory, FGroundTruthMapArtifacts::GetDefaultOccupancyBaseFileName());
 }
 
 // Exports the current map to the specified directory with the given base file name. Returns true on success.
 bool UOccupancyMapPublisherComponent::ExportMapToDirectory(const FString& MapsDirectory, const FString& BaseFileName)
 {
-	if (!bEnableGroundTruthMaps) {
+	if (!IsGroundTruthMapsEnabledForRun()) {
 		UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: map export skipped because ground truth maps are disabled."));
 		return false;
 	}
@@ -394,7 +417,7 @@ void UOccupancyMapPublisherComponent::BuildElevationPointCloud()
 
 void UOccupancyMapPublisherComponent::PublishMap()
 {
-	if (!bEnableGroundTruthMaps) return;
+	if (!IsGroundTruthMapsEnabledForRun()) return;
 	if (!ROSNode || !bMapGenerated) return;
 	
 	const double NowSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;

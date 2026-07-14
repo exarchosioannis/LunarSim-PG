@@ -1099,11 +1099,6 @@ void FsimulatorEditorModule::RefreshMapPublisherTargets(UWorld* EditorWorld)
 		}
 	}
 
-	if (TargetMapPublishers.Num() > 0) {
-		if (UOccupancyMapPublisherComponent* MapPublisher = TargetMapPublishers[0].Get()) {
-			bEnableGroundTruthMaps = MapPublisher->bEnableGroundTruthMaps;
-		}
-	}
 }
 
 bool FsimulatorEditorModule::CanApplySettings() const
@@ -1301,6 +1296,7 @@ void FsimulatorEditorModule::OnApplyClicked()
 	NewConfig.bGroundTruthSegmentation = bGroundTruthSegmentation;
 	NewConfig.bGroundTruthBoundingBoxes = bGroundTruthBoundingBoxes;
 	NewConfig.bTrajectoryCsv = bTrajectoryCsv;
+	NewConfig.bGroundTruthMaps = bEnableGroundTruthMaps;
 	NewConfig.ResolutionPreset = ResolutionPreset;
 	NewConfig.HorizontalFovDeg = FCaptureConfig::SanitizeHorizontalFovDeg(CameraHorizontalFovDeg);
 	NewConfig.CaptureRatePreset = ELunarSimCaptureRatePreset::Custom;
@@ -1334,14 +1330,8 @@ void FsimulatorEditorModule::OnApplyClicked()
 		UOccupancyMapPublisherComponent* MapPublisher = MapPublisherPtr.Get();
 		if (!IsUsableComponent(MapPublisher)) continue;
 
-		if (AActor* Owner = MapPublisher->GetOwner()) {
-			Owner->Modify();
-			Owner->MarkPackageDirty();
-		}
-
-		MapPublisher->Modify();
-		MapPublisher->bEnableGroundTruthMaps = bEnableGroundTruthMaps;
-		MapPublisher->MarkPackageDirty();
+		// Map publishers consume NewConfig from the frozen dataset-run config at
+		// runtime. Count targets for status reporting; do not maintain a second flag.
 		++MapsApplied;
 	}
 
@@ -1405,7 +1395,7 @@ void FsimulatorEditorModule::OnApplyClicked()
 		NewConfig.GetResolvedHorizontalFovDeg(),
 		NewConfig.GetResolvedCaptureHz(),
 		NewConfig.StereoBaselineCm,
-		bEnableGroundTruthMaps ? TEXT("true") : TEXT("false"),
+		NewConfig.IsGroundTruthMapsEnabled() ? TEXT("true") : TEXT("false"),
 		MapsApplied,
 		bImuApplied ? *FString::Printf(TEXT("%.2f"), ImuPublishHz) : TEXT("not applied"),
 		bRoverModeApplied ? *RoverControlModeToString(RoverControlMode) : TEXT("not applied")
@@ -1457,6 +1447,7 @@ void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
 	bGroundTruthSegmentation = CurrentConfig.bGroundTruthSegmentation;
 	bGroundTruthBoundingBoxes = CurrentConfig.bGroundTruthBoundingBoxes;
 	bTrajectoryCsv = CurrentConfig.bTrajectoryCsv;
+	bEnableGroundTruthMaps = CurrentConfig.bGroundTruthMaps;
 	const int32 ResolvedWidth = CurrentConfig.GetResolvedWidth();
 	const int32 ResolvedHeight = CurrentConfig.GetResolvedHeight();
 	ResolutionPreset = NormalizeEditorResolutionPreset(CurrentConfig.ResolutionPreset, ResolvedWidth, ResolvedHeight);

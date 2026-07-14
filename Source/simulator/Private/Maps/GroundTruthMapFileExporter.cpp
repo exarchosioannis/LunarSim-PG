@@ -24,45 +24,32 @@ bool FGroundTruthMapFileExporter::ExportToDirectory(const FString& MapsDirectory
 		PlatformFile.CreateDirectoryTree(*MapsDirectory);
 	}
 
-	const FString SafeOccupancyBaseFileName = Info.BaseFileName.IsEmpty() ? FString(TEXT("occupancy_map")) : Info.BaseFileName;
-	const FString SafeElevationBaseFileName = MakeElevationBaseFileName(SafeOccupancyBaseFileName);
-	const FString SafeSlopeBaseFileName = MakeSlopeBaseFileName(SafeOccupancyBaseFileName);
+	const FGroundTruthMapArtifactNames Names = FGroundTruthMapArtifacts::MakeNames(Info.BaseFileName);
 
-	const FString OccupancyPgmFileName = SafeOccupancyBaseFileName + TEXT(".pgm");
-	const FString OccupancyYamlFileName = SafeOccupancyBaseFileName + TEXT(".yaml");
+	const FString OccupancyPgmPath = FPaths::Combine(MapsDirectory, Names.OccupancyImage);
+	const FString OccupancyYamlPath = FPaths::Combine(MapsDirectory, Names.OccupancyYaml);
 
-	const FString ElevationCsvFileName = SafeElevationBaseFileName + TEXT(".csv");
-	const FString ElevationYamlFileName = SafeElevationBaseFileName + TEXT(".yaml");
-	const FString ElevationPreviewFileName = SafeElevationBaseFileName + TEXT("_preview.pgm");
+	const FString ElevationCsvPath = FPaths::Combine(MapsDirectory, Names.ElevationCsv);
+	const FString ElevationYamlPath = FPaths::Combine(MapsDirectory, Names.ElevationYaml);
+	const FString ElevationPreviewPath = FPaths::Combine(MapsDirectory, Names.ElevationPreview);
 
-	const FString SlopeCsvFileName = SafeSlopeBaseFileName + TEXT(".csv");
-	const FString SlopeYamlFileName = SafeSlopeBaseFileName + TEXT(".yaml");
-	const FString SlopePreviewFileName = SafeSlopeBaseFileName + TEXT("_preview.pgm");
-
-	const FString OccupancyPgmPath = FPaths::Combine(MapsDirectory, OccupancyPgmFileName);
-	const FString OccupancyYamlPath = FPaths::Combine(MapsDirectory, OccupancyYamlFileName);
-
-	const FString ElevationCsvPath = FPaths::Combine(MapsDirectory, ElevationCsvFileName);
-	const FString ElevationYamlPath = FPaths::Combine(MapsDirectory, ElevationYamlFileName);
-	const FString ElevationPreviewPath = FPaths::Combine(MapsDirectory, ElevationPreviewFileName);
-
-	const FString SlopeCsvPath = FPaths::Combine(MapsDirectory, SlopeCsvFileName);
-	const FString SlopeYamlPath = FPaths::Combine(MapsDirectory, SlopeYamlFileName);
-	const FString SlopePreviewPath = FPaths::Combine(MapsDirectory, SlopePreviewFileName);
+	const FString SlopeCsvPath = FPaths::Combine(MapsDirectory, Names.SlopeCsv);
+	const FString SlopeYamlPath = FPaths::Combine(MapsDirectory, Names.SlopeYaml);
+	const FString SlopePreviewPath = FPaths::Combine(MapsDirectory, Names.SlopePreview);
 
 	TArray<float> SlopeDataDegrees;
 	const bool bSlopeBuildOk = BuildSlopeDataDegrees(OccupancyMapMsg, ElevationDataMeters, SlopeDataDegrees);
 
 	const bool bOccupancyPgmOk = SaveMapPgm(OccupancyPgmPath, OccupancyMapMsg);
-	const bool bOccupancyYamlOk = SaveMapYaml(OccupancyYamlPath, OccupancyPgmFileName, OccupancyMapMsg);
+	const bool bOccupancyYamlOk = SaveMapYaml(OccupancyYamlPath, Names.OccupancyImage, OccupancyMapMsg);
 
 	const bool bElevationCsvOk = SaveElevationCsv(ElevationCsvPath, OccupancyMapMsg, ElevationDataMeters);
 	const bool bElevationPreviewOk = SaveElevationPreviewPgm(ElevationPreviewPath, OccupancyMapMsg, ElevationDataMeters);
-	const bool bElevationYamlOk = SaveElevationYaml(ElevationYamlPath, ElevationCsvFileName, ElevationPreviewFileName, Info.MapFrameId, OccupancyMapMsg);
+	const bool bElevationYamlOk = SaveElevationYaml(ElevationYamlPath, Names.ElevationCsv, Names.ElevationPreview, Info.MapFrameId, OccupancyMapMsg);
 
 	const bool bSlopeCsvOk = bSlopeBuildOk && SaveSlopeCsv(SlopeCsvPath, OccupancyMapMsg, SlopeDataDegrees);
 	const bool bSlopePreviewOk = bSlopeBuildOk && SaveSlopePreviewPgm(SlopePreviewPath, OccupancyMapMsg, SlopeDataDegrees);
-	const bool bSlopeYamlOk = bSlopeBuildOk && SaveSlopeYaml(SlopeYamlPath, SlopeCsvFileName, SlopePreviewFileName, Info.MapFrameId, OccupancyMapMsg);
+	const bool bSlopeYamlOk = bSlopeBuildOk && SaveSlopeYaml(SlopeYamlPath, Names.SlopeCsv, Names.SlopePreview, Info.MapFrameId, OccupancyMapMsg);
 
 	if (bOccupancyPgmOk && bOccupancyYamlOk && bElevationCsvOk && bElevationPreviewOk && bElevationYamlOk && bSlopeBuildOk && bSlopeCsvOk && bSlopePreviewOk && bSlopeYamlOk) {
 		UE_LOG(LogTemp, Log, TEXT("GroundTruthMapFileExporter: exported occupancy, elevation, and slope map files to %s"), *MapsDirectory);
@@ -71,18 +58,6 @@ bool FGroundTruthMapFileExporter::ExportToDirectory(const FString& MapsDirectory
 
 	UE_LOG(LogTemp, Warning, TEXT("GroundTruthMapFileExporter: failed to export one or more map files to %s"), *MapsDirectory);
 	return false;
-}
-
-FString FGroundTruthMapFileExporter::MakeElevationBaseFileName(const FString& OccupancyBaseFileName)
-{
-	if (OccupancyBaseFileName.Equals(TEXT("occupancy_map"), ESearchCase::IgnoreCase))  return TEXT("elevation_map");
-	return OccupancyBaseFileName + TEXT("_elevation");
-}
-
-FString FGroundTruthMapFileExporter::MakeSlopeBaseFileName(const FString& OccupancyBaseFileName)
-{
-	if (OccupancyBaseFileName.Equals(TEXT("occupancy_map"), ESearchCase::IgnoreCase))  return TEXT("slope_map");
-	return OccupancyBaseFileName + TEXT("_slope");
 }
 
 uint8 FGroundTruthMapFileExporter::OccupancyValueToPgmPixel(int8 CellValue)

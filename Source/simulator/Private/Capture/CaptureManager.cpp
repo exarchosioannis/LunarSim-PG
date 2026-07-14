@@ -1,6 +1,7 @@
 #include "Capture/CaptureManager.h"
 #include "Capture/CapturePoseSourceComponent.h"
 #include "Utils/DatasetRunSubsystem.h"
+#include "Maps/GroundTruthMapArtifacts.h"
 #include "Components/SceneComponent.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -64,6 +65,11 @@ void UCaptureManager::Initialize(const FCaptureConfig& InConfig, const FResolved
 			Config.GetResolvedCaptureHz(),
 			Config.GetResolvedHorizontalFovDeg(),
 			Config.StereoBaselineCm);
+	}
+	if (UWorld* World = GetWorld()) {
+		if (UDatasetRunSubsystem* DatasetRunSubsystem = World->GetSubsystem<UDatasetRunSubsystem>()) {
+			Config = DatasetRunSubsystem->RegisterCaptureConfigForRun(Config);
+		}
 	}
 	CameraCalibration = InCameraCalibration;
 	const FResolvedCameraCalibration ConfigCalibration = Config.GetResolvedCameraCalibration();
@@ -336,6 +342,35 @@ void UCaptureManager::WriteSessionMetadata()
 		*JsonNumber(RightTx),
 		*JsonNumber(CameraCalibration.Fy),
 		*JsonNumber(CameraCalibration.Cy));
+	FString MapsJson;
+	if (Config.IsGroundTruthMapsEnabled()) {
+		const FGroundTruthMapArtifactNames MapNames = FGroundTruthMapArtifacts::MakeNames(
+			FGroundTruthMapArtifacts::GetDefaultOccupancyBaseFileName());
+		MapsJson = FString::Printf(
+			TEXT("  \"maps\": {\n")
+			TEXT("    \"enabled\": true,\n")
+			TEXT("    \"path_base\": \"dataset_run\",\n")
+			TEXT("    \"occupancy_map\": \"%s\",\n")
+			TEXT("    \"occupancy_image\": \"%s\",\n")
+			TEXT("    \"elevation_map\": \"%s\",\n")
+			TEXT("    \"elevation_csv\": \"%s\",\n")
+			TEXT("    \"elevation_preview\": \"%s\",\n")
+			TEXT("    \"slope_map\": \"%s\",\n")
+			TEXT("    \"slope_csv\": \"%s\",\n")
+			TEXT("    \"slope_preview\": \"%s\"\n")
+			TEXT("  }"),
+			*EscapeJsonString(FGroundTruthMapArtifacts::MakeDatasetRunRelativePath(MapNames.OccupancyYaml)),
+			*EscapeJsonString(FGroundTruthMapArtifacts::MakeDatasetRunRelativePath(MapNames.OccupancyImage)),
+			*EscapeJsonString(FGroundTruthMapArtifacts::MakeDatasetRunRelativePath(MapNames.ElevationYaml)),
+			*EscapeJsonString(FGroundTruthMapArtifacts::MakeDatasetRunRelativePath(MapNames.ElevationCsv)),
+			*EscapeJsonString(FGroundTruthMapArtifacts::MakeDatasetRunRelativePath(MapNames.ElevationPreview)),
+			*EscapeJsonString(FGroundTruthMapArtifacts::MakeDatasetRunRelativePath(MapNames.SlopeYaml)),
+			*EscapeJsonString(FGroundTruthMapArtifacts::MakeDatasetRunRelativePath(MapNames.SlopeCsv)),
+			*EscapeJsonString(FGroundTruthMapArtifacts::MakeDatasetRunRelativePath(MapNames.SlopePreview)));
+	} else {
+		// Disabled runs intentionally contain no artifact paths: absence is valid.
+		MapsJson = TEXT("  \"maps\": {\n    \"enabled\": false\n  }");
+	}
 
 	const FString Json = FString::Printf(
 		TEXT("{\n")
@@ -367,13 +402,7 @@ void UCaptureManager::WriteSessionMetadata()
 		TEXT("    \"left_camera_optical\": \"left_camera_optical_frame\",\n")
 		TEXT("    \"right_camera_optical\": \"right_camera_optical_frame\"\n")
 		TEXT("  },\n")
-		TEXT("  \"maps\": {\n")
-		TEXT("    \"enabled\": true,\n")
-		TEXT("    \"occupancy_map\": \"Maps/occupancy_map.yaml\",\n")
-		TEXT("    \"elevation_map\": \"Maps/elevation_map.yaml\",\n")
-		TEXT("    \"elevation_csv\": \"Maps/elevation_map.csv\",\n")
-		TEXT("    \"elevation_preview\": \"Maps/elevation_map_preview.pgm\"\n")
-		TEXT("  },\n")
+		TEXT("%s,\n")
 		TEXT("  \"ground_truth_outputs\": {\n")
 		TEXT("    \"enabled\": %s,\n")
 		TEXT("    \"rgb\": %s,\n")
@@ -400,6 +429,7 @@ void UCaptureManager::WriteSessionMetadata()
 		*JsonNumber(StereoBaselineMeters),
 		*LeftProjectionMatrix,
 		*RightProjectionMatrix,
+		*MapsJson,
 		Config.IsGroundTruthEnabled() ? TEXT("true") : TEXT("false"),
 		Config.IsGroundTruthRgbEnabled() ? TEXT("true") : TEXT("false"),
 		Config.IsGroundTruthDepthEnabled() ? TEXT("true") : TEXT("false"),

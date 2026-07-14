@@ -2,6 +2,7 @@
 
 #include "Engine/World.h"
 #include "HAL/PlatformFileManager.h"
+#include "Maps/GroundTruthMapArtifacts.h"
 #include "Misc/DateTime.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -74,7 +75,7 @@ FString UDatasetRunSubsystem::GetMapsDirectory()
 		return FString();
 	}
 
-	const FString MapsDirectory = FPaths::Combine(RunDirectory, TEXT("Maps"));
+	const FString MapsDirectory = FPaths::Combine(RunDirectory, FGroundTruthMapArtifacts::GetMapsDirectoryName());
 	EnsureDirectoryExists(MapsDirectory);
 	return MapsDirectory;
 }
@@ -114,6 +115,28 @@ FString UDatasetRunSubsystem::CreateNextSessionDirectory(FString& OutSessionName
 	const FString SessionDirectory = FPaths::Combine(RunDirectory, OutSessionName);
 	EnsureDirectoryExists(SessionDirectory);
 	return SessionDirectory;
+}
+
+FCaptureConfig UDatasetRunSubsystem::RegisterCaptureConfigForRun(const FCaptureConfig& InConfig)
+{
+	if (bHasRunCaptureConfig) {
+		UE_LOG(LogTemp, Warning,
+			TEXT("DatasetRunSubsystem: capture config is already frozen for this play session; returning the existing run config."));
+		return RunCaptureConfig;
+	}
+
+	RunCaptureConfig = InConfig;
+	RunCaptureConfig.Sanitize();
+	bHasRunCaptureConfig = true;
+	return RunCaptureConfig;
+}
+
+bool UDatasetRunSubsystem::TryGetCaptureConfigForRun(FCaptureConfig& OutConfig) const
+{
+	if (!bHasRunCaptureConfig) return false;
+
+	OutConfig = RunCaptureConfig;
+	return true;
 }
 
 void UDatasetRunSubsystem::CreateRunForPlaySessionIfNeeded()

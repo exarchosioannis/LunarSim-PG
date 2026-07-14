@@ -115,6 +115,9 @@ struct SIMULATOR_API FCaptureConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Outputs")
 	bool bTrajectoryCsv = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Outputs")
+	bool bGroundTruthMaps = true;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
 	ELunarSimResolutionPreset ResolutionPreset = ELunarSimResolutionPreset::R1024x1024;
 
@@ -354,6 +357,11 @@ struct SIMULATOR_API FCaptureConfig
 	bool IsTrajectoryCsvEnabled() const
 	{
 		return bTrajectoryCsv;
+	}
+
+	bool IsGroundTruthMapsEnabled() const
+	{
+		return bGroundTruthMaps;
 	}
 
 	bool HasAnyCaptureOutput() const

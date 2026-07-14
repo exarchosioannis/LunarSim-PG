@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Maps/GroundTruthMapArtifacts.h"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 
 /*
@@ -26,9 +27,6 @@ public:
 		const FGroundTruthMapFileExportInfo& Info);
 
 private:
-	static FString MakeElevationBaseFileName(const FString& OccupancyBaseFileName);
-	static FString MakeSlopeBaseFileName(const FString& OccupancyBaseFileName);
-
 	static uint8 OccupancyValueToPgmPixel(int8 CellValue);
 	static uint8 ElevationValueToPreviewPixel(float ElevationMeters, float MinElevationMeters, float MaxElevationMeters);
 	static uint8 SlopeValueToPreviewPixel(float SlopeDegrees);
