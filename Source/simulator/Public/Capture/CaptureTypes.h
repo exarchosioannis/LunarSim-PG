@@ -21,14 +21,6 @@ enum class ELunarSimResolutionPreset : uint8
 	R1024x1024 = 0 UMETA(DisplayName = "1024x1024")
 };
 
-UENUM(BlueprintType)
-enum class ELunarSimCaptureRatePreset : uint8
-{
-	Hz6    UMETA(DisplayName = "6 Hz"),
-	Hz10   UMETA(DisplayName = "10 Hz"),
-	Custom UMETA(DisplayName = "Custom")
-};
-
 USTRUCT(BlueprintType)
 struct SIMULATOR_API FResolvedCameraCalibration
 {
@@ -124,55 +116,41 @@ struct SIMULATOR_API FCaptureConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "5.0", ClampMax = "170.0", UIMin = "5.0", UIMax = "170.0", Units = "deg"))
 	float HorizontalFovDeg = 90.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
-	ELunarSimCaptureRatePreset CaptureRatePreset = ELunarSimCaptureRatePreset::Hz6;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "0.001", ClampMax = "60", UIMin = "1", UIMax = "60", Units = "Hz"))
 	float CustomCaptureHz = 6.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stereo", meta = (ClampMin = "1.0", ClampMax = "200.0", UIMin = "1.0", UIMax = "200.0", Units = "cm"))
 	float StereoBaselineCm = 20.0f;
 
-	int32 GetResolvedWidth() const
+	FIntPoint GetResolvedResolution() const
 	{
 		switch (ResolutionPreset)
 		{
 			case ELunarSimResolutionPreset::R640x360:
-				return 640;
+				return FIntPoint(640, 360);
 			case ELunarSimResolutionPreset::R1024x576:
-				return 1024;
+				return FIntPoint(1024, 576);
 			case ELunarSimResolutionPreset::R1280x720:
-				return 1280;
+				return FIntPoint(1280, 720);
 			case ELunarSimResolutionPreset::R1920x1080:
-				return 1920;
+				return FIntPoint(1920, 1080);
 			case ELunarSimResolutionPreset::R640x640:
-				return 640;
+				return FIntPoint(640, 640);
 			case ELunarSimResolutionPreset::R1024x1024:
-				return 1024;
+				return FIntPoint(1024, 1024);
 			default:
-				return 1024;
+				return FIntPoint(1024, 1024);
 		}
+	}
+
+	int32 GetResolvedWidth() const
+	{
+		return GetResolvedResolution().X;
 	}
 
 	int32 GetResolvedHeight() const
 	{
-		switch (ResolutionPreset) 
-		{
-			case ELunarSimResolutionPreset::R640x360:
-				return 360;
-			case ELunarSimResolutionPreset::R1024x576:
-				return 576;
-			case ELunarSimResolutionPreset::R1280x720:
-				return 720;
-			case ELunarSimResolutionPreset::R1920x1080:
-				return 1080;
-			case ELunarSimResolutionPreset::R640x640:
-				return 640;
-			case ELunarSimResolutionPreset::R1024x1024:
-				return 1024;
-			default:
-				return 1024;
-		}
+		return GetResolvedResolution().Y;
 	}
 
 	static float GetDefaultCameraCaptureHz()
@@ -262,16 +240,7 @@ struct SIMULATOR_API FCaptureConfig
 
 	float GetResolvedCaptureHz() const
 	{
-		switch (CaptureRatePreset)
-		{
-			case ELunarSimCaptureRatePreset::Hz6:
-				return 6.0f;
-			case ELunarSimCaptureRatePreset::Hz10:
-				return 10.0f;
-			case ELunarSimCaptureRatePreset::Custom:
-			default:
-				return SanitizeCameraCaptureHz(CustomCaptureHz);
-		}
+		return SanitizeCameraCaptureHz(CustomCaptureHz);
 	}
 
 	float GetStereoBaselineMeters() const
@@ -286,9 +255,10 @@ struct SIMULATOR_API FCaptureConfig
 
 	FResolvedCameraCalibration GetResolvedCameraCalibration() const
 	{
+		const FIntPoint Resolution = GetResolvedResolution();
 		return FResolvedCameraCalibration::Resolve(
-			GetResolvedWidth(),
-			GetResolvedHeight(),
+			Resolution.X,
+			Resolution.Y,
 			GetResolvedHorizontalFovDeg());
 	}
 
@@ -364,6 +334,7 @@ struct SIMULATOR_API FCaptureConfig
 
 	bool HasAnyCaptureOutput() const
 	{
+		// Maps are run-level artifacts and do not schedule session frames.
 		return bStereoRosImages || IsGroundTruthEnabled() || bTrajectoryCsv;
 	}
 };

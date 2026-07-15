@@ -134,39 +134,47 @@ ARobotCamRig* FindUsableRobotCamRigChildActor(AActor* RoverActor, const UWorld* 
 	return nullptr;
 }
 
+struct FResolvedRoverPipeline
+{
+	ARobotCamRig* RobotCamRig = nullptr;
+	UChildActorComponent* RobotCamRigChildComponent = nullptr;
+	URoverGroundTruthPublisherComponent* GroundTruthPublisher = nullptr;
+	UImuSensorPublisherComponent* ImuPublisher = nullptr;
+	URoverVehicleControllerComponent* RoverController = nullptr;
+	URoverCmdVelVehicleControllerComponent* CmdVelController = nullptr;
+
+	bool IsComplete() const
+	{
+		return RobotCamRig
+			&& RobotCamRigChildComponent
+			&& GroundTruthPublisher
+			&& ImuPublisher
+			&& RoverController
+			&& CmdVelController;
+	}
+};
+
 bool ResolveCompleteRoverPipeline(
 	AActor* RoverActor,
 	UWorld* EditorWorld,
-	ARobotCamRig*& OutRobotCamRig,
-	UChildActorComponent*& OutRobotCamRigChildComponent,
-	URoverGroundTruthPublisherComponent*& OutGroundTruthPublisher,
-	UImuSensorPublisherComponent*& OutImuPublisher,
-	URoverVehicleControllerComponent*& OutRoverController,
-	URoverCmdVelVehicleControllerComponent*& OutCmdVelController)
+	FResolvedRoverPipeline& OutPipeline)
 {
-	OutRobotCamRig = nullptr;
-	OutRobotCamRigChildComponent = nullptr;
-	OutGroundTruthPublisher = nullptr;
-	OutImuPublisher = nullptr;
-	OutRoverController = nullptr;
-	OutCmdVelController = nullptr;
+	OutPipeline = FResolvedRoverPipeline();
 
 	if (!IsUsableEditorActor(RoverActor, EditorWorld)) {
 		return false;
 	}
 
-	OutGroundTruthPublisher = FindUsableComponentByClass<URoverGroundTruthPublisherComponent>(RoverActor);
-	OutImuPublisher = FindUsableComponentByClass<UImuSensorPublisherComponent>(RoverActor);
-	OutRoverController = FindUsableComponentByClass<URoverVehicleControllerComponent>(RoverActor);
-	OutCmdVelController = FindUsableComponentByClass<URoverCmdVelVehicleControllerComponent>(RoverActor);
-	OutRobotCamRig = FindUsableRobotCamRigChildActor(RoverActor, EditorWorld, OutRobotCamRigChildComponent);
+	OutPipeline.GroundTruthPublisher = FindUsableComponentByClass<URoverGroundTruthPublisherComponent>(RoverActor);
+	OutPipeline.ImuPublisher = FindUsableComponentByClass<UImuSensorPublisherComponent>(RoverActor);
+	OutPipeline.RoverController = FindUsableComponentByClass<URoverVehicleControllerComponent>(RoverActor);
+	OutPipeline.CmdVelController = FindUsableComponentByClass<URoverCmdVelVehicleControllerComponent>(RoverActor);
+	OutPipeline.RobotCamRig = FindUsableRobotCamRigChildActor(
+		RoverActor,
+		EditorWorld,
+		OutPipeline.RobotCamRigChildComponent);
 
-	return OutGroundTruthPublisher
-		&& OutImuPublisher
-		&& OutRoverController
-		&& OutCmdVelController
-		&& OutRobotCamRig
-		&& OutRobotCamRigChildComponent;
+	return OutPipeline.IsComplete();
 }
 
 TSharedRef<SWidget> MakeSimulatorConfigSection(const FText& Title, const TSharedRef<SWidget>& Body)
@@ -973,31 +981,21 @@ void FsimulatorEditorModule::RefreshTargetsFromEditorWorld()
 			continue;
 		}
 
-		URoverGroundTruthPublisherComponent* GroundTruthPublisher = nullptr;
-		UImuSensorPublisherComponent* ImuPublisher = nullptr;
-		URoverVehicleControllerComponent* RoverController = nullptr;
-		URoverCmdVelVehicleControllerComponent* CmdVelController = nullptr;
-		UChildActorComponent* RobotCamRigChildComponent = nullptr;
-		ARobotCamRig* RobotCamRig = nullptr;
+		FResolvedRoverPipeline Pipeline;
 		if (!ResolveCompleteRoverPipeline(
 			CandidateRoverActor,
 			EditorWorld,
-			RobotCamRig,
-			RobotCamRigChildComponent,
-			GroundTruthPublisher,
-			ImuPublisher,
-			RoverController,
-			CmdVelController)) {
+			Pipeline)) {
 			continue;
 		}
 
 		++RobotCamRigCount;
 		if (!TargetRoverActor.IsValid()) {
 			TargetRoverActor = CandidateRoverActor;
-			TargetRobotCamRig = RobotCamRig;
-			TargetImuPublisher = ImuPublisher;
-			TargetRoverController = RoverController;
-			TargetCmdVelController = CmdVelController;
+			TargetRobotCamRig = Pipeline.RobotCamRig;
+			TargetImuPublisher = Pipeline.ImuPublisher;
+			TargetRoverController = Pipeline.RoverController;
+			TargetCmdVelController = Pipeline.CmdVelController;
 		}
 	}
 
@@ -1048,22 +1046,12 @@ bool FsimulatorEditorModule::CanApplySettings() const
 
 	UWorld* EditorWorld = GetEditorWorld();
 	AActor* RoverActor = TargetRoverActor.Get();
-	ARobotCamRig* RobotCamRig = nullptr;
-	UChildActorComponent* RobotCamRigChildComponent = nullptr;
-	URoverGroundTruthPublisherComponent* GroundTruthPublisher = nullptr;
-	UImuSensorPublisherComponent* ImuPublisher = nullptr;
-	URoverVehicleControllerComponent* RoverController = nullptr;
-	URoverCmdVelVehicleControllerComponent* CmdVelController = nullptr;
+	FResolvedRoverPipeline Pipeline;
 
 	return ResolveCompleteRoverPipeline(
 		RoverActor,
 		EditorWorld,
-		RobotCamRig,
-		RobotCamRigChildComponent,
-		GroundTruthPublisher,
-		ImuPublisher,
-		RoverController,
-		CmdVelController);
+		Pipeline);
 }
 
 bool FsimulatorEditorModule::CanEditGroundTruthMaps() const
@@ -1107,44 +1095,9 @@ FText FsimulatorEditorModule::GetApplyStatusText() const
 	return LOCTEXT("SimpleReadyStatus", "Ready.");
 }
 
-void FsimulatorEditorModule::OnApplyClicked()
+FCaptureConfig FsimulatorEditorModule::BuildCaptureConfigFromUi(const FCaptureConfig& ExistingConfig) const
 {
-	if (IsEditorPlaySessionRunning()) {
-		LastApplyStatus = LOCTEXT("ApplyDuringPlayStatus", "Settings were not applied because PIE/simulation is running.");
-		UE_LOG(LogTemp, Warning, TEXT("Simulator config was not applied because capture configuration is locked while PIE/simulation is running."));
-		return;
-	}
-
-	UWorld* EditorWorld = GetEditorWorld();
-	AActor* RoverActor = TargetRoverActor.Get();
-	ARobotCamRig* RobotCamRig = nullptr;
-	UChildActorComponent* ChildActorComponent = nullptr;
-	URoverGroundTruthPublisherComponent* GroundTruthPublisher = nullptr;
-	UImuSensorPublisherComponent* ImuPublisher = nullptr;
-	URoverVehicleControllerComponent* RoverController = nullptr;
-	URoverCmdVelVehicleControllerComponent* CmdVelController = nullptr;
-
-	if (!ResolveCompleteRoverPipeline(
-		RoverActor,
-		EditorWorld,
-		RobotCamRig,
-		ChildActorComponent,
-		GroundTruthPublisher,
-		ImuPublisher,
-		RoverController,
-		CmdVelController)) {
-		LastApplyStatus = LOCTEXT("ApplyNoRoverPipelineStatus", "Settings were not applied because no complete ESA_Rover pipeline was found.");
-		UE_LOG(LogTemp, Warning, TEXT("Simulator config was not applied because no complete ESA_Rover pipeline was found in the editor world."));
-		return;
-	}
-
-	TargetRoverActor = RoverActor;
-	TargetRobotCamRig = RobotCamRig;
-	TargetImuPublisher = ImuPublisher;
-	TargetRoverController = RoverController;
-	TargetCmdVelController = CmdVelController;
-
-	FCaptureConfig NewConfig = RobotCamRig->GetCaptureConfig();
+	FCaptureConfig NewConfig = ExistingConfig;
 	NewConfig.RunMode = RunMode;
 	NewConfig.bStereoRosImages = bStereoRosImages;
 	NewConfig.bGroundTruthImages = bGroundTruthImages;
@@ -1156,9 +1109,44 @@ void FsimulatorEditorModule::OnApplyClicked()
 	NewConfig.bGroundTruthMaps = bEnableGroundTruthMaps;
 	NewConfig.ResolutionPreset = ResolutionPreset;
 	NewConfig.HorizontalFovDeg = FCaptureConfig::SanitizeHorizontalFovDeg(CameraHorizontalFovDeg);
-	NewConfig.CaptureRatePreset = ELunarSimCaptureRatePreset::Custom;
 	NewConfig.CustomCaptureHz = NormalizeEditorCaptureHz(CustomCaptureHz);
 	NewConfig.StereoBaselineCm = FCaptureConfig::SanitizeStereoBaselineCm(StereoBaselineCm);
+	return NewConfig;
+}
+
+void FsimulatorEditorModule::OnApplyClicked()
+{
+	if (IsEditorPlaySessionRunning()) {
+		LastApplyStatus = LOCTEXT("ApplyDuringPlayStatus", "Settings were not applied because PIE/simulation is running.");
+		UE_LOG(LogTemp, Warning, TEXT("Simulator config was not applied because capture configuration is locked while PIE/simulation is running."));
+		return;
+	}
+
+	UWorld* EditorWorld = GetEditorWorld();
+	AActor* RoverActor = TargetRoverActor.Get();
+	FResolvedRoverPipeline Pipeline;
+
+	if (!ResolveCompleteRoverPipeline(
+		RoverActor,
+		EditorWorld,
+		Pipeline)) {
+		LastApplyStatus = LOCTEXT("ApplyNoRoverPipelineStatus", "Settings were not applied because no complete ESA_Rover pipeline was found.");
+		UE_LOG(LogTemp, Warning, TEXT("Simulator config was not applied because no complete ESA_Rover pipeline was found in the editor world."));
+		return;
+	}
+	ARobotCamRig* RobotCamRig = Pipeline.RobotCamRig;
+	UChildActorComponent* ChildActorComponent = Pipeline.RobotCamRigChildComponent;
+	UImuSensorPublisherComponent* ImuPublisher = Pipeline.ImuPublisher;
+	URoverVehicleControllerComponent* RoverController = Pipeline.RoverController;
+	URoverCmdVelVehicleControllerComponent* CmdVelController = Pipeline.CmdVelController;
+
+	TargetRoverActor = RoverActor;
+	TargetRobotCamRig = RobotCamRig;
+	TargetImuPublisher = ImuPublisher;
+	TargetRoverController = RoverController;
+	TargetCmdVelController = CmdVelController;
+
+	const FCaptureConfig NewConfig = BuildCaptureConfigFromUi(RobotCamRig->GetCaptureConfig());
 
 	RoverActor->Modify();
 	RoverActor->MarkPackageDirty();
@@ -1305,9 +1293,11 @@ void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
 	bGroundTruthBoundingBoxes = CurrentConfig.bGroundTruthBoundingBoxes;
 	bTrajectoryCsv = CurrentConfig.bTrajectoryCsv;
 	bEnableGroundTruthMaps = CurrentConfig.bGroundTruthMaps;
-	const int32 ResolvedWidth = CurrentConfig.GetResolvedWidth();
-	const int32 ResolvedHeight = CurrentConfig.GetResolvedHeight();
-	ResolutionPreset = NormalizeEditorResolutionPreset(CurrentConfig.ResolutionPreset, ResolvedWidth, ResolvedHeight);
+	const FIntPoint ResolvedResolution = CurrentConfig.GetResolvedResolution();
+	ResolutionPreset = NormalizeEditorResolutionPreset(
+		CurrentConfig.ResolutionPreset,
+		ResolvedResolution.X,
+		ResolvedResolution.Y);
 	CameraHorizontalFovDeg = CurrentConfig.GetResolvedHorizontalFovDeg();
 	CustomCaptureHz = NormalizeEditorCaptureHz(CurrentConfig.GetResolvedCaptureHz());
 	StereoBaselineCm = FCaptureConfig::SanitizeStereoBaselineCm(CurrentConfig.StereoBaselineCm);

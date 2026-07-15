@@ -84,7 +84,7 @@ private:
 	FString CurrentImagesDirectory;
 	FString CurrentMapsDirectory;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Capture|Pose", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY()
 	UCapturePoseSourceComponent* RoverPoseSource = nullptr;
 
 	UPROPERTY()

@@ -82,6 +82,7 @@ private:
 	FText GetApplyStatusText() const;
 
 	void OnApplyClicked();
+	FCaptureConfig BuildCaptureConfigFromUi(const FCaptureConfig& ExistingConfig) const;
 	void LoadConfigFromRobotCamRig();
 	void LoadConfigFromRoverControl();
 	UWorld* GetEditorWorld() const;
