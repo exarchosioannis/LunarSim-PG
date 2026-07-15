@@ -44,7 +44,7 @@ void URoverCmdVelVehicleControllerComponent::TickComponent(
 		ROSNode->Tick(DeltaTime);
 	}
 
-	UpdateRoverCommand(DeltaTime);
+	UpdateRoverCommand();
 }
 
 void URoverCmdVelVehicleControllerComponent::SetSettings(const FRoverCmdVelControllerSettings& NewSettings)
@@ -166,7 +166,7 @@ void URoverCmdVelVehicleControllerComponent::OnCmdVel(const FTwist& Msg)
 	}
 }
 
-void URoverCmdVelVehicleControllerComponent::UpdateRoverCommand(float DeltaTime)
+void URoverCmdVelVehicleControllerComponent::UpdateRoverCommand()
 {
 	if (!RoverController) {
 		ResolveRoverController();

@@ -32,7 +32,6 @@ void URgbCameraCaptureComponent::Initialize(
 	SetupRenderTarget();
 	ApplyCameraLook();
 
-	// GPU Readback Setup
 	GPUReadback = MakeUnique<FRHIGPUTextureReadback>(TEXT("RgbCameraCaptureReadback"));
 }
 
@@ -119,7 +118,6 @@ bool URgbCameraCaptureComponent::StartCaptureAsync(const FCaptureFrameInfo& Fram
 		return false;
 	}
 
-	// Store the metadata for THIS capture request.
 	PendingFrameInfo = FrameInfo;
 
 	// Important synchronization detail:

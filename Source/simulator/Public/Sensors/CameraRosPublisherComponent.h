@@ -63,7 +63,6 @@ private:
 	FString TopicBase = TEXT("/left_camera");
 	FString FrameId = TEXT("left_camera");
 
-	// Reusable ROS Messages
 	sensor_msgs::msg::Image ReusableImgMsg;
 	sensor_msgs::msg::CameraInfo ReusableCamInfoMsg;
 

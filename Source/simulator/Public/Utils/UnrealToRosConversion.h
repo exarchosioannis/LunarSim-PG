@@ -27,5 +27,4 @@ namespace UnrealToRosConversion
 	FVector PositionCmToRosMeters(const FVector& UnrealPositionCm);
 	FQuat RotationToRosQuat(const FQuat& UnrealRotation);
 	FQuat RotationToRosQuat(const FRotator& UnrealRotation);
-	FTransform TransformToRos(const FTransform& UnrealTransform);
 }

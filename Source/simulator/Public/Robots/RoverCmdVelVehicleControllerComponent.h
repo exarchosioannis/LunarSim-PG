@@ -104,7 +104,7 @@ private:
 	void ResolveRoverController();
 	void OnCmdVel(const FTwist& Msg);
 
-	void UpdateRoverCommand(float DeltaTime);
+	void UpdateRoverCommand();
 	void ApplyStopCommand();
 	FRoverCmdVelControllerSettings MakeSanitizedSettings(const FRoverCmdVelControllerSettings& InSettings) const;
 };

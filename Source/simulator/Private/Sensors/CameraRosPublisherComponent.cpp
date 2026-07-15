@@ -1,7 +1,6 @@
 #include "Sensors/CameraRosPublisherComponent.h"
 #include "TempoROSTypes.h"
 
-//TempoROS message traits
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(sensor_msgs::msg::Image);
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(sensor_msgs::msg::CameraInfo);
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(std_msgs::msg::Int32);
@@ -82,7 +81,6 @@ void UCameraRosPublisherComponent::SetupRos()
 
        const bool bLiveReliable = RunMode == ELunarSimRunMode::Ros2Live;
        const int32 ImageQueueSize = bLiveReliable ? 5 : 20;
-       const TCHAR* QosModeName = bLiveReliable ? TEXT("LiveReliable") : TEXT("DatasetReliable");
 
        FROSQOSProfile ImageQOS;
        ImageQOS.CustomQueueSize(ImageQueueSize).Reliable();
@@ -153,7 +151,6 @@ void UCameraRosPublisherComponent::PublishFrame(
 		OutData[OutOffset + 2] = InData[InOffset + 2];
 	}
 	
-	// Set message headers using FrameInfo
 	const builtin_interfaces::msg::Time Stamp = ToRosTime(FrameInfo.StampSeconds);
 	ReusableImgMsg.header.frame_id = TCHAR_TO_UTF8(*FrameId);
 	ReusableImgMsg.header.stamp = Stamp;

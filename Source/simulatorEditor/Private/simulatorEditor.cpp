@@ -22,9 +22,6 @@
 #include "Widgets/Input/SNumericEntryBox.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SComboBox.h"
-#include "Widgets/Layout/SGridPanel.h"
-#include "Widgets/Layout/SExpandableArea.h"
-#include "Widgets/Layout/SSeparator.h"
 #include "Styling/AppStyle.h"
 #include "Styling/CoreStyle.h"
 
@@ -234,7 +231,6 @@ void FsimulatorEditorModule::StartupModule()
 {
 	InitRunModeOptions();
 	InitResolutionPresetOptions();
-	InitCaptureRatePresetOptions();
 	InitRoverControlOptions();
 
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(
@@ -794,61 +790,6 @@ void FsimulatorEditorModule::OnResolutionPresetSelectionChanged(TSharedPtr<ELuna
 	ResolutionPreset = *NewSelection;
 }
 
-void FsimulatorEditorModule::InitCaptureRatePresetOptions()
-{
-	if (CaptureRatePresetOptions.Num() > 0) return;
-
-	CaptureRatePresetOptions.Add(MakeShared<ELunarSimCaptureRatePreset>(ELunarSimCaptureRatePreset::Hz6));
-	CaptureRatePresetOptions.Add(MakeShared<ELunarSimCaptureRatePreset>(ELunarSimCaptureRatePreset::Hz10));
-	CaptureRatePresetOptions.Add(MakeShared<ELunarSimCaptureRatePreset>(ELunarSimCaptureRatePreset::Custom));
-}
-
-TSharedPtr<ELunarSimCaptureRatePreset> FsimulatorEditorModule::FindCaptureRatePresetOption(ELunarSimCaptureRatePreset InPreset) const
-{
-	for (const TSharedPtr<ELunarSimCaptureRatePreset>& Option : CaptureRatePresetOptions)
-	{
-		if (Option.IsValid() && *Option == InPreset)
-		{
-			return Option;
-		}
-	}
-	return nullptr;
-}
-
-FString FsimulatorEditorModule::CaptureRatePresetToString(ELunarSimCaptureRatePreset InPreset) const
-{
-	switch (InPreset)
-	{
-	case ELunarSimCaptureRatePreset::Hz6:
-		return TEXT("6 Hz");
-	case ELunarSimCaptureRatePreset::Hz10:
-		return TEXT("10 Hz");
-	case ELunarSimCaptureRatePreset::Custom:
-		return TEXT("Custom");
-	default:
-		return TEXT("6 Hz");
-	}
-}
-
-FText FsimulatorEditorModule::GetCaptureRatePresetText() const
-{
-	return FText::FromString(CaptureRatePresetToString(CaptureRatePreset));
-}
-
-TSharedRef<SWidget> FsimulatorEditorModule::MakeCaptureRatePresetComboWidget(TSharedPtr<ELunarSimCaptureRatePreset> InOption) const
-{
-	const ELunarSimCaptureRatePreset Preset = InOption.IsValid() ? *InOption : ELunarSimCaptureRatePreset::Hz6;
-	return SNew(STextBlock).Text(FText::FromString(CaptureRatePresetToString(Preset)));
-}
-
-void FsimulatorEditorModule::OnCaptureRatePresetSelectionChanged(TSharedPtr<ELunarSimCaptureRatePreset> NewSelection, ESelectInfo::Type SelectInfo)
-{
-	if (!NewSelection.IsValid()) return;
-
-	SelectedCaptureRatePresetOption = NewSelection;
-	CaptureRatePreset = *NewSelection;
-}
-
 void FsimulatorEditorModule::InitRoverControlOptions()
 {
 	if (RoverControlModeOptions.Num() > 0) return;
@@ -1010,7 +951,6 @@ UWorld* FsimulatorEditorModule::GetEditorWorld() const
 void FsimulatorEditorModule::RefreshTargetsFromEditorWorld()
 {
 	TargetRobotCamRig.Reset();
-	TargetRobotCamRigChildComponent.Reset();
 	TargetRoverActor.Reset();
 	TargetImuPublisher.Reset();
 	TargetRoverController.Reset();
@@ -1055,7 +995,6 @@ void FsimulatorEditorModule::RefreshTargetsFromEditorWorld()
 		if (!TargetRoverActor.IsValid()) {
 			TargetRoverActor = CandidateRoverActor;
 			TargetRobotCamRig = RobotCamRig;
-			TargetRobotCamRigChildComponent = RobotCamRigChildComponent;
 			TargetImuPublisher = ImuPublisher;
 			TargetRoverController = RoverController;
 			TargetCmdVelController = CmdVelController;
@@ -1127,11 +1066,6 @@ bool FsimulatorEditorModule::CanApplySettings() const
 		CmdVelController);
 }
 
-bool FsimulatorEditorModule::CanSelectTargetRobotCamRig() const
-{
-	return TargetRoverActor.IsValid();
-}
-
 bool FsimulatorEditorModule::CanEditGroundTruthMaps() const
 {
 	return TargetMapPublishers.Num() > 0;
@@ -1147,73 +1081,9 @@ bool FsimulatorEditorModule::CanEditRoverControl() const
 	return FindUsableComponentByClass<URoverVehicleControllerComponent>(TargetRoverActor.Get()) != nullptr;
 }
 
-bool FsimulatorEditorModule::CanEditCustomCaptureHz() const
-{
-	return CaptureRatePreset == ELunarSimCaptureRatePreset::Custom;
-}
-
 bool FsimulatorEditorModule::CanEditGroundTruthOutput() const
 {
 	return bGroundTruthImages;
-}
-
-FText FsimulatorEditorModule::GetTargetStatusText() const
-{
-	if (RobotCamRigCount <= 0) {
-		return LOCTEXT("NoRoverPipelineFoundStatus", "No complete ESA_Rover pipeline found in the level.");
-	}
-
-	if (RobotCamRigCount == 1) {
-		return LOCTEXT("OneRoverPipelineFoundStatus", "One complete ESA_Rover pipeline found.");
-	}
-
-	return FText::Format(
-		LOCTEXT("MultipleRoverPipelinesFoundStatus", "Multiple ESA_Rover pipelines found ({0}); using the first one."),
-		FText::AsNumber(RobotCamRigCount)
-	);
-}
-
-FText FsimulatorEditorModule::GetTargetActorText() const
-{
-	const AActor* RoverActor = TargetRoverActor.Get();
-	if (!RoverActor) {
-		return LOCTEXT("NoTargetRoverActorText", "Target ESA_Rover pipeline: none");
-	}
-
-	return FText::FromString(FString::Printf(TEXT("Target ESA_Rover pipeline: %s"), *RoverActor->GetActorLabel()));
-}
-
-FText FsimulatorEditorModule::GetMapStatusText() const
-{
-	if (GroundTruthMapPublisherCount <= 0) {
-		return LOCTEXT("NoGroundTruthMapPublisherStatus", "Ground Truth Maps: no map publisher found; map setting will be ignored.");
-	}
-
-	if (GroundTruthMapPublisherCount == 1) {
-		return LOCTEXT("OneGroundTruthMapPublisherStatus", "Ground Truth Maps: one map publisher found.");
-	}
-
-	return FText::Format(
-		LOCTEXT("MultipleGroundTruthMapPublishersStatus", "Ground Truth Maps: {0} map publishers found; applying to all."),
-		FText::AsNumber(GroundTruthMapPublisherCount)
-	);
-}
-
-FText FsimulatorEditorModule::GetImuStatusText() const
-{
-	AActor* RoverActor = TargetRoverActor.Get();
-	if (!RoverActor) {
-		return LOCTEXT("NoImuRoverPipelineStatus", "IMU: no complete ESA_Rover pipeline target.");
-	}
-
-	if (!FindUsableComponentByClass<UImuSensorPublisherComponent>(RoverActor)) {
-		return FText::FromString(FString::Printf(
-			TEXT("IMU: rover actor %s has no ImuSensorPublisherComponent; IMU Hz will not be applied."),
-			*RoverActor->GetActorLabel()
-		));
-	}
-
-	return FText::FromString(FString::Printf(TEXT("IMU: editing %s."), *RoverActor->GetActorLabel()));
 }
 
 FText FsimulatorEditorModule::GetApplyStatusText() const
@@ -1235,18 +1105,6 @@ FText FsimulatorEditorModule::GetApplyStatusText() const
 	}
 
 	return LOCTEXT("SimpleReadyStatus", "Ready.");
-}
-
-void FsimulatorEditorModule::SelectTargetRobotCamRig()
-{
-	if (!GEditor || !TargetRoverActor.IsValid()) return;
-
-	AActor* RoverActor = TargetRoverActor.Get();
-	GEditor->SelectNone(false, true, false);
-	GEditor->SelectActor(RoverActor, true, true, true);
-	GEditor->MoveViewportCamerasToActor(*RoverActor, false);
-
-	LastApplyStatus = FText::FromString(FString::Printf(TEXT("Selected target ESA_Rover pipeline: %s"), *RoverActor->GetActorLabel()));
 }
 
 void FsimulatorEditorModule::OnApplyClicked()
@@ -1282,7 +1140,6 @@ void FsimulatorEditorModule::OnApplyClicked()
 
 	TargetRoverActor = RoverActor;
 	TargetRobotCamRig = RobotCamRig;
-	TargetRobotCamRigChildComponent = ChildActorComponent;
 	TargetImuPublisher = ImuPublisher;
 	TargetRoverController = RoverController;
 	TargetCmdVelController = CmdVelController;
@@ -1452,12 +1309,10 @@ void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
 	const int32 ResolvedHeight = CurrentConfig.GetResolvedHeight();
 	ResolutionPreset = NormalizeEditorResolutionPreset(CurrentConfig.ResolutionPreset, ResolvedWidth, ResolvedHeight);
 	CameraHorizontalFovDeg = CurrentConfig.GetResolvedHorizontalFovDeg();
-	CaptureRatePreset = ELunarSimCaptureRatePreset::Custom;
 	CustomCaptureHz = NormalizeEditorCaptureHz(CurrentConfig.GetResolvedCaptureHz());
 	StereoBaselineCm = FCaptureConfig::SanitizeStereoBaselineCm(CurrentConfig.StereoBaselineCm);
 	SelectedRunModeOption = FindRunModeOption(RunMode);
 	SelectedResolutionPresetOption = FindResolutionPresetOption(ResolutionPreset);
-	SelectedCaptureRatePresetOption = FindCaptureRatePresetOption(CaptureRatePreset);
 }
 
 void FsimulatorEditorModule::LoadConfigFromRoverControl()

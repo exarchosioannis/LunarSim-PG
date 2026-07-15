@@ -1,7 +1,6 @@
 #include "Robots/RoverVehicleControllerComponent.h"
 
 #include "ChaosVehicleMovementComponent.h"
-#include "Engine/World.h"
 #include "GameFramework/Actor.h"
 
 namespace

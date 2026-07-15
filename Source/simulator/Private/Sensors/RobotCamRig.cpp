@@ -92,7 +92,7 @@ AActor* ARobotCamRig::ResolveRoverActor() const
 		return RoverActor;
 	}
 
-	//RobotCamRig rig is attached under the rover hierarchy.
+	// A child rig inherits its rover through the attachment hierarchy.
 	if (AActor* ParentActor = GetAttachParentActor()) {
 		if (ParentActor != this) {
 			return ParentActor;
@@ -104,7 +104,6 @@ AActor* ARobotCamRig::ResolveRoverActor() const
 			return OwnerActor;
 		}
 	}
-	//fallback
 	if (const USceneComponent* RootComponent = GetRootComponent()) {
 		if (const USceneComponent* ParentComponent = RootComponent->GetAttachParent()) {
 			if (AActor* ParentOwner = ParentComponent->GetOwner()) {
@@ -130,7 +129,7 @@ void ARobotCamRig::BeginPlay()
 		UE_LOG(LogTemp, Warning, TEXT("Ground Truth Images are enabled in ROS2 Live mode. This may reduce live experiment performance."));
 	}
 
-	//Attach RobotCamRig to the rover sensor mount first.
+	// Mount before camera calibration and TF publication so all extrinsics use the final pose.
 	AActor* ResolvedRoverActor = GetRoverActor();
 	if (bAttachToRoverSensorMountOnBeginPlay && ResolvedRoverActor) {
 		USceneComponent* MountComponent = nullptr;
@@ -154,20 +153,16 @@ void ARobotCamRig::BeginPlay()
 		}
 	}
 
-	//Finalize camera component transforms before publishing TF.
 	ApplyCameraCalibration();
 	ApplyStereoBaseline();
 
-	//Resolve actor/component references.
 	ResolveGroundTruthCameraChild();
 	ApplyGroundTruthConfig();
 	ResolveRoverGroundTruthComponents();
 
-	//Create TempoROS TF node and publish static camera transforms.
 	SetupCameraTfNode();
 	PublishStaticCameraTransforms();
 
-	//Initialize RGB capture components.
 	if (RgbCaptureComponent && RGBCapture) {
 		RgbCaptureComponent->Initialize(RGBCapture, ResolvedCameraCalibration, bUseGammaCorrection, OutputGamma, bUseFixedExposure, ExposureCompensation);
 	}
@@ -176,8 +171,7 @@ void ARobotCamRig::BeginPlay()
 		RightRgbCaptureComponent->Initialize(RightRGBCapture, ResolvedCameraCalibration, bUseGammaCorrection, OutputGamma, bUseFixedExposure, ExposureCompensation);
 	}
 
-	//Initialize ROS image/camera_info publishers.
-	//Image and camera_info messages should use optical frames.
+	// Image and CameraInfo messages use optical frames, not camera-link frames.
 	if (RosPublisherComponent && Camera) {
 		RosPublisherComponent->Initialize(
 			ResolvedCameraCalibration,
@@ -194,7 +188,7 @@ void ARobotCamRig::BeginPlay()
 			ResolvedStereoBaselineMeters, CaptureConfig.RunMode
 		);
 	}
-	//Initialize CaptureManager after camera components exist and are configured.
+	// CaptureManager receives the finalized, immutable calibration.
 	CaptureManager = NewObject<UCaptureManager>(this);
 
 	if (CaptureManager) {
@@ -206,11 +200,9 @@ void ARobotCamRig::BeginPlay()
 		}
 	}
 
-	//Warm the configured UnrealGT render paths before capture controls can create a session.
+	// Warm the configured UnrealGT render paths before capture controls can create a session.
 	InitializeGroundTruthWarmUp();
 
-	// Enable keyboard input for this actor during gameplay.
-	// This allows pressing C to toggle capture
 	if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController()) {
 		EnableInput(PlayerController);
 		if (InputComponent) {
@@ -368,7 +360,7 @@ void ARobotCamRig::InitializeGroundTruthWarmUp()
 		return;
 	}
 
-	//Reapply the immutable PIE configuration immediately before the one-time warm-up.
+	// Reapply the immutable PIE configuration immediately before the one-time warm-up.
 	ApplyGroundTruthConfig();
 	bGroundTruthWarmUpReady = GroundTruthCamera->RunInternalWarmUp();
 	bGroundTruthWarmUpFailed = !bGroundTruthWarmUpReady;
@@ -654,7 +646,6 @@ AActor* ARobotCamRig::GetRoverActor() const
 	return ResolveRoverActor();
 }
 
-// TF2
 void ARobotCamRig::EnforceCameraFrameIds()
 {
 	BaseFrameId = TEXT("base_link");

@@ -80,7 +80,7 @@ private:
 	UPROPERTY(EditAnywhere, Category = "ROS|Live", meta = (ClampMin = "1.0", UIMin = "1.0"))
 	float LivePathPublishHz = 10.0f;
 
-	const int32 MaxPathLength = 5000; // number of poses to keep in the path
+	const int32 MaxPathLength = 5000;
 
 	geometry_msgs::msg::PoseStamped ReusablePoseMsg;
 	nav_msgs::msg::Odometry ReusableOdomMsg;

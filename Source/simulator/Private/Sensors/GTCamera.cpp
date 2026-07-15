@@ -1,7 +1,5 @@
 #include "Sensors/GTCamera.h"
-#include "Capture/CaptureManager.h"
 #include "Components/ActorComponent.h"
-#include "Engine/Engine.h"
 #include "Generators/GTDataGeneratorComponent.h"
 #include "Generators/Image/GTImageGeneratorBase.h"
 #include "Generators/Image/GTSceneCaptureComponent2D.h"
@@ -337,12 +335,11 @@ void AGTCamera::SetInternalWarmUpFailure(const FString& Failure)
 
 
 void AGTCamera::TriggerGTGeneratorsWithFrame(int32 FrameIndex, double StampSeconds, int32 SessionId, UObject* CaptureManager) {
-	// Find GTGeneratorTrigger component on this actor using reflection
+	// Blueprint-generated trigger components require this string/reflection bridge.
 	for (UActorComponent* Component : GetComponents().Array())
 	{
 		if (Component && Component->GetClass()->GetName().Contains(TEXT("GTGeneratorTrigger")))
 		{
-			// Call TriggerWithFrame using reflection
 			if (UFunction* TriggerFunction = Component->GetClass()->FindFunctionByName(TEXT("TriggerWithFrame")))
 			{
 				struct FTriggerFrameParams

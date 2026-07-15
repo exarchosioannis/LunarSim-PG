@@ -30,12 +30,4 @@ namespace UnrealToRosConversion
 	{
 		return RotationToRosQuat(UnrealRotation.Quaternion());
 	}
-
-	FTransform TransformToRos(const FTransform& UnrealTransform)
-	{
-		const FVector RosLocation = PositionCmToRosMeters(UnrealTransform.GetLocation());
-		const FQuat RosRotation = RotationToRosQuat(UnrealTransform.GetRotation());
-
-		return FTransform(RosRotation, RosLocation, FVector::OneVector);
-	}
 }

@@ -29,7 +29,7 @@ protected:
 public:
     virtual void Tick(float DeltaTime) override;
 
-    // C++ will call this, Blueprint will implement what happens
+    // Blueprint owns the generator graph; C++ supplies canonical frame metadata.
     UFUNCTION(BlueprintImplementableEvent, Category = "GroundTruth")
     void CaptureGroundTruthNow(int32 FrameIndex, double StampSeconds, int32 SessionId, UObject* CaptureManager);
 

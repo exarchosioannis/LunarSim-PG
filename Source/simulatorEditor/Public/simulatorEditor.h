@@ -12,7 +12,6 @@ class AActor;
 class ARobotCamRig;
 class SDockTab;
 class FSpawnTabArgs;
-class UChildActorComponent;
 class UImuSensorPublisherComponent;
 class UOccupancyMapPublisherComponent;
 class URoverGroundTruthPublisherComponent;
@@ -46,13 +45,6 @@ private:
 	void OnResolutionPresetSelectionChanged(TSharedPtr<ELunarSimResolutionPreset> NewSelection, ESelectInfo::Type SelectInfo);
 	FString ResolutionPresetToString(ELunarSimResolutionPreset InPreset) const;
 
-	void InitCaptureRatePresetOptions();
-	TSharedPtr<ELunarSimCaptureRatePreset> FindCaptureRatePresetOption(ELunarSimCaptureRatePreset InPreset) const;
-	FText GetCaptureRatePresetText() const;
-	TSharedRef<SWidget> MakeCaptureRatePresetComboWidget(TSharedPtr<ELunarSimCaptureRatePreset> InOption) const;
-	void OnCaptureRatePresetSelectionChanged(TSharedPtr<ELunarSimCaptureRatePreset> NewSelection, ESelectInfo::Type SelectInfo);
-	FString CaptureRatePresetToString(ELunarSimCaptureRatePreset InPreset) const;
-
 	void InitRoverControlOptions();
 	TSharedPtr<ERoverControlMode> FindRoverControlModeOption(ERoverControlMode InMode) const;
 	FText GetRoverControlModeText() const;
@@ -82,18 +74,11 @@ private:
 	void OnImuHzChanged(float NewValue);
 
 	void RefreshTargetsFromEditorWorld();
-	void SelectTargetRobotCamRig();
 	bool CanApplySettings() const;
-	bool CanSelectTargetRobotCamRig() const;
 	bool CanEditGroundTruthMaps() const;
 	bool CanEditImuHz() const;
 	bool CanEditRoverControl() const;
-	bool CanEditCustomCaptureHz() const;
 	bool CanEditGroundTruthOutput() const;
-	FText GetTargetStatusText() const;
-	FText GetTargetActorText() const;
-	FText GetMapStatusText() const;
-	FText GetImuStatusText() const;
 	FText GetApplyStatusText() const;
 
 	void OnApplyClicked();
@@ -109,13 +94,10 @@ private:
 	TSharedPtr<ELunarSimRunMode> SelectedRunModeOption;
 	TArray<TSharedPtr<ELunarSimResolutionPreset>> ResolutionPresetOptions;
 	TSharedPtr<ELunarSimResolutionPreset> SelectedResolutionPresetOption;
-	TArray<TSharedPtr<ELunarSimCaptureRatePreset>> CaptureRatePresetOptions;
-	TSharedPtr<ELunarSimCaptureRatePreset> SelectedCaptureRatePresetOption;
 	TArray<TSharedPtr<ERoverControlMode>> RoverControlModeOptions;
 	TSharedPtr<ERoverControlMode> SelectedRoverControlModeOption;
 
 	TWeakObjectPtr<ARobotCamRig> TargetRobotCamRig;
-	TWeakObjectPtr<UChildActorComponent> TargetRobotCamRigChildComponent;
 	TWeakObjectPtr<AActor> TargetRoverActor;
 	TWeakObjectPtr<UImuSensorPublisherComponent> TargetImuPublisher;
 	TWeakObjectPtr<URoverVehicleControllerComponent> TargetRoverController;
@@ -124,7 +106,6 @@ private:
 
 	ELunarSimRunMode RunMode = ELunarSimRunMode::Dataset;
 	ELunarSimResolutionPreset ResolutionPreset = ELunarSimResolutionPreset::R1024x1024;
-	ELunarSimCaptureRatePreset CaptureRatePreset = ELunarSimCaptureRatePreset::Hz6;
 	ERoverControlMode RoverControlMode = ERoverControlMode::Manual;
 	FRoverCmdVelControllerSettings CmdVelSettings;
 	float CustomCaptureHz = 6.0f;

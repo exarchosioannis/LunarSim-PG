@@ -12,27 +12,23 @@
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(nav_msgs::msg::OccupancyGrid);
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(sensor_msgs::msg::PointCloud2);
 
-// creates the component and enables tick for ros publishing.
 UOccupancyMapPublisherComponent::UOccupancyMapPublisherComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 }
 
-//PLAY
 void UOccupancyMapPublisherComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	TryInitializeFromRunCaptureConfig();
 }
 
-//END
 void UOccupancyMapPublisherComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	ROSNode = nullptr;
 	Super::EndPlay(EndPlayReason);
 }
 
-// Ticks the ros node and republishes the maps the already generated maps every few seconds for rviz.
 void UOccupancyMapPublisherComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -85,7 +81,6 @@ bool UOccupancyMapPublisherComponent::IsGroundTruthMapsEnabledForRun() const
 	return bRunCaptureConfigResolved && RunCaptureConfig.IsGroundTruthMapsEnabled();
 }
 
-// creates the ROS node and registers map publishers.
 void UOccupancyMapPublisherComponent::SetupRos()
 {
 	if (ROSNode) return;
@@ -102,7 +97,6 @@ void UOccupancyMapPublisherComponent::SetupRos()
 	ROSNode->AddPublisher<sensor_msgs::msg::PointCloud2>(*ElevationPointCloudTopic, MapQOS, false);
 }
 
-// Converts UE time in seconds into a ROS builtin_interfaces/msg/Time timestamp.
 builtin_interfaces::msg::Time UOccupancyMapPublisherComponent::ToRosTime(double Seconds) const
 {
 	builtin_interfaces::msg::Time T;
@@ -116,7 +110,6 @@ builtin_interfaces::msg::Time UOccupancyMapPublisherComponent::ToRosTime(double 
 	return T;
 }
 
-// Regenerates the occupancy/elevation map layers and immediately republishes them to ROS.
 void UOccupancyMapPublisherComponent::RegenerateAndPublishMap()
 {
 	if (!IsGroundTruthMapsEnabledForRun()) {
@@ -128,7 +121,6 @@ void UOccupancyMapPublisherComponent::RegenerateAndPublishMap()
 	PublishMap();
 }
 
-// Builds the ground truth map stack: occupancy, elevation, and elevation point cloud.
 void UOccupancyMapPublisherComponent::GenerateOccupancyMap()
 {
 	UWorld* World = GetWorld();
@@ -200,13 +192,11 @@ void UOccupancyMapPublisherComponent::GenerateOccupancyMap()
 		ComputedOriginXMapMeters, ComputedOriginYMapMeters, *MapFrameId);
 }
 
-// ROS to UE5 conversion 
 FVector UOccupancyMapPublisherComponent::RosMapToUnrealWorldCm(double RosX_m, double RosY_m) const
 {
 	return FVector(RosX_m * 100.0, -RosY_m * 100.0, TraceBaseZCm);
 }
 
-// Uses a vertical raycast to classify one grid cell as occupied, free terrain, or unknown.
 int8 UOccupancyMapPublisherComponent::ClassifyCell(double CellCenterRosX_m, double CellCenterRosY_m) const
 {
 	UWorld* World = GetWorld();
@@ -247,7 +237,6 @@ int8 UOccupancyMapPublisherComponent::ClassifyCell(double CellCenterRosX_m, doub
 	return -1;
 }
 
-// Builds the list of actors tagged with MapIgnore so map raycasts skip dynamic objects like the rover.
 void UOccupancyMapPublisherComponent::BuildIgnoredMapActors()
 {
 	CachedIgnoredMapActors.Empty();
@@ -285,11 +274,9 @@ void UOccupancyMapPublisherComponent::BuildIgnoredMapActors()
 	}
 }
 
-// Uses a vertical raycast to sample the terrain height for one grid cell.
 bool UOccupancyMapPublisherComponent::SampleElevationCell(double CellCenterRosX_m, double CellCenterRosY_m, float& OutElevationMeters) const
 {
 	UWorld* World = GetWorld();
-	AActor* Owner = GetOwner();
 
 	if (!World) return false;
 	const FVector CenterUnreal = RosMapToUnrealWorldCm(CellCenterRosX_m, CellCenterRosY_m);
@@ -315,7 +302,6 @@ bool UOccupancyMapPublisherComponent::SampleElevationCell(double CellCenterRosX_
 	return false;
 }
 
-// "MapObstacle" tag is used to identify obstacles like rocks.
 bool UOccupancyMapPublisherComponent::HitHasOccupiedTag(const FHitResult& Hit) const
 {
 	const AActor* HitActor = Hit.GetActor();
@@ -326,7 +312,6 @@ bool UOccupancyMapPublisherComponent::HitHasOccupiedTag(const FHitResult& Hit) c
 	return false;
 }
 
-// "MapTerrain" tag is used to identify landscape.
 bool UOccupancyMapPublisherComponent::HitHasTerrainTag(const FHitResult& Hit) const
 {
 	const AActor* HitActor = Hit.GetActor();
@@ -337,7 +322,6 @@ bool UOccupancyMapPublisherComponent::HitHasTerrainTag(const FHitResult& Hit) co
 	return false;
 }
 
-// ignore actor/components with "MapIgnore" tag for map generation
 bool UOccupancyMapPublisherComponent::HitHasIgnoreTag(const FHitResult& Hit) const
 {
 	const AActor* HitActor = Hit.GetActor();
@@ -366,7 +350,6 @@ bool UOccupancyMapPublisherComponent::ExportMapToDefaultDatasetDirectory()
 	return ExportMapToDirectory(MapsDirectory, FGroundTruthMapArtifacts::GetDefaultOccupancyBaseFileName());
 }
 
-// Exports the current map to the specified directory with the given base file name. Returns true on success.
 bool UOccupancyMapPublisherComponent::ExportMapToDirectory(const FString& MapsDirectory, const FString& BaseFileName)
 {
 	if (!IsGroundTruthMapsEnabledForRun()) {
@@ -393,7 +376,6 @@ bool UOccupancyMapPublisherComponent::ExportMapToDirectory(const FString& MapsDi
 	return FGroundTruthMapFileExporter::ExportToDirectory(MapsDirectory, ExportInfo);
 }
 
-// elevation
 void UOccupancyMapPublisherComponent::BuildElevationPointCloud()
 {
 	const int32 Width = static_cast<int32>(ReusableMapMsg.info.width);
@@ -426,12 +408,10 @@ void UOccupancyMapPublisherComponent::PublishMap()
 	ReusableMapMsg.info.map_load_time = Stamp;
 	ReusableMapMsg.header.frame_id = TCHAR_TO_UTF8(*MapFrameId);
 
-	//occupancy 
 	ROSNode->Publish<nav_msgs::msg::OccupancyGrid>(*OccupancyMapTopic, ReusableMapMsg);
 
 	ReusableElevationPointCloudMsg.header.stamp = Stamp;
 	ReusableElevationPointCloudMsg.header.frame_id = TCHAR_TO_UTF8(*MapFrameId);
 
-	//elevation point cloud
 	ROSNode->Publish<sensor_msgs::msg::PointCloud2>(*ElevationPointCloudTopic, ReusableElevationPointCloudMsg);
 }
