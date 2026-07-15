@@ -81,6 +81,69 @@ void UGTActorInfoGeneratorComponent::GenerateData(
     GenerateDataInternal(TimeStamp, FrameIndex);
 }
 
+bool UGTActorInfoGeneratorComponent::RequiresInternalRenderWarmUp() const
+{
+    return bAccurateBoundingBoxes;
+}
+
+bool UGTActorInfoGeneratorComponent::WarmUpCaptureNoOutput(FString& OutError)
+{
+    OutError.Reset();
+    if (!bAccurateBoundingBoxes)
+    {
+        return true;
+    }
+
+    UGTImageGeneratorBase* LinkedImageGeneratorComponent =
+        Cast<UGTImageGeneratorBase>(LinkedImageGenerator.GetComponent(GetOwner()));
+    if (!IsValid(LinkedImageGeneratorComponent))
+    {
+        OutError = TEXT("Accurate bounding boxes require a valid linked image generator.");
+        return false;
+    }
+    if (!IsValid(SegmentationSceneCapture))
+    {
+        OutError = TEXT("Internal accurate-bounding-box segmentation capture is unavailable.");
+        return false;
+    }
+
+    ApplyLinkedCameraCalibration(
+        SegmentationSceneCapture,
+        LinkedImageGeneratorComponent->GetSceneCaptureComponent());
+    SegmentationSceneCapture->UpdateTextureTarget();
+    if (!IsValid(SegmentationSceneCapture->TextureTarget) ||
+        !SegmentationSceneCapture->TextureTarget->GameThread_GetRenderTargetResource())
+    {
+        OutError = TEXT("Internal accurate-bounding-box render target is unavailable.");
+        return false;
+    }
+
+    FGTImage WarmUpImage;
+    SegmentationSceneCapture->CaptureImage(WarmUpImage);
+
+    const int32 ExpectedWidth = SegmentationSceneCapture->TextureTarget->SizeX;
+    const int32 ExpectedHeight = SegmentationSceneCapture->TextureTarget->SizeY;
+    const int64 ExpectedPixelCount =
+        static_cast<int64>(ExpectedWidth) * static_cast<int64>(ExpectedHeight);
+    if (!WarmUpImage.IsValid() ||
+        WarmUpImage.Width != ExpectedWidth ||
+        WarmUpImage.Height != ExpectedHeight ||
+        WarmUpImage.Pixels.Num() != ExpectedPixelCount)
+    {
+        OutError = FString::Printf(
+            TEXT("Accurate-bounding-box warm-up readback was invalid (expected %dx%d/%lld pixels, got %dx%d/%d)."),
+            ExpectedWidth,
+            ExpectedHeight,
+            ExpectedPixelCount,
+            WarmUpImage.Width,
+            WarmUpImage.Height,
+            WarmUpImage.Pixels.Num());
+        return false;
+    }
+
+    return true;
+}
+
 void UGTActorInfoGeneratorComponent::GenerateDataInternal(
     const FDateTime& TimeStamp,
     int32 FrameIndex)

@@ -37,6 +37,11 @@ public:
   UFUNCTION(BlueprintCallable, Category = TriggerSettings)
   void ClearEnabledGeneratorComponentProperties();
 
+  bool ResolveEnabledGeneratorComponents(
+      TArray<UGTDataGeneratorComponent*>& OutGeneratorComponents,
+      TArray<FName>& OutGeneratorComponentProperties,
+      FString& OutError) const;
+
 protected:
   // Called when the game starts
   virtual void BeginPlay() override;

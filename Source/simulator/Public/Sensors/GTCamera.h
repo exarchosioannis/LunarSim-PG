@@ -5,6 +5,15 @@
 #include "GameFramework/Actor.h"
 #include "GTCamera.generated.h"
 
+enum class EGTInternalWarmUpState : uint8
+{
+    NotRequested,
+    InProgress,
+    Ready,
+    Failed,
+    Cancelled
+};
+
 UCLASS()
 class SIMULATOR_API AGTCamera : public AActor
 {
@@ -15,6 +24,7 @@ public:
 
 protected:
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
     virtual void Tick(float DeltaTime) override;
@@ -32,8 +42,23 @@ public:
     UFUNCTION(BlueprintCallable, Category = "GroundTruth")
     void SetGroundTruthOutputs(bool bRGB, bool bDepth, bool bSegmentation, bool bBoundingBoxes);
 
+    bool RunInternalWarmUp();
+    bool IsInternalWarmUpReady() const;
+    bool HasInternalWarmUpFailed() const;
+    const FString& GetInternalWarmUpFailure() const;
+
     
     // Called to trigger GT generators with frame synchronization
     UFUNCTION(BlueprintCallable, Category = "GroundTruth")
     void TriggerGTGeneratorsWithFrame(int32 FrameIndex, double StampSeconds, int32 SessionId, UObject* CaptureManager);
+
+private:
+    void SetInternalWarmUpFailure(const FString& Failure);
+
+    EGTInternalWarmUpState InternalWarmUpState = EGTInternalWarmUpState::NotRequested;
+    FString InternalWarmUpFailure;
+    bool bGroundTruthRGBEnabled = false;
+    bool bGroundTruthDepthEnabled = false;
+    bool bGroundTruthSegmentationEnabled = false;
+    bool bGroundTruthBoundingBoxesEnabled = false;
 };

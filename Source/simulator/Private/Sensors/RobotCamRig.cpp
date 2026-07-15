@@ -205,6 +205,10 @@ void ARobotCamRig::BeginPlay()
 			CaptureManager->SetRoverPoseSource(RoverPoseSource);
 		}
 	}
+
+	//Warm the configured UnrealGT render paths before capture controls can create a session.
+	InitializeGroundTruthWarmUp();
+
 	// Enable keyboard input for this actor during gameplay.
 	// This allows pressing C to toggle capture
 	if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController()) {
@@ -332,6 +336,49 @@ void ARobotCamRig::ApplyGroundTruthConfig()
 		CaptureConfig.IsGroundTruthBoundingBoxesEnabled());
 }
 
+void ARobotCamRig::InitializeGroundTruthWarmUp()
+{
+	bGroundTruthWarmUpReady = false;
+	bGroundTruthWarmUpFailed = false;
+	GroundTruthWarmUpFailure.Reset();
+
+	UWorld* World = GetWorld();
+	UE_LOG(LogTemp, Log,
+		TEXT("RobotCamRig: GT warm-up config world=%s world_id=%u resolution=%dx%d hfov=%.3f rgb=%s depth=%s segmentation=%s bounding_boxes=%s."),
+		World ? *World->GetName() : TEXT("None"),
+		World ? World->GetUniqueID() : 0,
+		ResolvedCameraCalibration.ImageWidth,
+		ResolvedCameraCalibration.ImageHeight,
+		ResolvedCameraCalibration.HorizontalFovDeg,
+		CaptureConfig.IsGroundTruthRgbEnabled() ? TEXT("true") : TEXT("false"),
+		CaptureConfig.IsGroundTruthDepthEnabled() ? TEXT("true") : TEXT("false"),
+		CaptureConfig.IsGroundTruthSegmentationEnabled() ? TEXT("true") : TEXT("false"),
+		CaptureConfig.IsGroundTruthBoundingBoxesEnabled() ? TEXT("true") : TEXT("false"));
+
+	if (!CaptureConfig.IsGroundTruthEnabled()) {
+		bGroundTruthWarmUpReady = true;
+		return;
+	}
+
+	if (!IsValid(GroundTruthCamera)) {
+		bGroundTruthWarmUpFailed = true;
+		GroundTruthWarmUpFailure =
+			TEXT("Ground truth is enabled but GroundTruthCamera is unavailable.");
+		UE_LOG(LogTemp, Error, TEXT("RobotCamRig: GT warm-up FAILED: %s"), *GroundTruthWarmUpFailure);
+		return;
+	}
+
+	//Reapply the immutable PIE configuration immediately before the one-time warm-up.
+	ApplyGroundTruthConfig();
+	bGroundTruthWarmUpReady = GroundTruthCamera->RunInternalWarmUp();
+	bGroundTruthWarmUpFailed = !bGroundTruthWarmUpReady;
+	if (bGroundTruthWarmUpFailed)
+	{
+		GroundTruthWarmUpFailure = GroundTruthCamera->GetInternalWarmUpFailure();
+		return;
+	}
+}
+
 
 void ARobotCamRig::ResolveRoverGroundTruthComponents()
 {
@@ -452,6 +499,15 @@ void ARobotCamRig::StartRgbCaptureAndPublish()
 
 	const double CaptureTimeSeconds = GetWorld()->GetTimeSeconds();
 	const FCaptureFrameInfo FrameInfo = CaptureManager->NextFrame(CaptureTimeSeconds);
+	if (FrameInfo.FrameIndex == 0)
+	{
+		UE_LOG(LogTemp, Log,
+			TEXT("RobotCamRig: first real synchronized frame session_id=%d frame_index=%d stamp=%.9f gt_ready=%s."),
+			FrameInfo.SessionId,
+			FrameInfo.FrameIndex,
+			FrameInfo.StampSeconds,
+			bGroundTruthWarmUpReady ? TEXT("true") : TEXT("false"));
+	}
 
 	if (Config.IsGroundTruthEnabled()) {
 		if (GroundTruthCamera) {
@@ -502,10 +558,24 @@ void ARobotCamRig::PollOneRgbCaptureAndPublish(URgbCameraCaptureComponent* Captu
 void ARobotCamRig::OnCaptureControl(int32 ControlValue)
 {
 	if (ControlValue == 1) {
+		if (!bGroundTruthWarmUpReady) {
+			const FString Reason = bGroundTruthWarmUpFailed
+				? GroundTruthWarmUpFailure
+				: TEXT("GT pipeline warm-up is not complete.");
+			UE_LOG(LogTemp, Error,
+				TEXT("RobotCamRig: capture start rejected before GT Ready; no session was created. Reason: %s"),
+				*Reason);
+			ShowCaptureScreenMessage(
+				FString::Printf(TEXT("Capture not started: %s"), *Reason), FColor::Red);
+			return;
+		}
+
 		if (RoverGroundTruthPublisher) {
 			RoverGroundTruthPublisher->ResetPath();
 		}
 		if (CaptureManager) {
+			UE_LOG(LogTemp, Log,
+				TEXT("RobotCamRig: real capture start accepted after GT Ready; creating the real session now."));
 			CaptureManager->StartCapture();
 		}
 		PublishAccumulator = 0.0f;
@@ -543,6 +613,9 @@ void ARobotCamRig::ShowCaptureScreenMessage(const FString& Message, const FColor
 void ARobotCamRig::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (CaptureManager) CaptureManager->StopCapture();
+	bGroundTruthWarmUpReady = false;
+	bGroundTruthWarmUpFailed = true;
+	GroundTruthWarmUpFailure = TEXT("PIE world is ending.");
 	CameraTfROSNode = nullptr;
 	Super::EndPlay(EndPlayReason);
 }

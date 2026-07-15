@@ -88,6 +88,9 @@ private:
 	AGTCamera* GroundTruthCamera = nullptr;
 
 	bool bWarnedMissingGroundTruthCamera = false;
+	bool bGroundTruthWarmUpReady = false;
+	bool bGroundTruthWarmUpFailed = false;
+	FString GroundTruthWarmUpFailure;
 
 	// Rover actor used for rover ground truth and optional camera-rig mounting.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Robot", meta=(AllowPrivateAccess="true"))
@@ -170,6 +173,7 @@ private:
 	// Ground truth helpers
 	void ResolveGroundTruthCameraChild();
 	void ApplyGroundTruthConfig();
+	void InitializeGroundTruthWarmUp();
 	void ResolveRoverGroundTruthComponents();
 
 	// Runtime rover resolution helper. Keeps the old manually-assigned RoverActor workflow,

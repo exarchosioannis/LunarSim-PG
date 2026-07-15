@@ -178,6 +178,11 @@ public:
 
     virtual void DrawDebug(FViewport* Viewport, FCanvas* Canvas) override;
 
+    bool RequiresInternalRenderWarmUp() const;
+
+    /** Warms the private accurate-bounding-box segmentation capture without generating CSV. */
+    bool WarmUpCaptureNoOutput(FString& OutError);
+
 #if WITH_EDITOR
     virtual bool CanEditChange(const FProperty* InProperty) const override;
 #endif

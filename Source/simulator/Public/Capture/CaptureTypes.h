@@ -253,9 +253,7 @@ struct SIMULATOR_API FCaptureConfig
 		const float SafeCustomCaptureHz = SanitizeCameraCaptureHz(CustomCaptureHz);
 		const float SafeStereoBaselineCm = SanitizeStereoBaselineCm(StereoBaselineCm);
 		const float SafeHorizontalFovDeg = SanitizeHorizontalFovDeg(HorizontalFovDeg);
-		const bool bChanged = CustomCaptureHz != SafeCustomCaptureHz
-			|| StereoBaselineCm != SafeStereoBaselineCm
-			|| HorizontalFovDeg != SafeHorizontalFovDeg;
+		const bool bChanged = CustomCaptureHz != SafeCustomCaptureHz || StereoBaselineCm != SafeStereoBaselineCm || HorizontalFovDeg != SafeHorizontalFovDeg;
 		CustomCaptureHz = SafeCustomCaptureHz;
 		StereoBaselineCm = SafeStereoBaselineCm;
 		HorizontalFovDeg = SafeHorizontalFovDeg;

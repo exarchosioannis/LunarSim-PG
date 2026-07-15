@@ -197,6 +197,40 @@ void UGTGeneratorTrigger::ClearEnabledGeneratorComponentProperties()
     EnabledGeneratorComponentProperties.Empty();
 }
 
+bool UGTGeneratorTrigger::ResolveEnabledGeneratorComponents(
+    TArray<UGTDataGeneratorComponent*>& OutGeneratorComponents,
+    TArray<FName>& OutGeneratorComponentProperties,
+    FString& OutError) const
+{
+    OutGeneratorComponents.Reset();
+    OutGeneratorComponentProperties.Reset();
+    OutError.Reset();
+
+    for (const FGTGeneratorReference& GeneratorReference : DataGenerators)
+    {
+        if (!IsGeneratorReferenceEnabled(GeneratorReference))
+        {
+            continue;
+        }
+
+        UGTDataGeneratorComponent* GeneratorComponent =
+            GeneratorReference.GetComponent(GetOwner());
+        if (!IsValid(GeneratorComponent))
+        {
+            OutError = FString::Printf(
+                TEXT("Enabled UnrealGT generator reference '%s' could not be resolved on '%s'."),
+                *GeneratorReference.ComponentProperty.ToString(),
+                GetOwner() ? *GetOwner()->GetName() : TEXT("None"));
+            return false;
+        }
+
+        OutGeneratorComponents.AddUnique(GeneratorComponent);
+        OutGeneratorComponentProperties.AddUnique(GeneratorReference.ComponentProperty);
+    }
+
+    return true;
+}
+
 bool UGTGeneratorTrigger::IsGeneratorReferenceEnabled(
     const FGTGeneratorReference& GeneratorReference) const
 {

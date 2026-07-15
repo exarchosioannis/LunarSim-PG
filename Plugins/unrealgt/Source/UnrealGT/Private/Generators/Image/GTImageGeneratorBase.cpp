@@ -147,6 +147,49 @@ UGTSceneCaptureComponent2D* UGTImageGeneratorBase::GetSceneCaptureComponent() co
     return SceneCaptureComponent;
 }
 
+bool UGTImageGeneratorBase::WarmUpCaptureNoOutput(FString& OutError)
+{
+    OutError.Reset();
+    if (!IsValid(SceneCaptureComponent))
+    {
+        OutError = TEXT("SceneCaptureComponent is unavailable.");
+        return false;
+    }
+
+    SceneCaptureComponent->UpdateTextureTarget();
+    if (!IsValid(SceneCaptureComponent->TextureTarget) ||
+        !SceneCaptureComponent->TextureTarget->GameThread_GetRenderTargetResource())
+    {
+        OutError = TEXT("Configured render target or its render resource is unavailable.");
+        return false;
+    }
+
+    FGTImage WarmUpImage;
+    SceneCaptureComponent->CaptureImage(WarmUpImage);
+
+    const int32 ExpectedWidth = SceneCaptureComponent->TextureTarget->SizeX;
+    const int32 ExpectedHeight = SceneCaptureComponent->TextureTarget->SizeY;
+    const int64 ExpectedPixelCount =
+        static_cast<int64>(ExpectedWidth) * static_cast<int64>(ExpectedHeight);
+    if (!WarmUpImage.IsValid() ||
+        WarmUpImage.Width != ExpectedWidth ||
+        WarmUpImage.Height != ExpectedHeight ||
+        WarmUpImage.Pixels.Num() != ExpectedPixelCount)
+    {
+        OutError = FString::Printf(
+            TEXT("Synchronous warm-up readback was invalid (expected %dx%d/%lld pixels, got %dx%d/%d)."),
+            ExpectedWidth,
+            ExpectedHeight,
+            ExpectedPixelCount,
+            WarmUpImage.Width,
+            WarmUpImage.Height,
+            WarmUpImage.Pixels.Num());
+        return false;
+    }
+
+    return true;
+}
+
 void UGTImageGeneratorBase::SetResolution(const FIntPoint& NewResolution)
 {
     Resolution = FIntPoint(

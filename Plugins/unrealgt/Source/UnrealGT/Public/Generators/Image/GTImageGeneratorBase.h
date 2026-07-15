@@ -39,6 +39,9 @@ public:
 
     virtual UGTSceneCaptureComponent2D* GetSceneCaptureComponent() const;
 
+    /** Performs one real synchronous capture and discards it before any output delegate. */
+    virtual bool WarmUpCaptureNoOutput(FString& OutError);
+
     UFUNCTION(BlueprintCallable, Category = Image)
     void SetResolution(const FIntPoint& NewResolution);
 
