@@ -209,9 +209,9 @@ void UImuSensorPublisherComponent::PublishImuSample(double CurrentTimeSeconds)
 	const FVector CurrentRosVelocityMps = (CurrentRosPositionMeters - PreviousRosPositionMeters) / Dt;
 	const FVector WorldLinearAccelerationMps2 = (CurrentRosVelocityMps - PreviousRosVelocityMps) / Dt;
 
-	// ROS world gravity points down on Z. Accelerometers measure specific force.
-	// Therefore a stationary level IMU should read approximately +9.80665 on local Z.
-	const FVector GravityWorldMps2(0.0, 0.0, -GravityMagnitudeMps2);
+	//Convert active Unreal world gravity to the ROS world basis and m/s^2.
+	const FVector UnrealGravityWorldCmPerSec2(0.0, 0.0, GetWorld()->GetGravityZ());
+	const FVector GravityWorldMps2 = UnrealToRosConversion::PositionCmToRosMeters(UnrealGravityWorldCmPerSec2);
 	const FVector SpecificForceWorldMps2 = WorldLinearAccelerationMps2 - GravityWorldMps2;
 	FVector LinearAccelerationBodyMps2 = CurrentRosRotation.Inverse().RotateVector(SpecificForceWorldMps2);
 

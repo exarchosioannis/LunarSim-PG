@@ -17,6 +17,8 @@ class USceneComponent;
  * Attach this component to BP_VehicleRover and add a SceneComponent named IMU_Mount.
  * The component publishes sensor_msgs/msg/Imu on /rover/imu at its own configurable rate.
  * It also publishes the static transform base_link -> imu_link using the IMU_Mount transform.
+ * Linear acceleration is sensor-frame specific force using active world gravity: a supported
+ * stationary sensor reports gravity opposition, while an ideal freely falling sensor reports zero.
  *
  * This component is independent from the camera/capture FrameInfo pipeline.
  * It is synchronized with the rest of the simulator by using the same UE world time base.
@@ -62,9 +64,8 @@ private:
 	UPROPERTY(EditAnywhere, Category = "IMU", meta = (ClampMin = "1.0", ClampMax = "400.0", UIMin = "1.0", UIMax = "200.0"))
 	float ImuPublishHz = 100.0f;
 
-	// Specific-force gravity value used by the accelerometer model.
-	// A stationary level IMU should read close to +9.80665 m/s^2 on its local Z axis.
-	UPROPERTY(EditAnywhere, Category = "IMU", meta = (ClampMin = "0.0"))
+	//Legacy serialized value retained for Blueprint/CDO compatibility. Active world gravity is authoritative.
+	UPROPERTY()
 	float GravityMagnitudeMps2 = 9.80665f;
 
 	UPROPERTY(EditAnywhere, Category = "IMU|Noise")
