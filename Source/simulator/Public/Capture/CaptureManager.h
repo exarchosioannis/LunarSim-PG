@@ -24,6 +24,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Capture")
 	void StartCapture();
+	bool TryStartCapture();
 
 	UFUNCTION(BlueprintCallable, Category = "Capture")
 	void StopCapture();
@@ -45,6 +46,7 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Capture|Session")
 	FString GetCurrentImagesDirectory() const;
+	const FString& GetCurrentSessionName() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Capture|Pose")
 	void SetRoverPoseSource(UCapturePoseSourceComponent* InRoverPoseSource);

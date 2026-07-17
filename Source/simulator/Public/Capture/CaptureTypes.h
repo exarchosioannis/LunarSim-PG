@@ -112,6 +112,11 @@ struct SIMULATOR_API FCaptureConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Outputs")
 	bool bGroundTruthMaps = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Capture Status", meta = (
+		DisplayName = "Show Capture Status Overlay",
+		ToolTip = "Show or hide the small on-screen capture status overlay. The capture cooldown remains active when the overlay is hidden."))
+	bool bShowCaptureStatusOverlay = true;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
 	ELunarSimResolutionPreset ResolutionPreset = ELunarSimResolutionPreset::R1024x1024;
 

@@ -6,6 +6,7 @@
 #include "Sensors/RgbCameraCaptureComponent.h"
 #include "Sensors/CameraRosPublisherComponent.h"
 #include "TempoROSNode.h"
+#include "TimerManager.h"
 #include "RobotCamRig.generated.h"
 
 class USceneComponent;
@@ -16,6 +17,7 @@ class AGTCamera;
 class AActor;
 class UCapturePoseSourceComponent;
 class URoverGroundTruthPublisherComponent;
+class UCaptureStatusOverlayComponent;
 
 UCLASS()
 class SIMULATOR_API ARobotCamRig : public AActor
@@ -37,6 +39,15 @@ protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 private:
+	enum class ECaptureRuntimeState : uint8
+	{
+		Idle,
+		Capturing,
+		Finalizing
+	};
+
+	static constexpr float CaptureFinalizationCooldownSeconds = 3.0f;
+
 	// Components
 	UPROPERTY()
 	USceneComponent* Root = nullptr;
@@ -74,6 +85,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	UCameraRosPublisherComponent* RightRosPublisherComponent = nullptr;
+
+	UPROPERTY(VisibleAnywhere, Category = "Components")
+	UCaptureStatusOverlayComponent* CaptureStatusOverlay = nullptr;
 
 	// Ground Truth Camera
 	// Assign BP_UnrealGT_Camera here in the RobotCamRig Details panel.
@@ -113,6 +127,10 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Camera")
 	FCaptureConfig CaptureConfig;
+
+	ECaptureRuntimeState CaptureRuntimeState = ECaptureRuntimeState::Idle;
+	bool bLoggedFinalizingStartRejection = false;
+	FTimerHandle FinalizationCooldownTimerHandle;
 
 	// Camera Settings
 	float PublishAccumulator = 0.0f;
@@ -165,6 +183,9 @@ private:
 
 	// Command helper
 	void OnCaptureControl(int32 ControlValue);
+	void RequestCaptureStart();
+	void RequestCaptureStop();
+	void CompleteCaptureFinalization();
 
 	// Keyboard helper
 	void ToggleCaptureFromKeyboard();

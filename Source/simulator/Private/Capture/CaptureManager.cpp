@@ -95,16 +95,21 @@ UWorld* UCaptureManager::GetWorld() const
 
 void UCaptureManager::StartCapture()
 {
+	TryStartCapture();
+}
+
+bool UCaptureManager::TryStartCapture()
+{
 	if (bCaptureEnabled)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Capture is already running. StartCapture ignored."));
-		return;
+		return false;
 	}
 
 	EnsureDatasetRunDirectory();
 	if (CurrentDatasetRunDirectory.IsEmpty()) {
 		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: cannot start capture because dataset run directory is unavailable."));
-		return;
+		return false;
 	}
 
 	CurrentSessionId++;
@@ -151,6 +156,7 @@ void UCaptureManager::StartCapture()
 	WriteSessionMetadata();
 
 	UE_LOG(LogTemp, Log, TEXT("CaptureManager: started %s inside dataset run %s"), *CurrentSessionName, *CurrentDatasetRunDirectory);
+	return true;
 }
 
 void UCaptureManager::StopCapture()
@@ -227,6 +233,11 @@ bool UCaptureManager::IsSessionValid(int32 SessionId) const
 FString UCaptureManager::GetCurrentImagesDirectory() const
 {
 	return CurrentImagesDirectory;
+}
+
+const FString& UCaptureManager::GetCurrentSessionName() const
+{
+	return CurrentSessionName;
 }
 
 void UCaptureManager::StartManifest()

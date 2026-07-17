@@ -13,11 +13,8 @@ public class simulator : ModuleRules
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", 
 			"TempoROS", "rclcpp", "RHI", "RenderCore", "UnrealGT", "ChaosVehicles", "ImageWrapper"});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "Landscape" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Landscape", "Slate", "SlateCore" });
 
-		// Uncomment if you are using Slate UI
-		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
-		
 		// Uncomment if you are using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
 

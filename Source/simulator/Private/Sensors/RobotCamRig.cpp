@@ -15,8 +15,11 @@
 #include "GameFramework/PlayerController.h"
 #include "InputCoreTypes.h"
 #include "TempoROSNode.h"
+#include "Utils/CaptureStatusOverlayComponent.h"
 #include "Utils/LunarSimRosInterface.h"
 #include "EngineUtils.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogCaptureRuntime, Log, All);
 
 ARobotCamRig::ARobotCamRig()
 {
@@ -74,6 +77,7 @@ ARobotCamRig::ARobotCamRig()
 
 	RosPublisherComponent = CreateDefaultSubobject<UCameraRosPublisherComponent>(TEXT("RosPublisherComponent"));
 	RightRosPublisherComponent = CreateDefaultSubobject<UCameraRosPublisherComponent>(TEXT("RightRosPublisherComponent"));
+	CaptureStatusOverlay = CreateDefaultSubobject<UCaptureStatusOverlayComponent>(TEXT("CaptureStatusOverlay"));
 
 	ApplyCameraCalibration();
 	ApplyStereoBaseline();
@@ -196,6 +200,9 @@ void ARobotCamRig::BeginPlay()
 		if (RoverPoseSource) {
 			CaptureManager->SetRoverPoseSource(RoverPoseSource);
 		}
+	}
+	if (CaptureStatusOverlay) {
+		CaptureStatusOverlay->SetOverlayEnabled(CaptureConfig.bShowCaptureStatusOverlay);
 	}
 
 	// Warm the configured UnrealGT render paths before capture controls can create a session.
@@ -554,42 +561,103 @@ void ARobotCamRig::PollOneRgbCaptureAndPublish(URgbCameraCaptureComponent* Captu
 void ARobotCamRig::OnCaptureControl(int32 ControlValue)
 {
 	if (ControlValue == 1) {
-		if (CaptureManager && CaptureManager->IsCaptureEnabled()) {
-			UE_LOG(LogTemp, Log, TEXT("RobotCamRig: capture is already active; repeated start command ignored."));
-			return;
-		}
-		if (!bGroundTruthWarmUpReady) {
-			const FString Reason = bGroundTruthWarmUpFailed
-				? GroundTruthWarmUpFailure
-				: TEXT("GT pipeline warm-up is not complete.");
-			UE_LOG(LogTemp, Error,
-				TEXT("RobotCamRig: capture start rejected before GT Ready; no session was created. Reason: %s"),
-				*Reason);
-			ShowCaptureScreenMessage(
-				FString::Printf(TEXT("Capture not started: %s"), *Reason), FColor::Red);
-			return;
-		}
-
-		if (RoverGroundTruthPublisher) {
-			RoverGroundTruthPublisher->ResetPath();
-		}
-		if (CaptureManager) {
-			UE_LOG(LogTemp, Log,
-				TEXT("RobotCamRig: real capture start accepted after GT Ready; creating the real session now."));
-			CaptureManager->StartCapture();
-		}
-		PublishAccumulator = 0.0f;
-		bWarnedMissingGroundTruthCamera = false;
-		ShowCaptureScreenMessage(TEXT("Capture started"), FColor::Green);
+		RequestCaptureStart();
 	} else if (ControlValue == 0) {
-		if (!CaptureManager || !CaptureManager->IsCaptureEnabled()) {
-			UE_LOG(LogTemp, Log, TEXT("RobotCamRig: capture is already stopped; repeated stop command ignored."));
-			return;
+		RequestCaptureStop();
+	}
+}
+
+void ARobotCamRig::RequestCaptureStart()
+{
+	if (CaptureRuntimeState == ECaptureRuntimeState::Capturing) {
+		UE_LOG(LogCaptureRuntime, Log, TEXT("Capture start ignored: capture is already active."));
+		return;
+	}
+	if (CaptureRuntimeState == ECaptureRuntimeState::Finalizing) {
+		if (!bLoggedFinalizingStartRejection) {
+			UE_LOG(LogCaptureRuntime, Warning, TEXT("Capture start rejected: finalization cooldown active"));
+			bLoggedFinalizingStartRejection = true;
 		}
-		if (CaptureManager) {
-			CaptureManager->StopCapture();
-		}
-		ShowCaptureScreenMessage(TEXT("Capture stopped"), FColor::Yellow);
+		return;
+	}
+	if (!CaptureManager) {
+		UE_LOG(LogCaptureRuntime, Warning, TEXT("Capture start rejected: CaptureManager is not ready."));
+		return;
+	}
+	if (!bGroundTruthWarmUpReady) {
+		const FString Reason = bGroundTruthWarmUpFailed
+			? GroundTruthWarmUpFailure
+			: TEXT("GT pipeline warm-up is not complete.");
+		UE_LOG(LogTemp, Error,
+			TEXT("RobotCamRig: capture start rejected before GT Ready; no session was created. Reason: %s"),
+			*Reason);
+		ShowCaptureScreenMessage(
+			FString::Printf(TEXT("Capture not started: %s"), *Reason), FColor::Red);
+		return;
+	}
+
+	UE_LOG(LogTemp, Log,
+		TEXT("RobotCamRig: real capture start accepted after GT Ready; creating the real session now."));
+	if (!CaptureManager->TryStartCapture()) {
+		UE_LOG(LogCaptureRuntime, Warning, TEXT("Capture start rejected: session creation failed."));
+		return;
+	}
+
+	if (RoverGroundTruthPublisher) {
+		RoverGroundTruthPublisher->ResetPath();
+	}
+
+	CaptureRuntimeState = ECaptureRuntimeState::Capturing;
+	bLoggedFinalizingStartRejection = false;
+	const FString& ActiveSessionName = CaptureManager->GetCurrentSessionName();
+	PublishAccumulator = 0.0f;
+	bWarnedMissingGroundTruthCamera = false;
+	UE_LOG(LogCaptureRuntime, Log,
+		TEXT("Capture state: Idle -> Capturing (%s)"), *ActiveSessionName);
+	if (CaptureStatusOverlay) {
+		CaptureStatusOverlay->ShowCapturing(ActiveSessionName);
+	}
+}
+
+void ARobotCamRig::RequestCaptureStop()
+{
+	if (CaptureRuntimeState != ECaptureRuntimeState::Capturing) {
+		UE_LOG(LogCaptureRuntime, Log, TEXT("Capture stop ignored: capture is already stopped or finalizing."));
+		return;
+	}
+
+	if (CaptureManager) {
+		CaptureManager->StopCapture();
+	}
+	CaptureRuntimeState = ECaptureRuntimeState::Finalizing;
+	bLoggedFinalizingStartRejection = false;
+	UE_LOG(LogCaptureRuntime, Log, TEXT("Capture state: Capturing -> Finalizing"));
+	if (CaptureStatusOverlay) {
+		CaptureStatusOverlay->ShowFinalizing();
+	}
+
+	if (UWorld* World = GetWorld()) {
+		World->GetTimerManager().SetTimer(
+			FinalizationCooldownTimerHandle,
+			this,
+			&ARobotCamRig::CompleteCaptureFinalization,
+			CaptureFinalizationCooldownSeconds,
+			false);
+	} else {
+		UE_LOG(LogCaptureRuntime, Warning,
+			TEXT("Capture finalization timer could not start because the world is unavailable."));
+	}
+}
+
+void ARobotCamRig::CompleteCaptureFinalization()
+{
+	if (CaptureRuntimeState != ECaptureRuntimeState::Finalizing) return;
+
+	CaptureRuntimeState = ECaptureRuntimeState::Idle;
+	bLoggedFinalizingStartRejection = false;
+	UE_LOG(LogCaptureRuntime, Log, TEXT("Capture state: Finalizing -> Idle"));
+	if (CaptureStatusOverlay) {
+		CaptureStatusOverlay->ShowReady();
 	}
 }
 
@@ -600,7 +668,7 @@ void ARobotCamRig::ToggleCaptureFromKeyboard()
 		UE_LOG(LogTemp, Warning, TEXT("C pressed but CaptureManager is not ready."));
 		return;
 	}
-	if (CaptureManager->IsCaptureEnabled()) {
+	if (CaptureRuntimeState == ECaptureRuntimeState::Capturing) {
 		OnCaptureControl(0);
 	} else {
 		OnCaptureControl(1);
@@ -616,7 +684,11 @@ void ARobotCamRig::ShowCaptureScreenMessage(const FString& Message, const FColor
 
 void ARobotCamRig::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (UWorld* World = GetWorld()) {
+		World->GetTimerManager().ClearTimer(FinalizationCooldownTimerHandle);
+	}
 	if (CaptureManager) CaptureManager->StopCapture();
+	CaptureRuntimeState = ECaptureRuntimeState::Idle;
 	bGroundTruthWarmUpReady = false;
 	bGroundTruthWarmUpFailed = true;
 	GroundTruthWarmUpFailure = TEXT("PIE world is ending.");
