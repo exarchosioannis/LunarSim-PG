@@ -237,7 +237,6 @@ TSharedRef<SWidget> MakeSimulatorConfigCheckRow(const TSharedRef<SWidget>& Check
 
 void FsimulatorEditorModule::StartupModule()
 {
-	InitRunModeOptions();
 	InitResolutionPresetOptions();
 	InitRoverControlOptions();
 
@@ -302,10 +301,8 @@ TSharedRef<SDockTab> FsimulatorEditorModule::OnSpawnSimulatorConfigTab(const FSp
 
 TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 {
-	InitRunModeOptions();
 	InitResolutionPresetOptions();
 	InitRoverControlOptions();
-	SelectedRunModeOption = FindRunModeOption(RunMode);
 	SelectedResolutionPresetOption = FindResolutionPresetOption(ResolutionPreset);
 	SelectedRoverControlModeOption = FindRoverControlModeOption(RoverControlMode);
 
@@ -322,29 +319,6 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 				SNew(STextBlock)
 				.Text(LOCTEXT("SimulatorConfigTitle", "Simulator Config"))
 				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 14))
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 10.f)
-			[
-				MakeSimulatorConfigSection(
-					LOCTEXT("ModeSectionLabel", "Mode"),
-					MakeSimulatorConfigFormRow(
-						LOCTEXT("RunModeLabel", "Run Mode"),
-						SNew(SBox)
-						.WidthOverride(220.f)
-						[
-							SNew(SComboBox<TSharedPtr<ELunarSimRunMode>>)
-							.OptionsSource(&RunModeOptions)
-							.InitiallySelectedItem(SelectedRunModeOption)
-							.OnGenerateWidget_Raw(this, &FsimulatorEditorModule::MakeRunModeComboWidget)
-							.OnSelectionChanged_Raw(this, &FsimulatorEditorModule::OnRunModeSelectionChanged)
-							[
-								SNew(STextBlock)
-								.Text_Raw(this, &FsimulatorEditorModule::GetRunModeText)
-							]
-						]))
 			]
 
 			+ SVerticalBox::Slot()
@@ -486,6 +460,14 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 								18.f)
 						])
 				]
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(0.f, 0.f, 0.f, 8.f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("CaptureKeyHelp", "Press C to Start/Stop Capture Session"))
 			]
 
 			+ SVerticalBox::Slot()
@@ -675,58 +657,6 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 				.Text_Raw(this, &FsimulatorEditorModule::GetApplyStatusText)
 			]
 		];
-}
-
-void FsimulatorEditorModule::InitRunModeOptions()
-{
-	if (RunModeOptions.Num() > 0) return;
-
-	RunModeOptions.Add(MakeShared<ELunarSimRunMode>(ELunarSimRunMode::Dataset));
-	RunModeOptions.Add(MakeShared<ELunarSimRunMode>(ELunarSimRunMode::Ros2Live));
-}
-
-TSharedPtr<ELunarSimRunMode> FsimulatorEditorModule::FindRunModeOption(ELunarSimRunMode InMode) const
-{
-	for (const TSharedPtr<ELunarSimRunMode>& Option : RunModeOptions)
-	{
-		if (Option.IsValid() && *Option == InMode)
-		{
-			return Option;
-		}
-	}
-	return nullptr;
-}
-
-FString FsimulatorEditorModule::RunModeToString(ELunarSimRunMode InMode) const
-{
-	switch (InMode)
-	{
-	case ELunarSimRunMode::Dataset:
-		return TEXT("Dataset");
-	case ELunarSimRunMode::Ros2Live:
-		return TEXT("ROS2Live");
-	default:
-		return TEXT("Dataset");
-	}
-}
-
-FText FsimulatorEditorModule::GetRunModeText() const
-{
-	return FText::FromString(RunModeToString(RunMode));
-}
-
-TSharedRef<SWidget> FsimulatorEditorModule::MakeRunModeComboWidget(TSharedPtr<ELunarSimRunMode> InOption) const
-{
-	const ELunarSimRunMode Mode = InOption.IsValid() ? *InOption : ELunarSimRunMode::Dataset;
-	return SNew(STextBlock).Text(FText::FromString(RunModeToString(Mode)));
-}
-
-void FsimulatorEditorModule::OnRunModeSelectionChanged(TSharedPtr<ELunarSimRunMode> NewSelection, ESelectInfo::Type SelectInfo)
-{
-	if (!NewSelection.IsValid()) return;
-
-	SelectedRunModeOption = NewSelection;
-	RunMode = *NewSelection;
 }
 
 void FsimulatorEditorModule::InitResolutionPresetOptions()
@@ -1098,7 +1028,6 @@ FText FsimulatorEditorModule::GetApplyStatusText() const
 FCaptureConfig FsimulatorEditorModule::BuildCaptureConfigFromUi(const FCaptureConfig& ExistingConfig) const
 {
 	FCaptureConfig NewConfig = ExistingConfig;
-	NewConfig.RunMode = RunMode;
 	NewConfig.bStereoRosImages = bStereoRosImages;
 	NewConfig.bGroundTruthImages = bGroundTruthImages;
 	NewConfig.bGroundTruthRgb = bGroundTruthRgb;
@@ -1223,10 +1152,9 @@ void FsimulatorEditorModule::OnApplyClicked()
 	FString Status = TEXT("Applied settings.");
 
 	UE_LOG(LogTemp, Display,
-		TEXT("Simulator config applied to ESA_Rover pipeline %s / %s: RunMode=%s, StereoRosImages=%s, GroundTruthImages=%s, GroundTruthRGB=%s, GroundTruthDepth=%s, GroundTruthSegmentation=%s, GroundTruthBoundingBoxes=%s, TrajectoryCsv=%s, Resolution=%s (%dx%d), HorizontalFovDeg=%.2f, CaptureHz=%.3f, StereoBaselineCm=%.2f, GroundTruthMaps=%s, MapPublishers=%d, ImuHz=%s, RoverControlMode=%s"),
+		TEXT("Simulator config applied to ESA_Rover pipeline %s / %s: StereoRosImages=%s, GroundTruthImages=%s, GroundTruthRGB=%s, GroundTruthDepth=%s, GroundTruthSegmentation=%s, GroundTruthBoundingBoxes=%s, TrajectoryCsv=%s, Resolution=%s (%dx%d), HorizontalFovDeg=%.2f, CaptureHz=%.3f, StereoBaselineCm=%.2f, GroundTruthMaps=%s, MapPublishers=%d, ImuHz=%s, RoverControlMode=%s"),
 		*RoverActor->GetActorLabel(),
 		*RobotCamRig->GetActorLabel(),
-		*RunModeToString(NewConfig.RunMode),
 		NewConfig.bStereoRosImages ? TEXT("true") : TEXT("false"),
 		NewConfig.bGroundTruthImages ? TEXT("true") : TEXT("false"),
 		NewConfig.bGroundTruthRgb ? TEXT("true") : TEXT("false"),
@@ -1284,7 +1212,6 @@ void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
 
 	const FCaptureConfig CurrentConfig = RobotCamRig->GetCaptureConfig();
 
-	RunMode = CurrentConfig.RunMode;
 	bStereoRosImages = CurrentConfig.bStereoRosImages;
 	bGroundTruthImages = CurrentConfig.bGroundTruthImages;
 	bGroundTruthRgb = CurrentConfig.bGroundTruthRgb;
@@ -1301,7 +1228,6 @@ void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
 	CameraHorizontalFovDeg = CurrentConfig.GetResolvedHorizontalFovDeg();
 	CustomCaptureHz = NormalizeEditorCaptureHz(CurrentConfig.GetResolvedCaptureHz());
 	StereoBaselineCm = FCaptureConfig::SanitizeStereoBaselineCm(CurrentConfig.StereoBaselineCm);
-	SelectedRunModeOption = FindRunModeOption(RunMode);
 	SelectedResolutionPresetOption = FindResolutionPresetOption(ResolutionPreset);
 }
 

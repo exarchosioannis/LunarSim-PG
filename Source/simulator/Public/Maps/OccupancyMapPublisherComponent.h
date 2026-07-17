@@ -4,6 +4,7 @@
 #include "Capture/CaptureTypes.h"
 #include "Components/ActorComponent.h"
 #include "TempoROSNode.h"
+#include "Utils/LunarSimRosInterface.h"
 
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
@@ -21,8 +22,8 @@
 	- Tag dynamic objects to ignore, such as the rover "MapIgnore"
 
 	ROS output:
-		/gt/map/occupancy          nav_msgs/msg/OccupancyGrid
-		/gt/map/elevation_points   sensor_msgs/msg/PointCloud2
+		/ground_truth/map/occupancy          nav_msgs/msg/OccupancyGrid
+		/ground_truth/map/elevation_points   sensor_msgs/msg/PointCloud2
 		frame_id                   map
 
 	The elevation layer samples the first valid vertical hit from either
@@ -74,8 +75,8 @@ private:
 	UTempoROSNode* ROSNode = nullptr;
 
 	const FString NodeName = TEXT("map_publisher");
-	const FString OccupancyMapTopic = TEXT("/gt/map/occupancy");
-	const FString ElevationPointCloudTopic = TEXT("/gt/map/elevation_points");
+	const FString OccupancyMapTopic = LunarSimRosTopics::GroundTruthOccupancyMap;
+	const FString ElevationPointCloudTopic = LunarSimRosTopics::GroundTruthElevationPoints;
 	const FString MapFrameId = TEXT("map");
 
 	// Automatic Landscape bounds are aligned to this existing sampling resolution.

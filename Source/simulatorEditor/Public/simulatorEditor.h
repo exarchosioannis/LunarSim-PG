@@ -31,13 +31,6 @@ private:
 	TSharedRef<SDockTab> OnSpawnSimulatorConfigTab(const FSpawnTabArgs& SpawnTabArgs);
 	TSharedRef<class SWidget> BuildSimulatorConfigPanel();
 
-	void InitRunModeOptions();
-	TSharedPtr<ELunarSimRunMode> FindRunModeOption(ELunarSimRunMode InMode) const;
-	FText GetRunModeText() const;
-	TSharedRef<SWidget> MakeRunModeComboWidget(TSharedPtr<ELunarSimRunMode> InOption) const;
-	void OnRunModeSelectionChanged(TSharedPtr<ELunarSimRunMode> NewSelection, ESelectInfo::Type SelectInfo);
-	FString RunModeToString(ELunarSimRunMode InMode) const;
-
 	void InitResolutionPresetOptions();
 	TSharedPtr<ELunarSimResolutionPreset> FindResolutionPresetOption(ELunarSimResolutionPreset InPreset) const;
 	FText GetResolutionPresetText() const;
@@ -91,8 +84,6 @@ private:
 private:
 	static const FName SimulatorConfigTabName;
 
-	TArray<TSharedPtr<ELunarSimRunMode>> RunModeOptions;
-	TSharedPtr<ELunarSimRunMode> SelectedRunModeOption;
 	TArray<TSharedPtr<ELunarSimResolutionPreset>> ResolutionPresetOptions;
 	TSharedPtr<ELunarSimResolutionPreset> SelectedResolutionPresetOption;
 	TArray<TSharedPtr<ERoverControlMode>> RoverControlModeOptions;
@@ -105,7 +96,6 @@ private:
 	TWeakObjectPtr<URoverCmdVelVehicleControllerComponent> TargetCmdVelController;
 	TArray<TWeakObjectPtr<UOccupancyMapPublisherComponent>> TargetMapPublishers;
 
-	ELunarSimRunMode RunMode = ELunarSimRunMode::Dataset;
 	ELunarSimResolutionPreset ResolutionPreset = ELunarSimResolutionPreset::R1024x1024;
 	ERoverControlMode RoverControlMode = ERoverControlMode::Manual;
 	FRoverCmdVelControllerSettings CmdVelSettings;

@@ -4,11 +4,11 @@
 #include "Capture/CapturePoseSourceComponent.h"
 #include "Capture/CaptureTypes.h"
 #include "TempoROSNode.h"
+#include "Utils/LunarSimRosInterface.h"
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
-#include "tf2_msgs/msg/tf_message.hpp"
 #include "builtin_interfaces/msg/time.hpp"
 
 #include "RoverGroundTruthPublisherComponent.generated.h"
@@ -34,7 +34,7 @@ public:
 	// Kept for compatibility. Live ROS publishing owns the rover ROS topics.
 	void PublishGroundTruth(const FCaptureFrameInfo& FrameInfo);
 
-	// Called when /control = 1 starts a new capture session.
+	// Called when the capture-control input starts a new capture session.
 	void ResetPath();
 
 	void TickRos(float DeltaTime);
@@ -51,10 +51,9 @@ private:
 
 	const FString NodeName = TEXT("rover_ground_truth_publisher");
 
-	const FString PoseTopic = TEXT("/gt/rover/pose");
-	const FString OdomTopic = TEXT("/gt/rover/odom");
-	const FString TfTopic = TEXT("/tf");
-	const FString PathTopic = TEXT("/gt/rover/path");
+	const FString PoseTopic = LunarSimRosTopics::GroundTruthPose;
+	const FString OdomTopic = LunarSimRosTopics::GroundTruthOdom;
+	const FString PathTopic = LunarSimRosTopics::GroundTruthPath;
 
 	const FString FrameId = TEXT("map");
 	const FString ChildFrameId = TEXT("base_link");
@@ -84,7 +83,6 @@ private:
 
 	geometry_msgs::msg::PoseStamped ReusablePoseMsg;
 	nav_msgs::msg::Odometry ReusableOdomMsg;
-	tf2_msgs::msg::TFMessage ReusableTfMsg;
 	nav_msgs::msg::Path ReusablePathMsg;
 
 	float LivePoseTfPublishAccumulator = 0.0f;

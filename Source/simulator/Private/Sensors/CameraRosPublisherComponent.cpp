@@ -1,5 +1,6 @@
 #include "Sensors/CameraRosPublisherComponent.h"
 #include "TempoROSTypes.h"
+#include "Utils/LunarSimRosInterface.h"
 
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(sensor_msgs::msg::Image);
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(sensor_msgs::msg::CameraInfo);
@@ -13,11 +14,9 @@ UCameraRosPublisherComponent::UCameraRosPublisherComponent()
 void UCameraRosPublisherComponent::Initialize(
 	const FResolvedCameraCalibration& InCalibration,
 	const FString& InFrameId,
-	const FString& InTopicBase,
 	bool bInSubscribeToControl,
 	bool bInIsRightStereoCamera,
-	double InStereoBaselineMeters,
-	ELunarSimRunMode InRunMode)
+	double InStereoBaselineMeters)
 {
 	Calibration = InCalibration;
 	if (!Calibration.IsValid()) {
@@ -25,10 +24,14 @@ void UCameraRosPublisherComponent::Initialize(
 		Calibration = FCaptureConfig().GetResolvedCameraCalibration();
 	}
 	FrameId = InFrameId;
-	TopicBase = InTopicBase;
 	CameraName = InFrameId;
 	bSubscribeToControl = bInSubscribeToControl;
-	RunMode = InRunMode;
+	ImageTopic = bInIsRightStereoCamera
+		? LunarSimRosTopics::StereoRightImage
+		: LunarSimRosTopics::StereoLeftImage;
+	CameraInfoTopic = bInIsRightStereoCamera
+		? LunarSimRosTopics::StereoRightCameraInfo
+		: LunarSimRosTopics::StereoLeftCameraInfo;
 	SetStereoCalibration(bInIsRightStereoCamera, InStereoBaselineMeters);
 
 	SetupReusableMessages();
@@ -77,36 +80,33 @@ void UCameraRosPublisherComponent::SetupReusableMessages()
 
 void UCameraRosPublisherComponent::SetupRos()
 {
-       ROSNode = UTempoROSNode::Create(*CameraName, this);
+	ROSNode = UTempoROSNode::Create(*CameraName, this);
 
-       const bool bLiveReliable = RunMode == ELunarSimRunMode::Ros2Live;
-       const int32 ImageQueueSize = bLiveReliable ? 5 : 20;
+	FROSQOSProfile StereoQOS;
+	StereoQOS.CustomQueueSize(20).Reliable().Volatile();
 
-       FROSQOSProfile ImageQOS;
-       ImageQOS.CustomQueueSize(ImageQueueSize).Reliable();
+	ROSNode->AddPublisher<sensor_msgs::msg::Image>(
+		*ImageTopic,
+		StereoQOS,
+		false
+	);
 
-       FROSQOSProfile DefaultQOS;
-       DefaultQOS.CustomQueueSize(10).Reliable();
+	ROSNode->AddPublisher<sensor_msgs::msg::CameraInfo>(
+		*CameraInfoTopic,
+		StereoQOS,
+		false
+	);
 
-       ROSNode->AddPublisher<sensor_msgs::msg::Image>(
-	       *(TopicBase + TEXT("/rgb/image_raw")),
-	       ImageQOS,
-	       false
-       );
-
-       ROSNode->AddPublisher<sensor_msgs::msg::CameraInfo>(
-	       *(TopicBase + TEXT("/camera_info")),
-	       DefaultQOS,
-	       false
-       );
-
-       if (bSubscribeToControl)
-       {
-	       ROSNode->AddSubscription<std_msgs::msg::Int32>(
-		       TEXT("/control"),
-		       TROSSubscriptionDelegate<std_msgs::msg::Int32>::CreateUObject(this, &UCameraRosPublisherComponent::OnCaptureControl)
-	       );
-       }
+	if (bSubscribeToControl)
+	{
+		FROSQOSProfile ControlQOS;
+		ControlQOS.CustomQueueSize(1).Reliable().Volatile();
+		ROSNode->AddSubscription<std_msgs::msg::Int32>(
+			LunarSimRosTopics::CaptureControl,
+			TROSSubscriptionDelegate<std_msgs::msg::Int32>::CreateUObject(this, &UCameraRosPublisherComponent::OnCaptureControl),
+			ControlQOS
+		);
+	}
 }
 
 builtin_interfaces::msg::Time UCameraRosPublisherComponent::ToRosTime(double Seconds) const
@@ -157,7 +157,7 @@ void UCameraRosPublisherComponent::PublishFrame(
 
 	// Publish image and matching camera_info. FrameIndex remains internal for
 	// manifest/trajectory alignment and is not exposed as a ROS topic.
-	ROSNode->Publish<sensor_msgs::msg::Image>(*(TopicBase + TEXT("/rgb/image_raw")), ReusableImgMsg);
+	ROSNode->Publish<sensor_msgs::msg::Image>(*ImageTopic, ReusableImgMsg);
 	PublishCameraInfo(Stamp);
 }
 
@@ -192,7 +192,7 @@ void UCameraRosPublisherComponent::PublishCameraInfo(const builtin_interfaces::m
 		0.0, Fy, Cy, 0.0,
 		0.0, 0.0, 1.0, 0.0
 	};
-	ROSNode->Publish<sensor_msgs::msg::CameraInfo>(*(TopicBase + TEXT("/camera_info")), ReusableCamInfoMsg);
+	ROSNode->Publish<sensor_msgs::msg::CameraInfo>(*CameraInfoTopic, ReusableCamInfoMsg);
 }
 
 bool UCameraRosPublisherComponent::IsReady() const

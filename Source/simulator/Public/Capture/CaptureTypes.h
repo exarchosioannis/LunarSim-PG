@@ -3,7 +3,9 @@
 #include "CoreMinimal.h"
 #include "CaptureTypes.generated.h"
 
-UENUM(BlueprintType)
+// Legacy serialized values retained for Blueprint/CDO compatibility only.
+// Capture behavior is unified and must never branch on this enum.
+UENUM()
 enum class ELunarSimRunMode : uint8
 {
 	Dataset  UMETA(DisplayName = "Dataset"),
@@ -83,7 +85,7 @@ struct SIMULATOR_API FCaptureConfig
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "LunarSim-PG")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Run modes are no longer active. Configure capture outputs instead."))
 	ELunarSimRunMode RunMode = ELunarSimRunMode::Dataset;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Outputs")
@@ -260,16 +262,6 @@ struct SIMULATOR_API FCaptureConfig
 			Resolution.X,
 			Resolution.Y,
 			GetResolvedHorizontalFovDeg());
-	}
-
-	bool IsDatasetMode() const
-	{
-		return RunMode == ELunarSimRunMode::Dataset;
-	}
-
-	bool IsRos2LiveMode() const
-	{
-		return RunMode == ELunarSimRunMode::Ros2Live;
 	}
 
 	bool IsLeftRosCameraEnabled() const

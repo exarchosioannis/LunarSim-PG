@@ -15,6 +15,7 @@
 #include "GameFramework/PlayerController.h"
 #include "InputCoreTypes.h"
 #include "TempoROSNode.h"
+#include "Utils/LunarSimRosInterface.h"
 #include "EngineUtils.h"
 
 ARobotCamRig::ARobotCamRig()
@@ -125,9 +126,6 @@ void ARobotCamRig::BeginPlay()
 	if (!IsValid(RoverActor)) {
 		RoverActor = ResolveRoverActor();
 	}
-	if (CaptureConfig.IsRos2LiveMode() && CaptureConfig.IsGroundTruthEnabled()) {
-		UE_LOG(LogTemp, Warning, TEXT("Ground Truth Images are enabled in ROS2 Live mode. This may reduce live experiment performance."));
-	}
 
 	// Mount before camera calibration and TF publication so all extrinsics use the final pose.
 	AActor* ResolvedRoverActor = GetRoverActor();
@@ -175,8 +173,8 @@ void ARobotCamRig::BeginPlay()
 	if (RosPublisherComponent && Camera) {
 		RosPublisherComponent->Initialize(
 			ResolvedCameraCalibration,
-			LeftCameraOpticalFrameId, TEXT("/left_camera"),
-			true, false, 0.0, CaptureConfig.RunMode
+			LeftCameraOpticalFrameId,
+			true, false, 0.0
 		);
 		RosPublisherComponent->OnCaptureControlReceived.AddUObject(this, &ARobotCamRig::OnCaptureControl );
 	}
@@ -184,8 +182,8 @@ void ARobotCamRig::BeginPlay()
 	if (RightRosPublisherComponent && RightCamera) {
 		RightRosPublisherComponent->Initialize(
 			ResolvedCameraCalibration,
-			RightCameraOpticalFrameId, TEXT("/right_camera"), false, true,
-			ResolvedStereoBaselineMeters, CaptureConfig.RunMode
+			RightCameraOpticalFrameId, false, true,
+			ResolvedStereoBaselineMeters
 		);
 	}
 	// CaptureManager receives the finalized, immutable calibration.
@@ -410,13 +408,19 @@ void ARobotCamRig::ResolveRoverGroundTruthComponents()
 	}
 
 	// Fallback: if the actor has only the old CapturePoseSourceComponent, CaptureManager can still
-	// write synchronized CSV trajectory rows, even though ROS /gt topics need the new publisher.
+	// write synchronized CSV trajectory rows, even though live ROS ground-truth topics need the publisher.
 	if (!RoverPoseSource && ResolvedRoverActor) {
 		RoverPoseSource = ResolvedRoverActor->FindComponentByClass<UCapturePoseSourceComponent>();
 	}
 
 	if (ResolvedRoverActor && !RoverGroundTruthPublisher) {
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: RoverActor '%s' has no RoverGroundTruthPublisherComponent. CSV pose may work if it has CapturePoseSourceComponent, but /gt/rover/pose, /gt/rover/odom, /tf and /gt/rover/path will not publish."), *ResolvedRoverActor->GetName());
+		UE_LOG(LogTemp, Warning,
+			TEXT("RobotCamRig: RoverActor '%s' has no RoverGroundTruthPublisherComponent. CSV pose may work if it has CapturePoseSourceComponent, but %s, %s, %s and %s will not publish."),
+			*ResolvedRoverActor->GetName(),
+			LunarSimRosTopics::GroundTruthPose,
+			LunarSimRosTopics::GroundTruthOdom,
+			LunarSimRosTopics::Tf,
+			LunarSimRosTopics::GroundTruthPath);
 	}
 }
 
@@ -550,6 +554,10 @@ void ARobotCamRig::PollOneRgbCaptureAndPublish(URgbCameraCaptureComponent* Captu
 void ARobotCamRig::OnCaptureControl(int32 ControlValue)
 {
 	if (ControlValue == 1) {
+		if (CaptureManager && CaptureManager->IsCaptureEnabled()) {
+			UE_LOG(LogTemp, Log, TEXT("RobotCamRig: capture is already active; repeated start command ignored."));
+			return;
+		}
 		if (!bGroundTruthWarmUpReady) {
 			const FString Reason = bGroundTruthWarmUpFailed
 				? GroundTruthWarmUpFailure
@@ -574,6 +582,10 @@ void ARobotCamRig::OnCaptureControl(int32 ControlValue)
 		bWarnedMissingGroundTruthCamera = false;
 		ShowCaptureScreenMessage(TEXT("Capture started"), FColor::Green);
 	} else if (ControlValue == 0) {
+		if (!CaptureManager || !CaptureManager->IsCaptureEnabled()) {
+			UE_LOG(LogTemp, Log, TEXT("RobotCamRig: capture is already stopped; repeated stop command ignored."));
+			return;
+		}
 		if (CaptureManager) {
 			CaptureManager->StopCapture();
 		}

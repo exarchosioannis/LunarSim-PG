@@ -116,7 +116,7 @@ void URoverCmdVelVehicleControllerComponent::SetupRos()
 		}
 	}
 
-	const FString DesiredTopic = Settings.CmdVelTopic.IsEmpty() ? TEXT("/cmd_vel") : Settings.CmdVelTopic;
+	const FString DesiredTopic = LunarSimRosTopics::CmdVel;
 	if (SubscribedCmdVelTopic == DesiredTopic) {
 		return;
 	}
@@ -126,12 +126,16 @@ void URoverCmdVelVehicleControllerComponent::SetupRos()
 		SubscribedCmdVelTopic.Empty();
 	}
 
+	FROSQOSProfile CmdVelQOS;
+	CmdVelQOS.CustomQueueSize(1).Reliable().Volatile();
+
 	if (!ROSNode->AddSubscription<FTwist>(
 		DesiredTopic,
 		TROSSubscriptionDelegate<FTwist>::CreateUObject(
 			this,
 			&URoverCmdVelVehicleControllerComponent::OnCmdVel
-		)
+		),
+		CmdVelQOS
 	)) {
 		UE_LOG(LogTemp, Warning, TEXT("RoverCmdVelVehicleControllerComponent: Failed to subscribe to %s."), *DesiredTopic);
 		return;
@@ -254,10 +258,7 @@ FRoverCmdVelControllerSettings URoverCmdVelVehicleControllerComponent::MakeSanit
 ) const
 {
 	FRoverCmdVelControllerSettings Sanitized = InSettings;
-	Sanitized.CmdVelTopic = Sanitized.CmdVelTopic.TrimStartAndEnd();
-	if (Sanitized.CmdVelTopic.IsEmpty()) {
-		Sanitized.CmdVelTopic = TEXT("/cmd_vel");
-	}
+	Sanitized.CmdVelTopic = LunarSimRosTopics::CmdVel;
 	Sanitized.MaxCmdLinearMps = FMath::Max(Sanitized.MaxCmdLinearMps, 0.01f);
 	Sanitized.MaxCmdAngularRadps = FMath::Max(Sanitized.MaxCmdAngularRadps, 0.01f);
 	Sanitized.CmdTimeoutSec = FMath::Max(Sanitized.CmdTimeoutSec, 0.0f);

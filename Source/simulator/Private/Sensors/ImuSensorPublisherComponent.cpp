@@ -28,6 +28,10 @@ void UImuSensorPublisherComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Keep the reflected field for existing Blueprint/CDO serialization, but
+	// make the locked project interface authoritative at runtime.
+	ImuTopic = LunarSimRosTopics::ImuData;
+
 	RandomStream.Initialize(FMath::Rand());
 
 	ResolveImuMountComponent();

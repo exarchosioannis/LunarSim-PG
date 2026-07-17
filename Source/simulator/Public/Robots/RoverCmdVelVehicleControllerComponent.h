@@ -6,6 +6,7 @@
 
 #include "TempoROSNode.h"
 #include "TempoROSTypes.h"
+#include "Utils/LunarSimRosInterface.h"
 
 #include "RoverCmdVelVehicleControllerComponent.generated.h"
 
@@ -22,7 +23,7 @@ struct SIMULATOR_API FRoverCmdVelControllerSettings
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ROS")
-	FString CmdVelTopic = TEXT("/cmd_vel");
+	FString CmdVelTopic = LunarSimRosTopics::CmdVel;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Control", meta = (ClampMin = "0.01", UIMin = "0.01", Units = "m/s"))
 	float MaxCmdLinearMps = 1.0f;

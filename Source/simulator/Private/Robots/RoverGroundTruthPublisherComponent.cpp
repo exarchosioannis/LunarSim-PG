@@ -8,7 +8,6 @@
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(geometry_msgs::msg::PoseStamped);
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(nav_msgs::msg::Odometry);
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(nav_msgs::msg::Path);
-DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(tf2_msgs::msg::TFMessage);
 
 URoverGroundTruthPublisherComponent::URoverGroundTruthPublisherComponent()
 {
@@ -38,8 +37,6 @@ void URoverGroundTruthPublisherComponent::EndPlay(const EEndPlayReason::Type End
 
 void URoverGroundTruthPublisherComponent::SetupReusableMessages()
 {
-	ReusableTfMsg.transforms.resize(1);
-
 	ReusableOdomMsg.header.frame_id = TCHAR_TO_UTF8(*FrameId);
 	ReusableOdomMsg.child_frame_id = TCHAR_TO_UTF8(*ChildFrameId);
 
@@ -58,24 +55,21 @@ void URoverGroundTruthPublisherComponent::SetupRos()
 		return;
 	}
 
-	FROSQOSProfile DefaultQOS;
-	DefaultQOS.CustomQueueSize(10).Reliable().Volatile();
+	FROSQOSProfile PoseOdomQOS;
+	PoseOdomQOS.CustomQueueSize(10).Reliable().Volatile();
 
 	if (bPublishLivePoseStamped) {
-		ROSNode->AddPublisher<geometry_msgs::msg::PoseStamped>(*PoseTopic, DefaultQOS, false);
+		ROSNode->AddPublisher<geometry_msgs::msg::PoseStamped>(*PoseTopic, PoseOdomQOS, false);
 	}
 
 	if (bPublishLiveOdometry) {
-		ROSNode->AddPublisher<nav_msgs::msg::Odometry>(*OdomTopic, DefaultQOS, false);
-	}
-
-	if (bPublishLiveTf) {
-		// Dynamic TF must be volatile, not transient local.
-		ROSNode->AddPublisher<tf2_msgs::msg::TFMessage>(*TfTopic, DefaultQOS, false);
+		ROSNode->AddPublisher<nav_msgs::msg::Odometry>(*OdomTopic, PoseOdomQOS, false);
 	}
 
 	if (bPublishLivePath) {
-		ROSNode->AddPublisher<nav_msgs::msg::Path>(*PathTopic, DefaultQOS, false);
+		FROSQOSProfile PathQOS;
+		PathQOS.CustomQueueSize(1).Reliable().TransientLocal();
+		ROSNode->AddPublisher<nav_msgs::msg::Path>(*PathTopic, PathQOS, false);
 	}
 }
 
@@ -183,18 +177,14 @@ void URoverGroundTruthPublisherComponent::PublishLivePoseAndTf(double StampSecon
 	}
 
 	if (bPublishLiveTf) {
-		auto& Transform = ReusableTfMsg.transforms[0];
-		Transform.header = ReusablePoseMsg.header;
-		Transform.child_frame_id = TCHAR_TO_UTF8(*ChildFrameId);
-		Transform.transform.translation.x = ReusablePoseMsg.pose.position.x;
-		Transform.transform.translation.y = ReusablePoseMsg.pose.position.y;
-		Transform.transform.translation.z = ReusablePoseMsg.pose.position.z;
-		Transform.transform.rotation.x = ReusablePoseMsg.pose.orientation.x;
-		Transform.transform.rotation.y = ReusablePoseMsg.pose.orientation.y;
-		Transform.transform.rotation.z = ReusablePoseMsg.pose.orientation.z;
-		Transform.transform.rotation.w = ReusablePoseMsg.pose.orientation.w;
-
-		ROSNode->Publish<tf2_msgs::msg::TFMessage>(*TfTopic, ReusableTfMsg);
+		const AActor* Owner = GetOwner();
+		if (Owner) {
+			ROSNode->PublishDynamicTransform(
+				Owner->GetActorTransform(),
+				ChildFrameId,
+				FrameId,
+				StampSeconds);
+		}
 	}
 }
 

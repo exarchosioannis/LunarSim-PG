@@ -22,11 +22,9 @@ public:
 	void Initialize(
 		const FResolvedCameraCalibration& InCalibration,
 		const FString& InFrameId,
-		const FString& InTopicBase,
 		bool bInSubscribeToControl = true,
 		bool bInIsRightStereoCamera = false,
-		double InStereoBaselineMeters = 0.0,
-		ELunarSimRunMode InRunMode = ELunarSimRunMode::Dataset
+		double InStereoBaselineMeters = 0.0
 	);
 
 	void SetStereoCalibration(bool bInIsRightStereoCamera, double InStereoBaselineMeters);
@@ -60,7 +58,8 @@ private:
 
 	FResolvedCameraCalibration Calibration;
 	FString CameraName = TEXT("left_camera");
-	FString TopicBase = TEXT("/left_camera");
+	FString ImageTopic;
+	FString CameraInfoTopic;
 	FString FrameId = TEXT("left_camera");
 
 	sensor_msgs::msg::Image ReusableImgMsg;
@@ -69,6 +68,5 @@ private:
 	bool bSubscribeToControl = true;
 	bool bIsRightStereoCamera = false;
 	double StereoBaselineMeters = 0.0;
-	ELunarSimRunMode RunMode = ELunarSimRunMode::Dataset;
 	bool bInitialized = false;
 };

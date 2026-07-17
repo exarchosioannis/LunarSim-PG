@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "TempoROSNode.h"
+#include "Utils/LunarSimRosInterface.h"
 
 #include "sensor_msgs/msg/imu.hpp"
 #include "builtin_interfaces/msg/time.hpp"
@@ -15,7 +16,7 @@ class USceneComponent;
  * Simulated rover IMU sensor.
  *
  * Attach this component to BP_VehicleRover and add a SceneComponent named IMU_Mount.
- * The component publishes sensor_msgs/msg/Imu on /rover/imu at its own configurable rate.
+ * The component publishes sensor_msgs/msg/Imu on the canonical IMU topic at its own configurable rate.
  * It also publishes the static transform base_link -> imu_link using the IMU_Mount transform.
  * Linear acceleration is sensor-frame specific force using active world gravity: a supported
  * stationary sensor reports gravity opposition, while an ideal freely falling sensor reports zero.
@@ -50,7 +51,7 @@ private:
 	FString NodeName = TEXT("imu_sensor_publisher");
 
 	UPROPERTY(EditAnywhere, Category = "ROS")
-	FString ImuTopic = TEXT("/rover/imu");
+	FString ImuTopic = LunarSimRosTopics::ImuData;
 
 	UPROPERTY(EditAnywhere, Category = "TF")
 	FString BaseFrameId = TEXT("base_link");
