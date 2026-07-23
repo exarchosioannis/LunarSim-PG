@@ -165,12 +165,28 @@ void ARobotCamRig::BeginPlay()
 	SetupCameraTfNode();
 	PublishStaticCameraTransforms();
 
+	const USceneCaptureComponent2D* GroundTruthRgbSceneCapture = GroundTruthCamera ? GroundTruthCamera->GetGroundTruthRgbSceneCapture() : nullptr;
+
 	if (RgbCaptureComponent && RGBCapture) {
-		RgbCaptureComponent->Initialize(RGBCapture, ResolvedCameraCalibration, bUseGammaCorrection, OutputGamma, bUseFixedExposure, ExposureCompensation);
+		RgbCaptureComponent->Initialize(
+			RGBCapture,
+			GroundTruthRgbSceneCapture,
+			ResolvedCameraCalibration,
+			bUseGammaCorrection,
+			OutputGamma,
+			bUseFixedExposure,
+			ExposureCompensation);
 	}
 
 	if (RightRgbCaptureComponent && RightRGBCapture) {
-		RightRgbCaptureComponent->Initialize(RightRGBCapture, ResolvedCameraCalibration, bUseGammaCorrection, OutputGamma, bUseFixedExposure, ExposureCompensation);
+		RightRgbCaptureComponent->Initialize(
+			RightRGBCapture,
+			GroundTruthRgbSceneCapture,
+			ResolvedCameraCalibration,
+			bUseGammaCorrection,
+			OutputGamma,
+			bUseFixedExposure,
+			ExposureCompensation);
 	}
 
 	// Image and CameraInfo messages use optical frames, not camera-link frames.

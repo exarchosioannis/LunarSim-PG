@@ -19,6 +19,7 @@ public:
 
 	void Initialize(
 		USceneCaptureComponent2D* InSceneCapture,
+		const USceneCaptureComponent2D* InAppearanceSource,
 		const FResolvedCameraCalibration& InCalibration,
 		bool bInUseGammaCorrection,
 		float InOutputGamma,
@@ -36,8 +37,8 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
-	void SetupRenderTarget();
-	void ApplyCameraLook();
+	void SetupRenderTarget(const USceneCaptureComponent2D* AppearanceSource);
+	void ApplyCameraLook(const USceneCaptureComponent2D* AppearanceSource);
 
 	UPROPERTY()
 	USceneCaptureComponent2D* SceneCapture = nullptr;

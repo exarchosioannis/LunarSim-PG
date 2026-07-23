@@ -5,6 +5,8 @@
 #include "GameFramework/Actor.h"
 #include "GTCamera.generated.h"
 
+class USceneCaptureComponent2D;
+
 enum class EGTInternalWarmUpState : uint8
 {
     NotRequested,
@@ -46,6 +48,7 @@ public:
     bool IsInternalWarmUpReady() const;
     bool HasInternalWarmUpFailed() const;
     const FString& GetInternalWarmUpFailure() const;
+    const USceneCaptureComponent2D* GetGroundTruthRgbSceneCapture() const;
 
     
     // Called to trigger GT generators with frame synchronization

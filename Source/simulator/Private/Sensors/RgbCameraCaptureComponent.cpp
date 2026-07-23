@@ -11,6 +11,7 @@ URgbCameraCaptureComponent::URgbCameraCaptureComponent()
 
 void URgbCameraCaptureComponent::Initialize(
 	USceneCaptureComponent2D* InSceneCapture,
+	const USceneCaptureComponent2D* InAppearanceSource,
 	const FResolvedCameraCalibration& InCalibration,
 	bool bInUseGammaCorrection,
 	float InOutputGamma,
@@ -29,13 +30,14 @@ void URgbCameraCaptureComponent::Initialize(
 	bCaptureInProgress = false;
 	bWaitingToEnqueueReadback = false;
 
-	SetupRenderTarget();
-	ApplyCameraLook();
+	ApplyCameraLook(InAppearanceSource);
+	SetupRenderTarget(InAppearanceSource);
 
 	GPUReadback = MakeUnique<FRHIGPUTextureReadback>(TEXT("RgbCameraCaptureReadback"));
 }
 
-void URgbCameraCaptureComponent::SetupRenderTarget()
+void URgbCameraCaptureComponent::SetupRenderTarget(
+	const USceneCaptureComponent2D* AppearanceSource)
 {
 	if (!RGBRenderTarget) {
 		RGBRenderTarget = NewObject<UTextureRenderTarget2D>(this, TEXT("RGBRenderTarget"));
@@ -43,8 +45,15 @@ void URgbCameraCaptureComponent::SetupRenderTarget()
 
 	if (RGBRenderTarget) {
 		RGBRenderTarget->RenderTargetFormat = RTF_RGBA8;
-		RGBRenderTarget->TargetGamma = bUseGammaCorrection ? OutputGamma : 1.0f;
-		RGBRenderTarget->InitAutoFormat(Width, Height);
+		const UTextureRenderTarget2D* AppearanceRenderTarget = AppearanceSource ? AppearanceSource->TextureTarget : nullptr;
+		if (AppearanceRenderTarget) {
+			RGBRenderTarget->TargetGamma = AppearanceRenderTarget->TargetGamma;
+			RGBRenderTarget->SRGB = AppearanceRenderTarget->SRGB;
+			RGBRenderTarget->bForceLinearGamma = AppearanceRenderTarget->bForceLinearGamma;
+		} else {
+			RGBRenderTarget->TargetGamma = bUseGammaCorrection ? OutputGamma : 1.0f;
+		}
+		RGBRenderTarget->InitCustomFormat(Width, Height, GetPixelFormatFromRenderTargetFormat(RTF_RGBA8), RGBRenderTarget->bForceLinearGamma);
 		RGBRenderTarget->UpdateResourceImmediate(true);
 	}
 
@@ -55,7 +64,8 @@ void URgbCameraCaptureComponent::SetupRenderTarget()
 	}
 }
 
-void URgbCameraCaptureComponent::ApplyCameraLook()
+void URgbCameraCaptureComponent::ApplyCameraLook(
+	const USceneCaptureComponent2D* AppearanceSource)
 {
 	if (!SceneCapture) return;
 	if (!Calibration.IsValid()) {
@@ -74,24 +84,32 @@ void URgbCameraCaptureComponent::ApplyCameraLook()
 	SceneCapture->bCaptureEveryFrame = false;
 	SceneCapture->bCaptureOnMovement = false;
 
-	// Avoid temporal history for sensor-like output.
-	SceneCapture->bAlwaysPersistRenderingState = false;
-	SceneCapture->ShowFlags.SetTemporalAA(false);
-	SceneCapture->ShowFlags.SetMotionBlur(false);
-	SceneCapture->ShowFlags.SetAntiAliasing(false);
+	if (AppearanceSource) {
+		SceneCapture->CaptureSource = AppearanceSource->CaptureSource;
+		SceneCapture->PostProcessSettings = AppearanceSource->PostProcessSettings;
+		SceneCapture->PostProcessBlendWeight = AppearanceSource->PostProcessBlendWeight;
+		SceneCapture->ShowFlags = AppearanceSource->ShowFlags;
+		SceneCapture->bAlwaysPersistRenderingState = AppearanceSource->bAlwaysPersistRenderingState;
+	} else {
+		// Preserve the legacy ROS-only fallback if the UnrealGT RGB source is unavailable.
+		SceneCapture->bAlwaysPersistRenderingState = false;
+		SceneCapture->ShowFlags.SetTemporalAA(false);
+		SceneCapture->ShowFlags.SetMotionBlur(false);
+		SceneCapture->ShowFlags.SetAntiAliasing(false);
 
-	SceneCapture->PostProcessBlendWeight = 1.0f;
-	FPostProcessSettings& PPS = SceneCapture->PostProcessSettings;
+		SceneCapture->PostProcessBlendWeight = 1.0f;
+		FPostProcessSettings& PPS = SceneCapture->PostProcessSettings;
 
-	PPS = FPostProcessSettings();
-	if (bUseFixedExposure) {
-		PPS.bOverride_AutoExposureMinBrightness = true;
-		PPS.bOverride_AutoExposureMaxBrightness = true;
-		PPS.bOverride_AutoExposureBias = true;
+		PPS = FPostProcessSettings();
+		if (bUseFixedExposure) {
+			PPS.bOverride_AutoExposureMinBrightness = true;
+			PPS.bOverride_AutoExposureMaxBrightness = true;
+			PPS.bOverride_AutoExposureBias = true;
 
-		PPS.AutoExposureMinBrightness = 1.0f;
-		PPS.AutoExposureMaxBrightness = 1.0f;
-		PPS.AutoExposureBias = ExposureCompensation;
+			PPS.AutoExposureMinBrightness = 1.0f;
+			PPS.AutoExposureMaxBrightness = 1.0f;
+			PPS.AutoExposureBias = ExposureCompensation;
+		}
 	}
 }
 

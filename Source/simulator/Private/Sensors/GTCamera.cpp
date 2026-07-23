@@ -3,6 +3,7 @@
 #include "Components/ActorComponent.h"
 #include "Generators/GTDataGeneratorComponent.h"
 #include "Generators/Image/GTImageGeneratorBase.h"
+#include "Generators/Image/GTImageGeneratorComponent.h"
 #include "Generators/Image/GTSceneCaptureComponent2D.h"
 #include "Generators/Text/GTActorInfoGeneratorComponent.h"
 #include "Triggers/GTGeneratorTrigger.h"
@@ -305,6 +306,12 @@ bool AGTCamera::HasInternalWarmUpFailed() const
 const FString& AGTCamera::GetInternalWarmUpFailure() const
 {
 	return InternalWarmUpFailure;
+}
+
+const USceneCaptureComponent2D* AGTCamera::GetGroundTruthRgbSceneCapture() const
+{
+	const UGTImageGeneratorComponent* RgbGenerator = FindComponentByClass<UGTImageGeneratorComponent>();
+	return RgbGenerator ? RgbGenerator->GetSceneCaptureComponent() : nullptr;
 }
 
 void AGTCamera::SetInternalWarmUpFailure(const FString& Failure)
