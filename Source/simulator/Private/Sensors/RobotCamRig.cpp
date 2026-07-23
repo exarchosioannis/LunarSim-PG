@@ -1,4 +1,5 @@
 #include "Sensors/RobotCamRig.h"
+#include "simulator.h"
 
 #include "Camera/CameraComponent.h"
 #include "Components/SceneComponent.h"
@@ -18,8 +19,6 @@
 #include "Utils/CaptureStatusOverlayComponent.h"
 #include "Utils/LunarSimRosInterface.h"
 #include "EngineUtils.h"
-
-DEFINE_LOG_CATEGORY_STATIC(LogCaptureRuntime, Log, All);
 
 ARobotCamRig::ARobotCamRig()
 {
@@ -149,9 +148,10 @@ void ARobotCamRig::BeginPlay()
 			SetActorRelativeLocation(FVector::ZeroVector);
 			SetActorRelativeRotation(FRotator::ZeroRotator);
 			SetActorRelativeScale3D(FVector::OneVector);
-			UE_LOG(LogTemp, Log, TEXT("RobotCamRig attached to rover sensor mount: %s"), *RoverSensorMountComponentName.ToString());
 		} else {
-			UE_LOG(LogTemp, Warning, TEXT("RobotCamRig could not find rover sensor mount component: %s"), *RoverSensorMountComponentName.ToString());
+			UE_LOG(LogLunarSimCapture, Warning,
+				TEXT("Camera rig mount degraded: resource=%s, stage=rover attachment, cause=mount component not found, effect=existing rig transform used; verify camera extrinsics."),
+				*RoverSensorMountComponentName.ToString());
 		}
 	}
 
@@ -212,7 +212,6 @@ void ARobotCamRig::BeginPlay()
 		EnableInput(PlayerController);
 		if (InputComponent) {
 			InputComponent->BindKey(EKeys::C, IE_Pressed, this, &ARobotCamRig::ToggleCaptureFromKeyboard);
-			UE_LOG(LogTemp, Log, TEXT("RobotCamRig: keyboard capture toggle bound to C."));
 		}
 	}
 }
@@ -220,7 +219,8 @@ void ARobotCamRig::BeginPlay()
 void ARobotCamRig::ApplyCameraCalibration()
 {
 	if (!ResolvedCameraCalibration.IsValid()) {
-		UE_LOG(LogTemp, Error, TEXT("RobotCamRig: resolved camera calibration is invalid; camera projection was not applied."));
+		UE_LOG(LogLunarSimCapture, Error,
+			TEXT("Camera calibration failed: subsystem=capture, resource=robot camera rig, stage=projection setup, cause=resolved calibration invalid, effect=camera projection not applied."));
 		return;
 	}
 
@@ -246,7 +246,7 @@ void ARobotCamRig::ApplyCameraCalibration()
 			|| !FMath::IsNearlyEqual(SceneCapture->FOVAngle, ResolvedCameraCalibration.HorizontalFovDeg)
 			|| !FMath::IsNearlyZero(SceneCapture->Overscan)
 			|| SceneCapture->bUseCustomProjectionMatrix) {
-			UE_LOG(LogTemp, Error,
+			UE_LOG(LogLunarSimCapture, Error,
 				TEXT("RobotCamRig: SceneCapture %s does not match the resolved ideal pinhole calibration."),
 				*SceneCapture->GetName());
 		}
@@ -339,19 +339,6 @@ void ARobotCamRig::InitializeGroundTruthWarmUp()
 	bGroundTruthWarmUpFailed = false;
 	GroundTruthWarmUpFailure.Reset();
 
-	UWorld* World = GetWorld();
-	UE_LOG(LogTemp, Log,
-		TEXT("RobotCamRig: GT warm-up config world=%s world_id=%u resolution=%dx%d hfov=%.3f rgb=%s depth=%s segmentation=%s bounding_boxes=%s."),
-		World ? *World->GetName() : TEXT("None"),
-		World ? World->GetUniqueID() : 0,
-		ResolvedCameraCalibration.ImageWidth,
-		ResolvedCameraCalibration.ImageHeight,
-		ResolvedCameraCalibration.HorizontalFovDeg,
-		CaptureConfig.IsGroundTruthRgbEnabled() ? TEXT("true") : TEXT("false"),
-		CaptureConfig.IsGroundTruthDepthEnabled() ? TEXT("true") : TEXT("false"),
-		CaptureConfig.IsGroundTruthSegmentationEnabled() ? TEXT("true") : TEXT("false"),
-		CaptureConfig.IsGroundTruthBoundingBoxesEnabled() ? TEXT("true") : TEXT("false"));
-
 	if (!CaptureConfig.IsGroundTruthEnabled()) {
 		bGroundTruthWarmUpReady = true;
 		return;
@@ -361,7 +348,9 @@ void ARobotCamRig::InitializeGroundTruthWarmUp()
 		bGroundTruthWarmUpFailed = true;
 		GroundTruthWarmUpFailure =
 			TEXT("Ground truth is enabled but GroundTruthCamera is unavailable.");
-		UE_LOG(LogTemp, Error, TEXT("RobotCamRig: GT warm-up FAILED: %s"), *GroundTruthWarmUpFailure);
+		UE_LOG(LogLunarSimCapture, Error,
+			TEXT("Ground-truth initialization failed: subsystem=UnrealGT, resource=GroundTruthCamera, stage=warm-up, cause=%s, effect=capture start disabled."),
+			*GroundTruthWarmUpFailure);
 		return;
 	}
 
@@ -421,7 +410,7 @@ void ARobotCamRig::ResolveRoverGroundTruthComponents()
 	}
 
 	if (ResolvedRoverActor && !RoverGroundTruthPublisher) {
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogLunarSimROS, Warning,
 			TEXT("RobotCamRig: RoverActor '%s' has no RoverGroundTruthPublisherComponent. CSV pose may work if it has CapturePoseSourceComponent, but %s, %s, %s and %s will not publish."),
 			*ResolvedRoverActor->GetName(),
 			LunarSimRosTopics::GroundTruthPose,
@@ -433,13 +422,7 @@ void ARobotCamRig::ResolveRoverGroundTruthComponents()
 
 void ARobotCamRig::ResolveCaptureSettings()
 {
-	if (CaptureConfig.Sanitize()) {
-		UE_LOG(LogTemp, Warning,
-			TEXT("RobotCamRig: invalid capture config values were normalized to CaptureHz=%.3f, HorizontalFovDeg=%.2f, StereoBaselineCm=%.2f."),
-			CaptureConfig.GetResolvedCaptureHz(),
-			CaptureConfig.GetResolvedHorizontalFovDeg(),
-			CaptureConfig.StereoBaselineCm);
-	}
+	CaptureConfig.Sanitize();
 	ResolvedCameraCalibration = CaptureConfig.GetResolvedCameraCalibration();
 	ResolvedStereoBaselineMeters = CaptureConfig.GetStereoBaselineMeters();
 }
@@ -469,7 +452,6 @@ void ARobotCamRig::UpdatePublishTimer(float DeltaSeconds)
 
 	const float ResolvedCaptureHz = CaptureManager->GetConfig().GetResolvedCaptureHz();
 	if (!FCaptureConfig::IsValidCameraCaptureHz(ResolvedCaptureHz)) {
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: invalid capture Hz %.3f; skipping capture tick."), ResolvedCaptureHz);
 		return;
 	}
 
@@ -502,36 +484,22 @@ void ARobotCamRig::StartRgbCaptureAndPublish()
 
 	const double CaptureTimeSeconds = GetWorld()->GetTimeSeconds();
 	const FCaptureFrameInfo FrameInfo = CaptureManager->NextFrame(CaptureTimeSeconds);
-	if (FrameInfo.FrameIndex == 0)
-	{
-		UE_LOG(LogTemp, Log,
-			TEXT("RobotCamRig: first real synchronized frame session_id=%d frame_index=%d stamp=%.9f gt_ready=%s."),
-			FrameInfo.SessionId,
-			FrameInfo.FrameIndex,
-			FrameInfo.StampSeconds,
-			bGroundTruthWarmUpReady ? TEXT("true") : TEXT("false"));
-	}
 
 	if (Config.IsGroundTruthEnabled()) {
 		if (GroundTruthCamera) {
 			if (Camera) GroundTruthCamera->SetActorTransform(Camera->GetComponentTransform());
 			ApplyGroundTruthConfig();
 			GroundTruthCamera->CaptureGroundTruthNow(FrameInfo.FrameIndex, FrameInfo.StampSeconds, FrameInfo.SessionId, CaptureManager);
-		} else if (!bWarnedMissingGroundTruthCamera) {
-			bWarnedMissingGroundTruthCamera = true;
-			UE_LOG(LogTemp, Warning, TEXT("Ground truth capture is enabled, but GroundTruthCameraClass is not set or is not based on GTCamera."));
 		}
 	}
 	
 	if (Config.IsLeftRosCameraEnabled() && RgbCaptureComponent) {
 		if (!RgbCaptureComponent->StartCaptureAsync(FrameInfo)) {
-			UE_LOG(LogTemp, Warning, TEXT("Left RGB capture readback could not start for frame %d"), FrameInfo.FrameIndex);
 		}
 	}
 
 	if (Config.IsRightRosCameraEnabled() && RightRgbCaptureComponent) {
 		if (!RightRgbCaptureComponent->StartCaptureAsync(FrameInfo)) {
-			UE_LOG(LogTemp, Warning, TEXT("Right RGB capture readback could not start for frame %d"), FrameInfo.FrameIndex);
 		}
 	}
 }
@@ -570,36 +538,26 @@ void ARobotCamRig::OnCaptureControl(int32 ControlValue)
 void ARobotCamRig::RequestCaptureStart()
 {
 	if (CaptureRuntimeState == ECaptureRuntimeState::Capturing) {
-		UE_LOG(LogCaptureRuntime, Log, TEXT("Capture start ignored: capture is already active."));
 		return;
 	}
 	if (CaptureRuntimeState == ECaptureRuntimeState::Finalizing) {
-		if (!bLoggedFinalizingStartRejection) {
-			UE_LOG(LogCaptureRuntime, Warning, TEXT("Capture start rejected: finalization cooldown active"));
-			bLoggedFinalizingStartRejection = true;
-		}
 		return;
 	}
 	if (!CaptureManager) {
-		UE_LOG(LogCaptureRuntime, Warning, TEXT("Capture start rejected: CaptureManager is not ready."));
+		UE_LOG(LogLunarSimCapture, Error,
+			TEXT("Capture start failed: subsystem=capture, resource=CaptureManager, stage=request validation, cause=manager unavailable, effect=no session created."));
 		return;
 	}
 	if (!bGroundTruthWarmUpReady) {
 		const FString Reason = bGroundTruthWarmUpFailed
 			? GroundTruthWarmUpFailure
 			: TEXT("GT pipeline warm-up is not complete.");
-		UE_LOG(LogTemp, Error,
-			TEXT("RobotCamRig: capture start rejected before GT Ready; no session was created. Reason: %s"),
-			*Reason);
 		ShowCaptureScreenMessage(
 			FString::Printf(TEXT("Capture not started: %s"), *Reason), FColor::Red);
 		return;
 	}
 
-	UE_LOG(LogTemp, Log,
-		TEXT("RobotCamRig: real capture start accepted after GT Ready; creating the real session now."));
 	if (!CaptureManager->TryStartCapture()) {
-		UE_LOG(LogCaptureRuntime, Warning, TEXT("Capture start rejected: session creation failed."));
 		return;
 	}
 
@@ -608,12 +566,8 @@ void ARobotCamRig::RequestCaptureStart()
 	}
 
 	CaptureRuntimeState = ECaptureRuntimeState::Capturing;
-	bLoggedFinalizingStartRejection = false;
 	const FString& ActiveSessionName = CaptureManager->GetCurrentSessionName();
 	PublishAccumulator = 0.0f;
-	bWarnedMissingGroundTruthCamera = false;
-	UE_LOG(LogCaptureRuntime, Log,
-		TEXT("Capture state: Idle -> Capturing (%s)"), *ActiveSessionName);
 	if (CaptureStatusOverlay) {
 		CaptureStatusOverlay->ShowCapturing(ActiveSessionName);
 	}
@@ -622,7 +576,6 @@ void ARobotCamRig::RequestCaptureStart()
 void ARobotCamRig::RequestCaptureStop()
 {
 	if (CaptureRuntimeState != ECaptureRuntimeState::Capturing) {
-		UE_LOG(LogCaptureRuntime, Log, TEXT("Capture stop ignored: capture is already stopped or finalizing."));
 		return;
 	}
 
@@ -630,8 +583,6 @@ void ARobotCamRig::RequestCaptureStop()
 		CaptureManager->StopCapture();
 	}
 	CaptureRuntimeState = ECaptureRuntimeState::Finalizing;
-	bLoggedFinalizingStartRejection = false;
-	UE_LOG(LogCaptureRuntime, Log, TEXT("Capture state: Capturing -> Finalizing"));
 	if (CaptureStatusOverlay) {
 		CaptureStatusOverlay->ShowFinalizing();
 	}
@@ -644,8 +595,8 @@ void ARobotCamRig::RequestCaptureStop()
 			CaptureFinalizationCooldownSeconds,
 			false);
 	} else {
-		UE_LOG(LogCaptureRuntime, Warning,
-			TEXT("Capture finalization timer could not start because the world is unavailable."));
+		UE_LOG(LogLunarSimCapture, Error,
+			TEXT("Capture finalization failed: subsystem=capture, resource=world timer, stage=cooldown scheduling, cause=world unavailable, effect=runtime state remains finalizing."));
 	}
 }
 
@@ -654,8 +605,6 @@ void ARobotCamRig::CompleteCaptureFinalization()
 	if (CaptureRuntimeState != ECaptureRuntimeState::Finalizing) return;
 
 	CaptureRuntimeState = ECaptureRuntimeState::Idle;
-	bLoggedFinalizingStartRejection = false;
-	UE_LOG(LogCaptureRuntime, Log, TEXT("Capture state: Finalizing -> Idle"));
 	if (CaptureStatusOverlay) {
 		CaptureStatusOverlay->ShowReady();
 	}
@@ -665,7 +614,6 @@ void ARobotCamRig::ToggleCaptureFromKeyboard()
 {
 	if (!CaptureManager) {
 		ShowCaptureScreenMessage(TEXT("CaptureManager not ready"), FColor::Red);
-		UE_LOG(LogTemp, Warning, TEXT("C pressed but CaptureManager is not ready."));
 		return;
 	}
 	if (CaptureRuntimeState == ECaptureRuntimeState::Capturing) {
@@ -700,7 +648,6 @@ void ARobotCamRig::SetCaptureConfig(const FCaptureConfig& NewConfig)
 {
 	const UWorld* World = GetWorld();
 	if ((World && World->IsGameWorld()) || HasActorBegunPlay() || (CaptureManager && CaptureManager->IsCaptureEnabled())) {
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: SetCaptureConfig ignored. Capture configuration is editor/design-time only and is frozen once PIE/gameplay begins."));
 		return;
 	}
 
@@ -744,26 +691,27 @@ void ARobotCamRig::SetupCameraTfNode()
 	if (CameraTfROSNode) return;
 	CameraTfROSNode = UTempoROSNode::Create(TEXT("robot_cam_rig_tf_node"), this, false );
 	if (!CameraTfROSNode) {
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: failed to create camera TF ROS node."));
+		UE_LOG(LogLunarSimROS, Error,
+			TEXT("Camera TF initialization failed: subsystem=ROS TF, resource=robot_cam_rig_tf_node, stage=node creation, cause=TempoROS node unavailable, effect=camera transforms disabled."));
 		return;
 	}
-	UE_LOG(LogTemp, Log, TEXT("RobotCamRig: camera TF ROS node created."));
 }
 
 void ARobotCamRig::PublishStaticCameraTransforms()
 {
 	EnforceCameraFrameIds();
 	if (!CameraTfROSNode) {
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: cannot publish camera TFs because CameraTfROSNode is null."));
 		return;
 	}
 	AActor* ResolvedRoverActor = GetRoverActor();
 	if (!ResolvedRoverActor) {
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: cannot publish camera TFs because RoverActor is null."));
+		UE_LOG(LogLunarSimROS, Error,
+			TEXT("Camera TF initialization failed: subsystem=ROS TF, resource=rover actor, stage=extrinsic resolution, cause=rover unavailable, effect=base-relative camera transforms disabled."));
 		return;
 	}
 	if (!Camera || !RightCamera) {
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: cannot publish camera TFs because one or both camera components are null."));
+		UE_LOG(LogLunarSimROS, Error,
+			TEXT("Camera TF initialization failed: subsystem=ROS TF, resource=camera components, stage=extrinsic resolution, cause=left or right camera unavailable, effect=camera transforms disabled."));
 		return;
 	}
 
@@ -779,10 +727,8 @@ void ARobotCamRig::PublishStaticCameraTransforms()
 	const bool bRightOpticalOk = CameraTfROSNode->PublishStaticTransform(CameraLinkToOpticalTransform, RightCameraOpticalFrameId, RightCameraLinkFrameId );
 
 	if (bLeftLinkOk && bRightLinkOk && bLeftOpticalOk && bRightOpticalOk) {
-		UE_LOG(LogTemp, Log,
-			TEXT("RobotCamRig: published static camera TFs: %s -> %s -> %s and %s -> %s -> %s"),
-			*BaseFrameId, *LeftCameraLinkFrameId, *LeftCameraOpticalFrameId, *BaseFrameId, *RightCameraLinkFrameId, *RightCameraOpticalFrameId);
 	} else {
-		UE_LOG(LogTemp, Warning, TEXT("RobotCamRig: failed to publish one or more static camera TFs."));
+		UE_LOG(LogLunarSimROS, Error,
+			TEXT("Camera TF initialization incomplete: subsystem=ROS TF, resource=left/right camera link and optical transforms, stage=static transform publication, cause=one or more publishes failed, effect=camera output is not fully frame-resolved."));
 	}
 }

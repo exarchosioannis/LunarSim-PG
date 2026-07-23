@@ -1,4 +1,5 @@
 #include "Robots/RoverVehicleControllerComponent.h"
+#include "simulator.h"
 
 #include "ChaosVehicleMovementComponent.h"
 #include "GameFramework/Actor.h"
@@ -400,7 +401,7 @@ void URoverVehicleControllerComponent::ResolveVehicleMovement()
 
 	if (!VehicleMovement && !bLoggedMissingMovement) {
 		UE_LOG(
-			LogTemp,
+			LogLunarSimROS,
 			Warning,
 			TEXT("RoverVehicleControllerComponent: No ChaosVehicleMovementComponent found on %s. Add this component to the rover vehicle Pawn that owns the Chaos movement component."),
 			*Owner->GetName()

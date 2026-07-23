@@ -1,4 +1,5 @@
 #include "Robots/RoverCmdVelVehicleControllerComponent.h"
+#include "simulator.h"
 
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
@@ -88,7 +89,7 @@ void URoverCmdVelVehicleControllerComponent::ResolveRoverController()
 	if (!RoverController) {
 		if (!bLoggedMissingRoverController) {
 			UE_LOG(
-				LogTemp,
+				LogLunarSimROS,
 				Warning,
 				TEXT("RoverCmdVelVehicleControllerComponent: No RoverVehicleControllerComponent found on %s. cmd_vel will be ignored until the rover controller exists."),
 				*Owner->GetName()
@@ -97,13 +98,6 @@ void URoverCmdVelVehicleControllerComponent::ResolveRoverController()
 		}
 		return;
 	}
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("RoverCmdVelVehicleControllerComponent: Commanding RoverVehicleControllerComponent on %s."),
-		*Owner->GetName()
-	);
 }
 
 void URoverCmdVelVehicleControllerComponent::SetupRos()
@@ -111,7 +105,8 @@ void URoverCmdVelVehicleControllerComponent::SetupRos()
 	if (!ROSNode) {
 		ROSNode = UTempoROSNode::Create(TEXT("rover_cmd_vel_vehicle_controller"), this, false);
 		if (!ROSNode) {
-			UE_LOG(LogTemp, Warning, TEXT("RoverCmdVelVehicleControllerComponent: Failed to create ROS node."));
+			UE_LOG(LogLunarSimROS, Error,
+				TEXT("Rover control initialization failed: subsystem=cmd_vel, resource=rover_cmd_vel_vehicle_controller, stage=node creation, cause=TempoROS node unavailable, effect=cmd_vel commands disabled."));
 			return;
 		}
 	}
@@ -137,15 +132,15 @@ void URoverCmdVelVehicleControllerComponent::SetupRos()
 		),
 		CmdVelQOS
 	)) {
-		UE_LOG(LogTemp, Warning, TEXT("RoverCmdVelVehicleControllerComponent: Failed to subscribe to %s."), *DesiredTopic);
+		UE_LOG(LogLunarSimROS, Error,
+			TEXT("Rover control initialization failed: subsystem=cmd_vel, resource=%s, stage=subscription, cause=subscription registration failed, effect=cmd_vel commands disabled."),
+			*DesiredTopic);
 		return;
 	}
 
 	SubscribedCmdVelTopic = DesiredTopic;
 	bHasReceivedCommand = false;
 	LastCmdTime = -1000000.0f;
-
-	UE_LOG(LogTemp, Log, TEXT("RoverCmdVelVehicleControllerComponent: Subscribed to %s."), *SubscribedCmdVelTopic);
 }
 
 void URoverCmdVelVehicleControllerComponent::OnCmdVel(const FTwist& Msg)
@@ -155,18 +150,6 @@ void URoverCmdVelVehicleControllerComponent::OnCmdVel(const FTwist& Msg)
 
 	if (GetWorld()) {
 		LastCmdTime = GetWorld()->GetTimeSeconds();
-	}
-
-	if (bLogReceivedCmdVel) {
-		const float RosLinearMps = Msg.LinearVelocity.X * MetersPerCentimeter;
-		const float RosAngularRadps = -FMath::DegreesToRadians(Msg.AngularVelocity.Z);
-		UE_LOG(
-			LogTemp,
-			Log,
-			TEXT("cmd_vel received (ROS SI): linear.x=%.3f m/s angular.z=%.3f rad/s"),
-			RosLinearMps,
-			RosAngularRadps
-		);
 	}
 }
 

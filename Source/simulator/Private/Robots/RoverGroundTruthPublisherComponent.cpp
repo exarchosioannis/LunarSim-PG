@@ -1,4 +1,5 @@
 #include "Robots/RoverGroundTruthPublisherComponent.h"
+#include "simulator.h"
 #include "Utils/UnrealToRosConversion.h"
 
 #include "GameFramework/Actor.h"
@@ -51,7 +52,9 @@ void URoverGroundTruthPublisherComponent::SetupRos()
 {
 	ROSNode = UTempoROSNode::Create(*NodeName, this);
 	if (!ROSNode) {
-		UE_LOG(LogTemp, Warning, TEXT("RoverGroundTruthPublisherComponent: failed to create ROS node."));
+		UE_LOG(LogLunarSimROS, Error,
+			TEXT("Rover ground-truth initialization failed: subsystem=ROS, resource=%s, stage=node creation, cause=TempoROS node unavailable, effect=enabled pose/odometry/path/TF outputs disabled."),
+			*NodeName);
 		return;
 	}
 

@@ -1,4 +1,5 @@
 #include "Maps/GroundTruthMapFileExporter.h"
+#include "simulator.h"
 
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -7,7 +8,6 @@
 bool FGroundTruthMapFileExporter::ExportToDirectory(const FString& MapsDirectory, const FGroundTruthMapFileExportInfo& Info)
 {
 	if (MapsDirectory.IsEmpty() || !Info.OccupancyMapMsg || !Info.ElevationDataMeters) {
-		UE_LOG(LogTemp, Warning, TEXT("GroundTruthMapFileExporter: missing export input."));
 		return false;
 	}
 
@@ -15,7 +15,6 @@ bool FGroundTruthMapFileExporter::ExportToDirectory(const FString& MapsDirectory
 	const TArray<float>& ElevationDataMeters = *Info.ElevationDataMeters;
 
 	if (OccupancyMapMsg.info.width == 0 || OccupancyMapMsg.info.height == 0 || OccupancyMapMsg.data.empty()) {
-		UE_LOG(LogTemp, Warning, TEXT("GroundTruthMapFileExporter: occupancy map is empty."));
 		return false;
 	}
 
@@ -52,11 +51,12 @@ bool FGroundTruthMapFileExporter::ExportToDirectory(const FString& MapsDirectory
 	const bool bSlopeYamlOk = bSlopeBuildOk && SaveSlopeYaml(SlopeYamlPath, Names.SlopeCsv, Names.SlopePreview, Info.MapFrameId, OccupancyMapMsg);
 
 	if (bOccupancyPgmOk && bOccupancyYamlOk && bElevationCsvOk && bElevationPreviewOk && bElevationYamlOk && bSlopeBuildOk && bSlopeCsvOk && bSlopePreviewOk && bSlopeYamlOk) {
-		UE_LOG(LogTemp, Log, TEXT("GroundTruthMapFileExporter: exported occupancy, elevation, and slope map files to %s"), *MapsDirectory);
 		return true;
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("GroundTruthMapFileExporter: failed to export one or more map files to %s"), *MapsDirectory);
+	UE_LOG(LogLunarSimMaps, Error,
+		TEXT("Map export incomplete: subsystem=maps, resource=%s, stage=artifact writes, cause=one or more occupancy/elevation/slope files failed, effect=map artifact set incomplete."),
+		*MapsDirectory);
 	return false;
 }
 

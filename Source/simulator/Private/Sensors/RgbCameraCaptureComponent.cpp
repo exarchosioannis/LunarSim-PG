@@ -59,7 +59,6 @@ void URgbCameraCaptureComponent::ApplyCameraLook()
 {
 	if (!SceneCapture) return;
 	if (!Calibration.IsValid()) {
-		UE_LOG(LogTemp, Error, TEXT("RgbCameraCaptureComponent: invalid resolved camera calibration; RGB capture projection was not applied."));
 		return;
 	}
 
@@ -99,22 +98,18 @@ void URgbCameraCaptureComponent::ApplyCameraLook()
 bool URgbCameraCaptureComponent::StartCaptureAsync(const FCaptureFrameInfo& FrameInfo)
 {
 	if (bCaptureInProgress) {
-		UE_LOG(LogTemp, Warning, TEXT("RGB capture already in progress, cannot start new capture for frame %d"), FrameInfo.FrameIndex);
 		return false;
 	}
 
 	if (!SceneCapture) {
-		UE_LOG(LogTemp, Warning, TEXT("SceneCapture component is null, cannot start RGB capture for frame %d"), FrameInfo.FrameIndex);
 		return false;
 	}
 
 	if (!RGBRenderTarget) {
-		UE_LOG(LogTemp, Warning, TEXT("RGBRenderTarget is null, cannot start RGB capture for frame %d"), FrameInfo.FrameIndex);
 		return false;
 	}
 
 	if (!GPUReadback.IsValid()) {
-		UE_LOG(LogTemp, Warning, TEXT("GPUReadback is invalid, cannot start RGB capture for frame %d"), FrameInfo.FrameIndex);
 		return false;
 	}
 
@@ -134,8 +129,6 @@ bool URgbCameraCaptureComponent::StartCaptureAsync(const FCaptureFrameInfo& Fram
 
 	bCaptureInProgress = true;
 	bWaitingToEnqueueReadback = true;
-
-	UE_LOG(LogTemp, Verbose, TEXT("RGB START frame=%d stamp=%.6f"), FrameInfo.FrameIndex, FrameInfo.StampSeconds);
 
 	return true;
 }
@@ -163,12 +156,11 @@ bool URgbCameraCaptureComponent::PollReadback(TArray<uint8>& OutPixels, FCapture
 		}
 
 		ENQUEUE_RENDER_COMMAND(EnqueueRgbCaptureReadback)(
-			[Readback = GPUReadback.Get(), RTRes = Res, FrameIndex = PendingFrameInfo.FrameIndex](FRHICommandListImmediate& RHICmdList) {
+			[Readback = GPUReadback.Get(), RTRes = Res](FRHICommandListImmediate& RHICmdList) {
 				if (!Readback || !RTRes) return;
 				FRHITexture* Tex = RTRes->GetRenderTargetTexture();
 				if (!Tex) return;
 				Readback->EnqueueCopy(RHICmdList, Tex);
-				UE_LOG(LogTemp, Verbose, TEXT("RGB READBACK ENQUEUED frame=%d"), FrameIndex);
 			});
 
 		bWaitingToEnqueueReadback = false;
@@ -208,8 +200,6 @@ bool URgbCameraCaptureComponent::PollReadback(TArray<uint8>& OutPixels, FCapture
 	GPUReadback->Unlock();
 
 	OutFrameInfo = PendingFrameInfo;
-
-	UE_LOG(LogTemp, Verbose, TEXT("RGB READBACK DONE frame=%d stamp=%.6f"), OutFrameInfo.FrameIndex, OutFrameInfo.StampSeconds);
 
 	bCaptureInProgress = false;
 	return true;

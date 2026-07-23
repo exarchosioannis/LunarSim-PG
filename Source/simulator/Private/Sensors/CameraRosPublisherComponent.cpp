@@ -20,7 +20,6 @@ void UCameraRosPublisherComponent::Initialize(
 {
 	Calibration = InCalibration;
 	if (!Calibration.IsValid()) {
-		UE_LOG(LogTemp, Error, TEXT("CameraRosPublisherComponent: invalid resolved calibration; using the default 1024x1024, 90 degree calibration."));
 		Calibration = FCaptureConfig().GetResolvedCameraCalibration();
 	}
 	FrameId = InFrameId;
@@ -53,10 +52,6 @@ void UCameraRosPublisherComponent::SetStereoCalibration(bool bInIsRightStereoCam
 
 	if (!FMath::IsFinite(InStereoBaselineMeters) || InStereoBaselineMeters <= 0.0) {
 		StereoBaselineMeters = FCaptureConfig::GetDefaultStereoBaselineCm() / 100.0;
-		UE_LOG(LogTemp, Warning,
-			TEXT("CameraRosPublisherComponent: invalid right stereo baseline %.6f m; using %.6f m for camera_info."),
-			InStereoBaselineMeters,
-			StereoBaselineMeters);
 		return;
 	}
 

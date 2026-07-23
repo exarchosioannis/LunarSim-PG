@@ -1,4 +1,5 @@
 #include "Sensors/GTCamera.h"
+#include "simulator.h"
 #include "Components/ActorComponent.h"
 #include "Generators/GTDataGeneratorComponent.h"
 #include "Generators/Image/GTImageGeneratorBase.h"
@@ -61,7 +62,6 @@ void AGTCamera::SetGroundTruthResolution(int32 Width, int32 Height)
 void AGTCamera::SetGroundTruthCalibration(const FResolvedCameraCalibration& CameraCalibration)
 {
 	if (!CameraCalibration.IsValid()) {
-		UE_LOG(LogTemp, Error, TEXT("GTCamera: invalid resolved camera calibration; UnrealGT projection was not applied."));
 		return;
 	}
 
@@ -87,7 +87,7 @@ void AGTCamera::SetGroundTruthCalibration(const FResolvedCameraCalibration& Came
 		if (!FMath::IsNearlyEqual(SceneCapture->FOVAngle, CameraCalibration.HorizontalFovDeg)
 			|| !FMath::IsNearlyZero(SceneCapture->Overscan)
 			|| SceneCapture->bUseCustomProjectionMatrix) {
-			UE_LOG(LogTemp, Error,
+			UE_LOG(LogLunarSimCapture, Error,
 				TEXT("GTCamera: UnrealGT SceneCapture %s does not match the resolved calibration."),
 				*SceneCapture->GetName());
 		}
@@ -162,10 +162,6 @@ bool AGTCamera::RunInternalWarmUp()
 	if (!bHasEnabledOutput)
 	{
 		InternalWarmUpState = EGTInternalWarmUpState::Ready;
-		UE_LOG(LogTemp, Log,
-			TEXT("UnrealGT warm-up READY world=%s world_id=%u participants=none (GT outputs disabled)."),
-			GetWorld() ? *GetWorld()->GetName() : TEXT("None"),
-			GetWorld() ? GetWorld()->GetUniqueID() : 0);
 		return true;
 	}
 
@@ -250,9 +246,6 @@ bool AGTCamera::RunInternalWarmUp()
 			}
 			else
 			{
-				UE_LOG(LogTemp, Log,
-					TEXT("UnrealGT warm-up participant=%s complete (no render required; accurate bounding boxes disabled)."),
-					*ActorInfo->GetName());
 			}
 			continue;
 		}
@@ -263,12 +256,6 @@ bool AGTCamera::RunInternalWarmUp()
 		return false;
 	}
 
-	UE_LOG(LogTemp, Log,
-		TEXT("UnrealGT warm-up START world=%s world_id=%u participants=[%s]."),
-		GetWorld() ? *GetWorld()->GetName() : TEXT("None"),
-		GetWorld() ? GetWorld()->GetUniqueID() : 0,
-		*FString::Join(ParticipantNames, TEXT(", ")));
-
 	for (UGTImageGeneratorBase* ImageParticipant : ImageParticipants)
 	{
 		FString Error;
@@ -278,9 +265,6 @@ bool AGTCamera::RunInternalWarmUp()
 				TEXT("%s failed: %s"), *ImageParticipant->GetName(), *Error));
 			return false;
 		}
-		UE_LOG(LogTemp, Log,
-			TEXT("UnrealGT warm-up participant=%s COMPLETE (pixels discarded; no DataReady)."),
-			*ImageParticipant->GetName());
 	}
 
 	for (UGTActorInfoGeneratorComponent* ActorInfoParticipant : ActorInfoParticipants)
@@ -293,17 +277,18 @@ bool AGTCamera::RunInternalWarmUp()
 				*ActorInfoParticipant->GetName(), *Error));
 			return false;
 		}
-		UE_LOG(LogTemp, Log,
-			TEXT("UnrealGT warm-up participant=%s/InternalSegmentationSceneCapture COMPLETE (pixels discarded; no DataReady)."),
-			*ActorInfoParticipant->GetName());
 	}
 
 	InternalWarmUpState = EGTInternalWarmUpState::Ready;
-	UE_LOG(LogTemp, Log,
-		TEXT("UnrealGT warm-up READY world=%s world_id=%u participant_count=%d."),
+	UE_LOG(LogLunarSimCapture, Verbose,
+		TEXT("UnrealGT warm-up summary: world=%s, world_id=%u, outputs=[rgb=%s,depth=%s,segmentation=%s,bounding_boxes=%s], participants=[%s], result=ready."),
 		GetWorld() ? *GetWorld()->GetName() : TEXT("None"),
 		GetWorld() ? GetWorld()->GetUniqueID() : 0,
-		ImageParticipants.Num() + ActorInfoParticipants.Num());
+		bGroundTruthRGBEnabled ? TEXT("true") : TEXT("false"),
+		bGroundTruthDepthEnabled ? TEXT("true") : TEXT("false"),
+		bGroundTruthSegmentationEnabled ? TEXT("true") : TEXT("false"),
+		bGroundTruthBoundingBoxesEnabled ? TEXT("true") : TEXT("false"),
+		*FString::Join(ParticipantNames, TEXT(", ")));
 	return true;
 }
 
@@ -326,7 +311,7 @@ void AGTCamera::SetInternalWarmUpFailure(const FString& Failure)
 {
 	InternalWarmUpState = EGTInternalWarmUpState::Failed;
 	InternalWarmUpFailure = Failure;
-	UE_LOG(LogTemp, Error,
+	UE_LOG(LogLunarSimCapture, Error,
 		TEXT("UnrealGT warm-up FAILED world=%s world_id=%u reason=%s"),
 		GetWorld() ? *GetWorld()->GetName() : TEXT("None"),
 		GetWorld() ? GetWorld()->GetUniqueID() : 0,

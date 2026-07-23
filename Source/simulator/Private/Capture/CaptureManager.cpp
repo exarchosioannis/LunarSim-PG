@@ -1,4 +1,5 @@
 #include "Capture/CaptureManager.h"
+#include "simulator.h"
 #include "Capture/CapturePoseSourceComponent.h"
 #include "Utils/DatasetRunSubsystem.h"
 #include "Maps/GroundTruthMapArtifacts.h"
@@ -54,13 +55,12 @@ namespace
 void UCaptureManager::Initialize(const FCaptureConfig& InConfig, const FResolvedCameraCalibration& InCameraCalibration)
 {
 	if (bConfigInitialized) {
-		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: Initialize ignored because capture config is already initialized for this run."));
 		return;
 	}
 
 	Config = InConfig;
 	if (Config.Sanitize()) {
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogLunarSimCapture, Warning,
 			TEXT("CaptureManager: invalid capture config values were normalized to CaptureHz=%.3f, HorizontalFovDeg=%.2f, StereoBaselineCm=%.2f."),
 			Config.GetResolvedCaptureHz(),
 			Config.GetResolvedHorizontalFovDeg(),
@@ -77,8 +77,6 @@ void UCaptureManager::Initialize(const FCaptureConfig& InConfig, const FResolved
 		|| CameraCalibration.ImageWidth != ConfigCalibration.ImageWidth
 		|| CameraCalibration.ImageHeight != ConfigCalibration.ImageHeight
 		|| !FMath::IsNearlyEqual(CameraCalibration.HorizontalFovDeg, ConfigCalibration.HorizontalFovDeg)) {
-		UE_LOG(LogTemp, Warning,
-			TEXT("CaptureManager: supplied camera calibration did not match sanitized config; using the config-resolved calibration."));
 		CameraCalibration = ConfigCalibration;
 	}
 	bConfigInitialized = true;
@@ -102,13 +100,13 @@ bool UCaptureManager::TryStartCapture()
 {
 	if (bCaptureEnabled)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Capture is already running. StartCapture ignored."));
 		return false;
 	}
 
 	EnsureDatasetRunDirectory();
 	if (CurrentDatasetRunDirectory.IsEmpty()) {
-		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: cannot start capture because dataset run directory is unavailable."));
+		UE_LOG(LogLunarSimCapture, Error,
+			TEXT("Capture start failed: subsystem=dataset, resource=run directory, stage=session creation, cause=dataset run directory unavailable, effect=no session created."));
 		return false;
 	}
 
@@ -155,7 +153,6 @@ bool UCaptureManager::TryStartCapture()
 	StartManifest();
 	WriteSessionMetadata();
 
-	UE_LOG(LogTemp, Log, TEXT("CaptureManager: started %s inside dataset run %s"), *CurrentSessionName, *CurrentDatasetRunDirectory);
 	return true;
 }
 
@@ -271,7 +268,9 @@ void UCaptureManager::StartManifest()
 
 	if (!FFileHelper::SaveStringToFile(Header, *ManifestFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM, &IFileManager::Get(), FILEWRITE_None))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: failed to write manifest header to %s"), *ManifestFilePath);
+		UE_LOG(LogLunarSimCapture, Error,
+			TEXT("Capture session incomplete: subsystem=dataset, resource=%s, stage=manifest header write, cause=file write failed, effect=manifest unavailable."),
+			*ManifestFilePath);
 	}
 
 	const FString TrajectoryHeader = TEXT(
@@ -451,7 +450,9 @@ void UCaptureManager::WriteSessionMetadata()
 
 	if (!FFileHelper::SaveStringToFile(Json, *MetadataFilePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: failed to write session metadata to %s"), *MetadataFilePath);
+		UE_LOG(LogLunarSimCapture, Error,
+			TEXT("Capture session incomplete: subsystem=dataset, resource=%s, stage=session metadata write, cause=file write failed, effect=metadata unavailable."),
+			*MetadataFilePath);
 	}
 }
 
@@ -468,7 +469,6 @@ void UCaptureManager::EnsureDatasetRunDirectory()
 
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
 	if (CurrentDatasetRunDirectory.IsEmpty()) {
-		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: dataset run directory is unavailable."));
 		return;
 	}
 
@@ -532,7 +532,9 @@ void UCaptureManager::AppendManifestRow(const FCaptureFrameInfo& FrameInfo)
 		&IFileManager::Get(),
 		FILEWRITE_Append))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("CaptureManager: failed to append manifest row to %s"), *ManifestFilePath);
+		UE_LOG(LogLunarSimCapture, Error,
+			TEXT("Capture frame incomplete: subsystem=dataset, resource=%s, stage=manifest row append, cause=file write failed, effect=frame %d absent from manifest."),
+			*ManifestFilePath, FrameInfo.FrameIndex);
 	}
 }
 

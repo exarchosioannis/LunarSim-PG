@@ -7,6 +7,7 @@ public class simulator : ModuleRules
 	public simulator(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+		PrivateIncludePaths.Add(ModuleDirectory);
 
 		bEnableExceptions = true;
 	

@@ -91,9 +91,6 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rover CmdVel Controller", meta = (AllowPrivateAccess = "true"))
 	FRoverCmdVelControllerSettings Settings;
 
-	UPROPERTY(EditAnywhere, Category = "Debug")
-	bool bLogReceivedCmdVel = false;
-
 	FTwist CurrentUnrealTwist;
 
 	FString SubscribedCmdVelTopic;

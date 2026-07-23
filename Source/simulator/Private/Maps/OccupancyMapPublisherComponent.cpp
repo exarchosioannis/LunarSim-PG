@@ -1,4 +1,5 @@
 #include "Maps/OccupancyMapPublisherComponent.h"
+#include "simulator.h"
 #include "Maps/GroundTruthElevationPointCloudBuilder.h"
 #include "Maps/GroundTruthMapFileExporter.h"
 #include "Utils/DatasetRunSubsystem.h"
@@ -196,7 +197,7 @@ namespace
 
 		if (ValidCandidateCount == 0)
 		{
-			UE_LOG(LogTemp, Error,
+			UE_LOG(LogLunarSimMaps, Error,
 				TEXT("OccupancyMapPublisherComponent: automatic Landscape bounds failed: no valid registered typed Landscape components were found."));
 			return false;
 		}
@@ -228,7 +229,7 @@ namespace
 
 		if (!SelectedCandidate)
 		{
-			UE_LOG(LogTemp, Error,
+			UE_LOG(LogLunarSimMaps, Error,
 				TEXT("OccupancyMapPublisherComponent: automatic Landscape bounds failed: %d unrelated logical Landscapes have valid components (%d are MapTerrain-tagged), and no unique Landscape is associated with map publisher %s at (%.3f, %.3f, %.3f) cm. Refusing to union or choose arbitrarily."),
 				ValidCandidateCount, TaggedCandidateCount,
 				*Owner->GetPathName(),
@@ -266,7 +267,7 @@ namespace
 			!FMath::IsFinite(RawMinYMapMeters) || !FMath::IsFinite(RawMaxYMapMeters) ||
 			RawMaxXMapMeters <= RawMinXMapMeters || RawMaxYMapMeters <= RawMinYMapMeters)
 		{
-			UE_LOG(LogTemp, Error,
+			UE_LOG(LogLunarSimMaps, Error,
 				TEXT("OccupancyMapPublisherComponent: automatic Landscape bounds failed for %s: non-finite or zero-sized XY bounds."),
 				*LandscapeName);
 			return false;
@@ -283,7 +284,7 @@ namespace
 			ScaledMinX <= MinSafeCellEdge || ScaledMaxX >= MaxSafeCellEdge ||
 			ScaledMinY <= MinSafeCellEdge || ScaledMaxY >= MaxSafeCellEdge)
 		{
-			UE_LOG(LogTemp, Error,
+			UE_LOG(LogLunarSimMaps, Error,
 				TEXT("OccupancyMapPublisherComponent: automatic Landscape bounds failed for %s: bounds/resolution exceed supported integer alignment range."),
 				*LandscapeName);
 			return false;
@@ -299,7 +300,7 @@ namespace
 
 		if (WidthCells64 <= 0 || HeightCells64 <= 0)
 		{
-			UE_LOG(LogTemp, Error,
+			UE_LOG(LogLunarSimMaps, Error,
 				TEXT("OccupancyMapPublisherComponent: automatic Landscape bounds failed for %s: invalid grid dimensions (%lld x %lld)."),
 				*LandscapeName, WidthCells64, HeightCells64);
 			return false;
@@ -307,7 +308,7 @@ namespace
 
 		if (WidthCells64 > MaxGroundTruthMapCellCount / HeightCells64)
 		{
-			UE_LOG(LogTemp, Error,
+			UE_LOG(LogLunarSimMaps, Error,
 				TEXT("OccupancyMapPublisherComponent: automatic Landscape bounds failed for %s: detected %.3f x %.3f m at %.6f m/cell requests %lld x %lld cells, exceeding the safe %lld-cell limit. Resolution was not reduced and bounds were not cropped."),
 				*LandscapeName,
 				RawMaxXMapMeters - RawMinXMapMeters,
@@ -331,7 +332,7 @@ namespace
 		if (!FMath::IsFinite(OutBounds.TraceStartZCm) || !FMath::IsFinite(OutBounds.TraceEndZCm) ||
 			OutBounds.TraceStartZCm <= OutBounds.TraceEndZCm)
 		{
-			UE_LOG(LogTemp, Error,
+			UE_LOG(LogLunarSimMaps, Error,
 				TEXT("OccupancyMapPublisherComponent: automatic Landscape bounds failed for %s: invalid Z trace range [%.3f, %.3f] cm."),
 				*LandscapeName, OutBounds.TraceEndZCm, OutBounds.TraceStartZCm);
 			return false;
@@ -352,8 +353,6 @@ namespace
 	{
 		if (!World || !Owner)
 		{
-			UE_LOG(LogTemp, Error,
-				TEXT("OccupancyMapPublisherComponent: automatic Landscape bounds failed: invalid world or map-publisher owner."));
 			return false;
 		}
 
@@ -361,7 +360,7 @@ namespace
 			!FMath::IsFinite(TraceStartMarginCm) || TraceStartMarginCm < 0.0f ||
 			!FMath::IsFinite(TraceEndMarginCm) || TraceEndMarginCm < 0.0f)
 		{
-			UE_LOG(LogTemp, Error,
+			UE_LOG(LogLunarSimMaps, Error,
 				TEXT("OccupancyMapPublisherComponent: automatic Landscape bounds failed: invalid resolution or vertical trace margins."));
 			return false;
 		}
@@ -423,8 +422,6 @@ bool UOccupancyMapPublisherComponent::TryInitializeFromRunCaptureConfig()
 
 	bRunCaptureConfigResolved = true;
 	if (!IsGroundTruthMapsEnabledForRun()) {
-		UE_LOG(LogTemp, Log,
-			TEXT("OccupancyMapPublisherComponent: ground truth maps are disabled in the frozen run capture config."));
 		return true;
 	}
 
@@ -446,7 +443,9 @@ void UOccupancyMapPublisherComponent::SetupRos()
 	if (ROSNode) return;
 	ROSNode = UTempoROSNode::Create(*NodeName, this, false);
 	if (!ROSNode) {
-		UE_LOG(LogTemp, Warning, TEXT("OccupancyMapPublisherComponent: failed to create ROS node."));
+		UE_LOG(LogLunarSimROS, Error,
+			TEXT("Map ROS initialization failed: subsystem=maps, resource=%s, stage=node creation, cause=TempoROS node unavailable, effect=occupancy and elevation topics disabled."),
+			*NodeName);
 		return;
 	}
 
@@ -473,7 +472,6 @@ builtin_interfaces::msg::Time UOccupancyMapPublisherComponent::ToRosTime(double 
 void UOccupancyMapPublisherComponent::RegenerateAndPublishMap()
 {
 	if (!IsGroundTruthMapsEnabledForRun()) {
-		UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: map generation skipped because ground truth maps are disabled."));
 		return;
 	}
 
@@ -489,7 +487,7 @@ void UOccupancyMapPublisherComponent::GenerateOccupancyMap()
 	bMapGenerated = false;
 	if (!World || !Owner)
 	{
-		UE_LOG(LogTemp, Error,
+		UE_LOG(LogLunarSimMaps, Error,
 			TEXT("OccupancyMapPublisherComponent: map generation failed: invalid world or map-publisher owner."));
 		return;
 	}
@@ -515,34 +513,6 @@ void UOccupancyMapPublisherComponent::GenerateOccupancyMap()
 	ComputedOriginYMapMeters = ResolvedBounds.OriginYMapMeters;
 	ComputedTraceStartZCm = ResolvedBounds.TraceStartZCm;
 	ComputedTraceEndZCm = ResolvedBounds.TraceEndZCm;
-
-	UE_LOG(LogTemp, Log,
-		TEXT("OccupancyMapPublisherComponent: selected typed logical Landscape=%s via %s; actors/proxies=%d (%d streaming), components=%d."),
-		*ResolvedBounds.Landscape->GetPathName(),
-		*ResolvedBounds.SelectionReason,
-		ResolvedBounds.ProxyCount,
-		ResolvedBounds.StreamingProxyCount,
-		ResolvedBounds.ComponentCount);
-	UE_LOG(LogTemp, Log,
-		TEXT("OccupancyMapPublisherComponent: Landscape raw world bounds cm XY=[(%.3f, %.3f), (%.3f, %.3f)] Z=[%.3f, %.3f]; aligned ROS XY=[(%.6f, %.6f), (%.6f, %.6f)]."),
-		ResolvedBounds.RawWorldBounds.Min.X,
-		ResolvedBounds.RawWorldBounds.Min.Y,
-		ResolvedBounds.RawWorldBounds.Max.X,
-		ResolvedBounds.RawWorldBounds.Max.Y,
-		ResolvedBounds.RawWorldBounds.Min.Z,
-		ResolvedBounds.RawWorldBounds.Max.Z,
-		ResolvedBounds.OriginXMapMeters,
-		ResolvedBounds.OriginYMapMeters,
-		ResolvedBounds.AlignedMaxXMapMeters,
-		ResolvedBounds.AlignedMaxYMapMeters);
-	UE_LOG(LogTemp, Log,
-		TEXT("OccupancyMapPublisherComponent: automatic grid resolution=%.6f m/cell, size=%dx%d, cells=%lld, Z trace start=%.3f cm end=%.3f cm."),
-		SafeResolution,
-		WidthCells,
-		HeightCells,
-		ResolvedBounds.TotalCells,
-		ComputedTraceStartZCm,
-		ComputedTraceEndZCm);
 
 	ReusableMapMsg.header.frame_id = TCHAR_TO_UTF8(*MapFrameId);
 	ReusableMapMsg.info.resolution = SafeResolution;
@@ -594,11 +564,29 @@ void UOccupancyMapPublisherComponent::GenerateOccupancyMap()
 	BuildElevationPointCloud();
 
 	bMapGenerated = true;
-	UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: generated occupancy/elevation/elevation point cloud maps %dx%d at %.3f m/cell, origin=(%.3f, %.3f), frame=%s"),
-		WidthCells, HeightCells, SafeResolution,
-		ComputedOriginXMapMeters, ComputedOriginYMapMeters, *MapFrameId);
-	UE_LOG(LogTemp, Log,
-		TEXT("OccupancyMapPublisherComponent: unknown occupancy cells=%d/%d (%.2f%%); elevation no-hit/void cells=%d/%d (%.2f%%)."),
+	UE_LOG(LogLunarSimMaps, Verbose,
+		TEXT("Map build summary: landscape=%s, selection=%s, proxies=%d (%d streaming), components=%d, raw_bounds_cm=[(%.3f,%.3f,%.3f),(%.3f,%.3f,%.3f)], aligned_ros_xy=[(%.6f,%.6f),(%.6f,%.6f)], resolution=%.6f m/cell, grid=%dx%d (%lld cells), trace_z_cm=[%.3f,%.3f], unknown=%d/%d (%.2f%%), elevation_no_hit=%d/%d (%.2f%%)."),
+		*ResolvedBounds.Landscape->GetPathName(),
+		*ResolvedBounds.SelectionReason,
+		ResolvedBounds.ProxyCount,
+		ResolvedBounds.StreamingProxyCount,
+		ResolvedBounds.ComponentCount,
+		ResolvedBounds.RawWorldBounds.Min.X,
+		ResolvedBounds.RawWorldBounds.Min.Y,
+		ResolvedBounds.RawWorldBounds.Min.Z,
+		ResolvedBounds.RawWorldBounds.Max.X,
+		ResolvedBounds.RawWorldBounds.Max.Y,
+		ResolvedBounds.RawWorldBounds.Max.Z,
+		ResolvedBounds.OriginXMapMeters,
+		ResolvedBounds.OriginYMapMeters,
+		ResolvedBounds.AlignedMaxXMapMeters,
+		ResolvedBounds.AlignedMaxYMapMeters,
+		SafeResolution,
+		WidthCells,
+		HeightCells,
+		ResolvedBounds.TotalCells,
+		ComputedTraceEndZCm,
+		ComputedTraceStartZCm,
 		UnknownOccupancyCells,
 		TotalCells,
 		100.0 * static_cast<double>(UnknownOccupancyCells) / static_cast<double>(TotalCells),
@@ -752,14 +740,14 @@ bool UOccupancyMapPublisherComponent::HitHasIgnoreTag(const FHitResult& Hit) con
 bool UOccupancyMapPublisherComponent::ExportMapToDefaultDatasetDirectory()
 {
 	if (!IsGroundTruthMapsEnabledForRun()) {
-		UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: map export skipped because ground truth maps are disabled."));
 		return false;
 	}
 
 	UWorld* World = GetWorld();
 	UDatasetRunSubsystem* DatasetRunSubsystem = World ? World->GetSubsystem<UDatasetRunSubsystem>() : nullptr;
 	if (!DatasetRunSubsystem) {
-		UE_LOG(LogTemp, Warning, TEXT("OccupancyMapPublisherComponent: cannot export map because DatasetRunSubsystem is unavailable."));
+		UE_LOG(LogLunarSimMaps, Error,
+			TEXT("Map export failed: subsystem=maps, resource=dataset run, stage=directory resolution, cause=DatasetRunSubsystem unavailable, effect=map artifacts not written."));
 		return false;
 	}
 
@@ -770,18 +758,17 @@ bool UOccupancyMapPublisherComponent::ExportMapToDefaultDatasetDirectory()
 bool UOccupancyMapPublisherComponent::ExportMapToDirectory(const FString& MapsDirectory, const FString& BaseFileName)
 {
 	if (!IsGroundTruthMapsEnabledForRun()) {
-		UE_LOG(LogTemp, Log, TEXT("OccupancyMapPublisherComponent: map export skipped because ground truth maps are disabled."));
 		return false;
 	}
 
 	if (MapsDirectory.IsEmpty()) {
-		UE_LOG(LogTemp, Warning, TEXT("OccupancyMapPublisherComponent: cannot export map because MapsDirectory is empty."));
+		UE_LOG(LogLunarSimMaps, Error,
+			TEXT("Map export failed: subsystem=maps, resource=maps directory, stage=directory resolution, cause=empty output path, effect=map artifacts not written."));
 		return false;
 	}
 
 	if (!bMapGenerated) GenerateOccupancyMap();
 	if (!bMapGenerated) {
-		UE_LOG(LogTemp, Warning, TEXT("OccupancyMapPublisherComponent: cannot export map because map generation failed."));
 		return false;
 	}
 

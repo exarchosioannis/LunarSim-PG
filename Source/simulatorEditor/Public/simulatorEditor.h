@@ -35,7 +35,8 @@ private:
 	TSharedPtr<ELunarSimResolutionPreset> FindResolutionPresetOption(ELunarSimResolutionPreset InPreset) const;
 	FText GetResolutionPresetText() const;
 	TSharedRef<SWidget> MakeResolutionPresetComboWidget(TSharedPtr<ELunarSimResolutionPreset> InOption) const;
-	void OnResolutionPresetSelectionChanged(TSharedPtr<ELunarSimResolutionPreset> NewSelection, ESelectInfo::Type SelectInfo);
+	void OnResolutionPresetSelectionChanged(TSharedPtr<ELunarSimResolutionPreset> NewSelection,
+	                                        ESelectInfo::Type SelectInfo);
 	FString ResolutionPresetToString(ELunarSimResolutionPreset InPreset) const;
 
 	void InitRoverControlOptions();

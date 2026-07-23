@@ -101,7 +101,6 @@ private:
 	UPROPERTY()
 	AGTCamera* GroundTruthCamera = nullptr;
 
-	bool bWarnedMissingGroundTruthCamera = false;
 	bool bGroundTruthWarmUpReady = false;
 	bool bGroundTruthWarmUpFailed = false;
 	FString GroundTruthWarmUpFailure;
@@ -129,7 +128,6 @@ private:
 	FCaptureConfig CaptureConfig;
 
 	ECaptureRuntimeState CaptureRuntimeState = ECaptureRuntimeState::Idle;
-	bool bLoggedFinalizingStartRejection = false;
 	FTimerHandle FinalizationCooldownTimerHandle;
 
 	// Camera Settings

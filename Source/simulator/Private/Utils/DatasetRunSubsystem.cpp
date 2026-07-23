@@ -120,8 +120,6 @@ FString UDatasetRunSubsystem::CreateNextSessionDirectory(FString& OutSessionName
 FCaptureConfig UDatasetRunSubsystem::RegisterCaptureConfigForRun(const FCaptureConfig& InConfig)
 {
 	if (bHasRunCaptureConfig) {
-		UE_LOG(LogTemp, Warning,
-			TEXT("DatasetRunSubsystem: capture config is already frozen for this play session; returning the existing run config."));
 		return RunCaptureConfig;
 	}
 

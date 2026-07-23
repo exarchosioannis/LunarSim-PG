@@ -9,14 +9,17 @@
 #include "Sensors/ImuSensorPublisherComponent.h"
 #include "Sensors/RobotCamRig.h"
 #include "Capture/CaptureTypes.h"
+#include "RockBaking/SRockBakingPanel.h"
 
 #include "Framework/Docking/TabManager.h"
+#include "ScopedTransaction.h"
 #include "ToolMenus.h"
 
 #include "Widgets/Docking/SDockTab.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SNumericEntryBox.h"
@@ -33,13 +36,19 @@ namespace
 {
 ERoverControlMode NormalizeEditorRoverControlMode(ERoverControlMode InMode)
 {
-	return InMode == ERoverControlMode::RosCmdVel ? ERoverControlMode::RosCmdVel : ERoverControlMode::Manual;
+	switch (InMode) {
+	case ERoverControlMode::Manual:
+	case ERoverControlMode::RosCmdVel:
+	case ERoverControlMode::Disabled:
+		return InMode;
+	default:
+		return ERoverControlMode::Manual;
+	}
 }
 
 ELunarSimResolutionPreset NormalizeEditorResolutionPreset(ELunarSimResolutionPreset InPreset, int32 Width, int32 Height)
 {
-	switch (InPreset)
-	{
+	switch (InPreset) {
 	case ELunarSimResolutionPreset::R640x360:
 	case ELunarSimResolutionPreset::R1024x576:
 	case ELunarSimResolutionPreset::R1280x720:
@@ -51,22 +60,26 @@ ELunarSimResolutionPreset NormalizeEditorResolutionPreset(ELunarSimResolutionPre
 		break;
 	}
 
-	if (Width == 640 && Height == 360) return ELunarSimResolutionPreset::R640x360;
-	if (Width == 1024 && Height == 576) return ELunarSimResolutionPreset::R1024x576;
-	if (Width == 1280 && Height == 720) return ELunarSimResolutionPreset::R1280x720;
-	if (Width == 1920 && Height == 1080) return ELunarSimResolutionPreset::R1920x1080;
-	if (Width == 640 && Height == 640) return ELunarSimResolutionPreset::R640x640;
-	if (Width == 1024 && Height == 1024) return ELunarSimResolutionPreset::R1024x1024;
+	if (Width == 640 && Height == 360)
+		return ELunarSimResolutionPreset::R640x360;
+	if (Width == 1024 && Height == 576)
+		return ELunarSimResolutionPreset::R1024x576;
+	if (Width == 1280 && Height == 720)
+		return ELunarSimResolutionPreset::R1280x720;
+	if (Width == 1920 && Height == 1080)
+		return ELunarSimResolutionPreset::R1920x1080;
+	if (Width == 640 && Height == 640)
+		return ELunarSimResolutionPreset::R640x640;
+	if (Width == 1024 && Height == 1024)
+		return ELunarSimResolutionPreset::R1024x1024;
 
 	return ELunarSimResolutionPreset::R1024x1024;
 }
 
 float NormalizeEditorCaptureHz(float InCaptureHz)
 {
-	return FMath::Clamp(
-		FCaptureConfig::SanitizeCameraCaptureHz(InCaptureHz),
-		FCaptureConfig::GetMinCameraCaptureHz(),
-		FCaptureConfig::GetMaxCameraCaptureHz());
+	return FMath::Clamp(FCaptureConfig::SanitizeCameraCaptureHz(InCaptureHz), FCaptureConfig::GetMinCameraCaptureHz(),
+	                    FCaptureConfig::GetMaxCameraCaptureHz());
 }
 
 bool IsEditorPlaySessionRunning()
@@ -76,23 +89,20 @@ bool IsEditorPlaySessionRunning()
 
 bool HasInvalidEditorFlags(const UObject* Object)
 {
-	return !Object
-		|| Object->HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject | RF_BeginDestroyed | RF_FinishDestroyed);
+	return !Object ||
+	       Object->HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject | RF_BeginDestroyed | RF_FinishDestroyed);
 }
 
 bool IsUsableEditorActor(AActor* Actor, const UWorld* ExpectedWorld)
 {
-	return IsValid(Actor)
-		&& Actor->GetWorld() == ExpectedWorld
-		&& !Actor->IsActorBeingDestroyed()
-		&& !HasInvalidEditorFlags(Actor);
+	return IsValid(Actor) && Actor->GetWorld() == ExpectedWorld && !Actor->IsActorBeingDestroyed() &&
+	       !HasInvalidEditorFlags(Actor);
 }
 
 bool IsUsableRobotCamRig(ARobotCamRig* RobotCamRig, const UWorld* ExpectedWorld)
 {
-	return IsUsableEditorActor(RobotCamRig, ExpectedWorld)
-		&& IsValid(RobotCamRig->GetRootComponent())
-		&& !HasInvalidEditorFlags(RobotCamRig->GetRootComponent());
+	return IsUsableEditorActor(RobotCamRig, ExpectedWorld) && IsValid(RobotCamRig->GetRootComponent()) &&
+	       !HasInvalidEditorFlags(RobotCamRig->GetRootComponent());
 }
 
 bool IsUsableComponent(const UActorComponent* Component)
@@ -100,14 +110,14 @@ bool IsUsableComponent(const UActorComponent* Component)
 	return IsValid(Component) && !HasInvalidEditorFlags(Component);
 }
 
-template <typename ComponentType>
-ComponentType* FindUsableComponentByClass(AActor* Actor)
+template <typename ComponentType> ComponentType* FindUsableComponentByClass(AActor* Actor)
 {
 	ComponentType* Component = Actor ? Actor->FindComponentByClass<ComponentType>() : nullptr;
 	return IsUsableComponent(Component) ? Component : nullptr;
 }
 
-ARobotCamRig* FindUsableRobotCamRigChildActor(AActor* RoverActor, const UWorld* EditorWorld, UChildActorComponent*& OutChildActorComponent)
+ARobotCamRig* FindUsableRobotCamRigChildActor(AActor* RoverActor, const UWorld* EditorWorld,
+                                              UChildActorComponent*& OutChildActorComponent)
 {
 	OutChildActorComponent = nullptr;
 	if (!IsUsableEditorActor(RoverActor, EditorWorld)) {
@@ -116,8 +126,7 @@ ARobotCamRig* FindUsableRobotCamRigChildActor(AActor* RoverActor, const UWorld* 
 
 	TArray<UChildActorComponent*> ChildActorComponents;
 	RoverActor->GetComponents<UChildActorComponent>(ChildActorComponents);
-	for (UChildActorComponent* ChildActorComponent : ChildActorComponents)
-	{
+	for (UChildActorComponent* ChildActorComponent : ChildActorComponents) {
 		if (!IsUsableComponent(ChildActorComponent)) {
 			continue;
 		}
@@ -145,19 +154,12 @@ struct FResolvedRoverPipeline
 
 	bool IsComplete() const
 	{
-		return RobotCamRig
-			&& RobotCamRigChildComponent
-			&& GroundTruthPublisher
-			&& ImuPublisher
-			&& RoverController
-			&& CmdVelController;
+		return RobotCamRig && RobotCamRigChildComponent && GroundTruthPublisher && ImuPublisher && RoverController &&
+		       CmdVelController;
 	}
 };
 
-bool ResolveCompleteRoverPipeline(
-	AActor* RoverActor,
-	UWorld* EditorWorld,
-	FResolvedRoverPipeline& OutPipeline)
+bool ResolveCompleteRoverPipeline(AActor* RoverActor, UWorld* EditorWorld, FResolvedRoverPipeline& OutPipeline)
 {
 	OutPipeline = FResolvedRoverPipeline();
 
@@ -169,10 +171,8 @@ bool ResolveCompleteRoverPipeline(
 	OutPipeline.ImuPublisher = FindUsableComponentByClass<UImuSensorPublisherComponent>(RoverActor);
 	OutPipeline.RoverController = FindUsableComponentByClass<URoverVehicleControllerComponent>(RoverActor);
 	OutPipeline.CmdVelController = FindUsableComponentByClass<URoverCmdVelVehicleControllerComponent>(RoverActor);
-	OutPipeline.RobotCamRig = FindUsableRobotCamRigChildActor(
-		RoverActor,
-		EditorWorld,
-		OutPipeline.RobotCamRigChildComponent);
+	OutPipeline.RobotCamRig =
+	    FindUsableRobotCamRigChildActor(RoverActor, EditorWorld, OutPipeline.RobotCamRigChildComponent);
 
 	return OutPipeline.IsComplete();
 }
@@ -234,31 +234,26 @@ TSharedRef<SWidget> MakeSimulatorConfigCheckRow(const TSharedRef<SWidget>& Check
 }
 }
 
-
 void FsimulatorEditorModule::StartupModule()
 {
 	InitResolutionPresetOptions();
 	InitRoverControlOptions();
 
-	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(
-		SimulatorConfigTabName,
-		FOnSpawnTab::CreateRaw(this, &FsimulatorEditorModule::OnSpawnSimulatorConfigTab)
-	)
-	.SetDisplayName(LOCTEXT("SimulatorConfigTabTitle", "Simulator Config"))
-	.SetMenuType(ETabSpawnerMenuType::Hidden);
+	FGlobalTabmanager::Get()
+	    ->RegisterNomadTabSpawner(SimulatorConfigTabName,
+	                              FOnSpawnTab::CreateRaw(this, &FsimulatorEditorModule::OnSpawnSimulatorConfigTab))
+	    .SetDisplayName(LOCTEXT("SimulatorConfigTabTitle", "Simulator Config"))
+	    .SetMenuType(ETabSpawnerMenuType::Hidden);
 
-	if (UToolMenus::IsToolMenuUIEnabled())
-	{
+	if (UToolMenus::IsToolMenuUIEnabled()) {
 		UToolMenus::RegisterStartupCallback(
-			FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FsimulatorEditorModule::RegisterMenus)
-		);
+		    FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FsimulatorEditorModule::RegisterMenus));
 	}
 }
 
 void FsimulatorEditorModule::ShutdownModule()
 {
-	if (UToolMenus::IsToolMenuUIEnabled())
-	{
+	if (UToolMenus::IsToolMenuUIEnabled()) {
 		UToolMenus::UnRegisterStartupCallback(this);
 		UToolMenus::UnregisterOwner(this);
 	}
@@ -271,17 +266,15 @@ void FsimulatorEditorModule::RegisterMenus()
 	FToolMenuOwnerScoped OwnerScoped(this);
 
 	UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window");
-	if (!Menu) return;
+	if (!Menu)
+		return;
 
-	FToolMenuSection& Section = Menu->AddSection("SimulatorConfigSection", LOCTEXT("SimulatorConfigSection", "Simulator"));
+	FToolMenuSection& Section =
+	    Menu->AddSection("SimulatorConfigSection", LOCTEXT("SimulatorConfigSection", "Simulator"));
 
-	Section.AddMenuEntry(
-		"OpenSimulatorConfig",
-		LOCTEXT("OpenSimulatorConfigLabel", "Simulator Config"),
-		LOCTEXT("OpenSimulatorConfigTooltip", "Open the Simulator Config window"),
-		FSlateIcon(),
-		FUIAction(FExecuteAction::CreateRaw(this, &FsimulatorEditorModule::OpenSimulatorConfigTab))
-	);
+	Section.AddMenuEntry("OpenSimulatorConfig", LOCTEXT("OpenSimulatorConfigLabel", "Simulator Config"),
+	                     LOCTEXT("OpenSimulatorConfigTooltip", "Open the Simulator Config window"), FSlateIcon(),
+	                     FUIAction(FExecuteAction::CreateRaw(this, &FsimulatorEditorModule::OpenSimulatorConfigTab)));
 }
 
 void FsimulatorEditorModule::OpenSimulatorConfigTab()
@@ -308,360 +301,378 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 
 	return SNew(SBox)
 		.Padding(12.0f)
-		.MinDesiredWidth(760.f)
 		[
-			SNew(SVerticalBox)
+			SNew(SScrollBox)
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 10.f)
+			+ SScrollBox::Slot()
 			[
-				SNew(STextBlock)
-				.Text(LOCTEXT("SimulatorConfigTitle", "Simulator Config"))
-				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 14))
-			]
+				SNew(SVerticalBox)
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 10.f)
-			[
-				SNew(SHorizontalBox)
-
-				+ SHorizontalBox::Slot()
-				.FillWidth(1.f)
-				.Padding(0.f, 0.f, 5.f, 0.f)
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f, 0.f, 10.f)
 				[
-					MakeSimulatorConfigSection(
-						LOCTEXT("OutputsSectionLabel", "Outputs"),
-						SNew(SVerticalBox)
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigCheckRow(
-								SNew(SCheckBox)
-								.IsChecked_Raw(this, &FsimulatorEditorModule::GetStereoRosImagesCheckState)
-								.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnStereoRosImagesChanged)
-								[
-									SNew(STextBlock)
-									.Text(LOCTEXT("StereoRosImagesLabel", "Stereo ROS Images + CameraInfo"))
-									.AutoWrapText(true)
-								])
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigCheckRow(
-								SNew(SCheckBox)
-								.IsChecked_Raw(this, &FsimulatorEditorModule::GetTrajectoryCsvCheckState)
-								.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnTrajectoryCsvChanged)
-								[
-									SNew(STextBlock)
-									.Text(LOCTEXT("TrajectoryCsvLabel", "Trajectory CSV"))
-								])
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigCheckRow(
-								SNew(SCheckBox)
-								.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditGroundTruthMaps)
-								.IsChecked_Raw(this, &FsimulatorEditorModule::GetEnableGroundTruthMapsCheckState)
-								.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnEnableGroundTruthMapsChanged)
-								[
-									SNew(STextBlock)
-									.Text(LOCTEXT("GroundTruthRosMapsLabel", "Ground Truth ROS Maps"))
-									.AutoWrapText(true)
-								])
-						])
+					SNew(STextBlock)
+					.Text(LOCTEXT("SimulatorConfigTitle", "Simulator Config"))
+					.Font(FCoreStyle::GetDefaultFontStyle("Bold", 14))
 				]
 
-				+ SHorizontalBox::Slot()
-				.FillWidth(1.f)
-				.Padding(5.f, 0.f, 0.f, 0.f)
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f, 0.f, 8.f)
 				[
-					MakeSimulatorConfigSection(
-						LOCTEXT("GroundTruthOutputsSectionLabel", "Ground Truth Outputs"),
-						SNew(SVerticalBox)
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigCheckRow(
-								SNew(SCheckBox)
-								.IsChecked_Raw(this, &FsimulatorEditorModule::GetGroundTruthImagesCheckState)
-								.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnGroundTruthImagesChanged)
-								[
-									SNew(STextBlock)
-									.Text(LOCTEXT("GroundTruthImagesLabel", "Ground Truth Images"))
-									.AutoWrapText(true)
-								])
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigCheckRow(
-								SNew(SCheckBox)
-								.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditGroundTruthOutput)
-								.IsChecked_Raw(this, &FsimulatorEditorModule::GetGroundTruthRgbCheckState)
-								.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnGroundTruthRgbChanged)
-								[
-									SNew(STextBlock)
-									.Text(LOCTEXT("GroundTruthRgbLabel", "RGB"))
-								],
-								18.f)
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigCheckRow(
-								SNew(SCheckBox)
-								.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditGroundTruthOutput)
-								.IsChecked_Raw(this, &FsimulatorEditorModule::GetGroundTruthDepthCheckState)
-								.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnGroundTruthDepthChanged)
-								[
-									SNew(STextBlock)
-									.Text(LOCTEXT("GroundTruthDepthLabel", "Depth"))
-								],
-								18.f)
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigCheckRow(
-								SNew(SCheckBox)
-								.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditGroundTruthOutput)
-								.IsChecked_Raw(this, &FsimulatorEditorModule::GetGroundTruthSegmentationCheckState)
-								.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnGroundTruthSegmentationChanged)
-								[
-									SNew(STextBlock)
-									.Text(LOCTEXT("GroundTruthSegmentationLabel", "Segmentation"))
-								],
-								18.f)
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigCheckRow(
-								SNew(SCheckBox)
-								.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditGroundTruthOutput)
-								.IsChecked_Raw(this, &FsimulatorEditorModule::GetGroundTruthBoundingBoxesCheckState)
-								.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnGroundTruthBoundingBoxesChanged)
-								[
-									SNew(STextBlock)
-									.Text(LOCTEXT("GroundTruthBoundingBoxesLabel", "Bounding Boxes"))
-								],
-								18.f)
-						])
+					SNew(STextBlock)
+					.Text(LOCTEXT("DataGenerationTitle", "Data Generation and ROS 2"))
+					.Font(FCoreStyle::GetDefaultFontStyle("Bold", 12))
 				]
-			]
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 8.f)
-			[
-				SNew(STextBlock)
-				.Text(LOCTEXT("CaptureKeyHelp", "Press C to Start/Stop Capture Session"))
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 12.f)
-			[
-				SNew(SHorizontalBox)
-
-				+ SHorizontalBox::Slot()
-				.FillWidth(1.f)
-				.Padding(0.f, 0.f, 5.f, 0.f)
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f, 0.f, 10.f)
 				[
-					MakeSimulatorConfigSection(
-						LOCTEXT("CaptureSectionLabel", "Capture"),
-						SNew(SVerticalBox)
+					SNew(SHorizontalBox)
 
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigFormRow(
-								LOCTEXT("ResolutionLabel", "Resolution"),
-								SNew(SBox)
-								.WidthOverride(180.f)
-								[
-									SNew(SComboBox<TSharedPtr<ELunarSimResolutionPreset>>)
-									.OptionsSource(&ResolutionPresetOptions)
-									.InitiallySelectedItem(SelectedResolutionPresetOption)
-									.OnGenerateWidget_Raw(this, &FsimulatorEditorModule::MakeResolutionPresetComboWidget)
-									.OnSelectionChanged_Raw(this, &FsimulatorEditorModule::OnResolutionPresetSelectionChanged)
+					+ SHorizontalBox::Slot()
+					.FillWidth(1.f)
+					.Padding(0.f, 0.f, 5.f, 0.f)
+					[
+						MakeSimulatorConfigSection(
+							LOCTEXT("OutputsSectionLabel", "Outputs"),
+							SNew(SVerticalBox)
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigCheckRow(
+									SNew(SCheckBox)
+									.IsChecked_Raw(this, &FsimulatorEditorModule::GetStereoRosImagesCheckState)
+									.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnStereoRosImagesChanged)
 									[
 										SNew(STextBlock)
-										.Text_Raw(this, &FsimulatorEditorModule::GetResolutionPresetText)
-									]
-								])
-						]
+										.Text(LOCTEXT("StereoRosImagesLabel", "Stereo ROS Images + CameraInfo"))
+										.AutoWrapText(true)
+									])
+							]
 
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigFormRow(
-								LOCTEXT("CameraHorizontalFovDegLabel", "Horizontal FOV deg"),
-								SNew(SBox)
-								.WidthOverride(120.f)
-								[
-									SNew(SNumericEntryBox<float>)
-									.Value_Lambda([this]() -> TOptional<float>
-									{
-										return CameraHorizontalFovDeg;
-									})
-									.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnCameraHorizontalFovDegChanged)
-									.MinValue(FCaptureConfig::GetMinHorizontalFovDeg())
-									.MaxValue(FCaptureConfig::GetMaxHorizontalFovDeg())
-									.MinSliderValue(FCaptureConfig::GetMinHorizontalFovDeg())
-									.MaxSliderValue(FCaptureConfig::GetMaxHorizontalFovDeg())
-									.AllowSpin(true)
-								])
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigFormRow(
-								LOCTEXT("CaptureHzLabel", "Capture Hz"),
-								SNew(SBox)
-								.WidthOverride(120.f)
-								[
-									SNew(SNumericEntryBox<float>)
-									.Value_Lambda([this]() -> TOptional<float>
-									{
-										return CustomCaptureHz;
-									})
-									.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnCustomCaptureHzChanged)
-									.MinValue(FCaptureConfig::GetMinCameraCaptureHz())
-									.MaxValue(FCaptureConfig::GetMaxCameraCaptureHz())
-									.MinSliderValue(1.0f)
-									.MaxSliderValue(FCaptureConfig::GetMaxCameraCaptureHz())
-									.AllowSpin(true)
-								])
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigFormRow(
-								LOCTEXT("StereoBaselineCmLabel", "Stereo Baseline cm"),
-								SNew(SBox)
-								.WidthOverride(120.f)
-								[
-									SNew(SNumericEntryBox<float>)
-									.Value_Lambda([this]() -> TOptional<float>
-									{
-										return StereoBaselineCm;
-									})
-									.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnStereoBaselineCmChanged)
-									.MinValue(FCaptureConfig::GetMinStereoBaselineCm())
-									.MaxValue(FCaptureConfig::GetMaxStereoBaselineCm())
-									.MinSliderValue(FCaptureConfig::GetMinStereoBaselineCm())
-									.MaxSliderValue(100.0f)
-									.AllowSpin(true)
-								])
-						])
-				]
-
-				+ SHorizontalBox::Slot()
-				.FillWidth(1.f)
-				.Padding(5.f, 0.f, 0.f, 0.f)
-				[
-					MakeSimulatorConfigSection(
-						LOCTEXT("RoverSensorsSectionLabel", "Rover / Sensors"),
-						SNew(SVerticalBox)
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigFormRow(
-								LOCTEXT("ImuHzLabel", "IMU Hz"),
-								SNew(SBox)
-								.WidthOverride(120.f)
-								.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditImuHz)
-								[
-									SNew(SNumericEntryBox<float>)
-									.Value_Lambda([this]() -> TOptional<float>
-									{
-										return ImuPublishHz;
-									})
-									.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnImuHzChanged)
-									.MinValue(1.0f)
-									.MaxValue(400.0f)
-									.MinSliderValue(1.0f)
-									.MaxSliderValue(200.0f)
-									.AllowSpin(true)
-								])
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							MakeSimulatorConfigFormRow(
-								LOCTEXT("RoverControlModeLabel", "Control Mode"),
-								SNew(SBox)
-								.WidthOverride(180.f)
-								.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditRoverControl)
-								[
-									SNew(SComboBox<TSharedPtr<ERoverControlMode>>)
-									.OptionsSource(&RoverControlModeOptions)
-									.InitiallySelectedItem(SelectedRoverControlModeOption)
-									.OnGenerateWidget_Raw(this, &FsimulatorEditorModule::MakeRoverControlModeComboWidget)
-									.OnSelectionChanged_Raw(this, &FsimulatorEditorModule::OnRoverControlModeSelectionChanged)
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigCheckRow(
+									SNew(SCheckBox)
+									.IsChecked_Raw(this, &FsimulatorEditorModule::GetTrajectoryCsvCheckState)
+									.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnTrajectoryCsvChanged)
 									[
 										SNew(STextBlock)
-										.Text_Raw(this, &FsimulatorEditorModule::GetRoverControlModeText)
-									]
-								])
-						]
+										.Text(LOCTEXT("TrajectoryCsvLabel", "Trajectory CSV"))
+									])
+							]
 
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						.Padding(0.f, 8.f, 0.f, 0.f)
-						[
-							SNew(STextBlock)
-							.Text(LOCTEXT("ImuHzNote", "Note: IMU rate capped by FPS"))
-							.AutoWrapText(true)
-						])
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigCheckRow(
+									SNew(SCheckBox)
+									.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditGroundTruthMaps)
+									.IsChecked_Raw(this, &FsimulatorEditorModule::GetEnableGroundTruthMapsCheckState)
+									.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnEnableGroundTruthMapsChanged)
+									[
+										SNew(STextBlock)
+										.Text(LOCTEXT("GroundTruthRosMapsLabel", "Ground Truth ROS Maps"))
+										.AutoWrapText(true)
+									])
+							])
+					]
+
+					+ SHorizontalBox::Slot()
+					.FillWidth(1.f)
+					.Padding(5.f, 0.f, 0.f, 0.f)
+					[
+						MakeSimulatorConfigSection(
+							LOCTEXT("GroundTruthOutputsSectionLabel", "Ground Truth Outputs"),
+							SNew(SVerticalBox)
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigCheckRow(
+									SNew(SCheckBox)
+									.IsChecked_Raw(this, &FsimulatorEditorModule::GetGroundTruthImagesCheckState)
+									.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnGroundTruthImagesChanged)
+									[
+										SNew(STextBlock)
+										.Text(LOCTEXT("GroundTruthImagesLabel", "Ground Truth Images"))
+										.AutoWrapText(true)
+									])
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigCheckRow(
+									SNew(SCheckBox)
+									.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditGroundTruthOutput)
+									.IsChecked_Raw(this, &FsimulatorEditorModule::GetGroundTruthRgbCheckState)
+									.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnGroundTruthRgbChanged)
+									[
+										SNew(STextBlock)
+										.Text(LOCTEXT("GroundTruthRgbLabel", "RGB"))
+									],
+									18.f)
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigCheckRow(
+									SNew(SCheckBox)
+									.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditGroundTruthOutput)
+									.IsChecked_Raw(this, &FsimulatorEditorModule::GetGroundTruthDepthCheckState)
+									.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnGroundTruthDepthChanged)
+									[
+										SNew(STextBlock)
+										.Text(LOCTEXT("GroundTruthDepthLabel", "Depth"))
+									],
+									18.f)
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigCheckRow(
+									SNew(SCheckBox)
+									.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditGroundTruthOutput)
+									.IsChecked_Raw(this, &FsimulatorEditorModule::GetGroundTruthSegmentationCheckState)
+									.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnGroundTruthSegmentationChanged)
+									[
+										SNew(STextBlock)
+										.Text(LOCTEXT("GroundTruthSegmentationLabel", "Segmentation"))
+									],
+									18.f)
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigCheckRow(
+									SNew(SCheckBox)
+									.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditGroundTruthOutput)
+									.IsChecked_Raw(this, &FsimulatorEditorModule::GetGroundTruthBoundingBoxesCheckState)
+									.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnGroundTruthBoundingBoxesChanged)
+									[
+										SNew(STextBlock)
+										.Text(LOCTEXT("GroundTruthBoundingBoxesLabel", "Bounding Boxes"))
+									],
+									18.f)
+							])
+					]
 				]
-			]
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 0.f, 0.f, 0.f)
-			.HAlign(HAlign_Left)
-			[
-				SNew(SButton)
-				.Text(LOCTEXT("ApplyButtonLabel", "Apply Settings"))
-				.IsEnabled_Raw(this, &FsimulatorEditorModule::CanApplySettings)
-				.OnClicked_Lambda([this]()
-				{
-					OnApplyClicked();
-					return FReply::Handled();
-				})
-			]
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f, 0.f, 8.f)
+				[
+					SNew(STextBlock)
+					.Text(LOCTEXT("CaptureKeyHelp", "Press C to Start/Stop Capture Session"))
+				]
 
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			.Padding(0.f, 10.f, 0.f, 0.f)
-			[
-				SNew(STextBlock)
-				.Text_Raw(this, &FsimulatorEditorModule::GetApplyStatusText)
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f, 0.f, 12.f)
+				[
+					SNew(SHorizontalBox)
+
+					+ SHorizontalBox::Slot()
+					.FillWidth(1.f)
+					.Padding(0.f, 0.f, 5.f, 0.f)
+					[
+						MakeSimulatorConfigSection(
+							LOCTEXT("CaptureSectionLabel", "Capture"),
+							SNew(SVerticalBox)
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigFormRow(
+									LOCTEXT("ResolutionLabel", "Resolution"),
+									SNew(SBox)
+									.WidthOverride(180.f)
+									[
+										SNew(SComboBox<TSharedPtr<ELunarSimResolutionPreset>>)
+										.OptionsSource(&ResolutionPresetOptions)
+										.InitiallySelectedItem(SelectedResolutionPresetOption)
+										.OnGenerateWidget_Raw(this, &FsimulatorEditorModule::MakeResolutionPresetComboWidget)
+										.OnSelectionChanged_Raw(this, &FsimulatorEditorModule::OnResolutionPresetSelectionChanged)
+										[
+											SNew(STextBlock)
+											.Text_Raw(this, &FsimulatorEditorModule::GetResolutionPresetText)
+										]
+									])
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigFormRow(
+									LOCTEXT("CameraHorizontalFovDegLabel", "Horizontal FOV deg"),
+									SNew(SBox)
+									.WidthOverride(120.f)
+									[
+										SNew(SNumericEntryBox<float>)
+										.Value_Lambda([this]() -> TOptional<float> {
+											return CameraHorizontalFovDeg;
+										})
+										.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnCameraHorizontalFovDegChanged)
+										.MinValue(FCaptureConfig::GetMinHorizontalFovDeg())
+										.MaxValue(FCaptureConfig::GetMaxHorizontalFovDeg())
+										.MinSliderValue(FCaptureConfig::GetMinHorizontalFovDeg())
+										.MaxSliderValue(FCaptureConfig::GetMaxHorizontalFovDeg())
+										.AllowSpin(true)
+									])
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigFormRow(
+									LOCTEXT("CaptureHzLabel", "Capture Hz"),
+									SNew(SBox)
+									.WidthOverride(120.f)
+									[
+										SNew(SNumericEntryBox<float>)
+										.Value_Lambda([this]() -> TOptional<float> {
+											return CustomCaptureHz;
+										})
+										.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnCustomCaptureHzChanged)
+										.MinValue(FCaptureConfig::GetMinCameraCaptureHz())
+										.MaxValue(FCaptureConfig::GetMaxCameraCaptureHz())
+										.MinSliderValue(1.0f)
+										.MaxSliderValue(FCaptureConfig::GetMaxCameraCaptureHz())
+										.AllowSpin(true)
+									])
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigFormRow(
+									LOCTEXT("StereoBaselineCmLabel", "Stereo Baseline cm"),
+									SNew(SBox)
+									.WidthOverride(120.f)
+									[
+										SNew(SNumericEntryBox<float>)
+										.Value_Lambda([this]() -> TOptional<float> {
+											return StereoBaselineCm;
+										})
+										.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnStereoBaselineCmChanged)
+										.MinValue(FCaptureConfig::GetMinStereoBaselineCm())
+										.MaxValue(FCaptureConfig::GetMaxStereoBaselineCm())
+										.MinSliderValue(FCaptureConfig::GetMinStereoBaselineCm())
+										.MaxSliderValue(100.0f)
+										.AllowSpin(true)
+									])
+							])
+					]
+
+					+ SHorizontalBox::Slot()
+					.FillWidth(1.f)
+					.Padding(5.f, 0.f, 0.f, 0.f)
+					[
+						MakeSimulatorConfigSection(
+							LOCTEXT("RoverSensorsSectionLabel", "Rover / Sensors"),
+							SNew(SVerticalBox)
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigFormRow(
+									LOCTEXT("ImuHzLabel", "IMU Hz"),
+									SNew(SBox)
+									.WidthOverride(120.f)
+									.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditImuHz)
+									[
+										SNew(SNumericEntryBox<float>)
+										.Value_Lambda([this]() -> TOptional<float> {
+											return ImuPublishHz;
+										})
+										.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnImuHzChanged)
+										.MinValue(1.0f)
+										.MaxValue(400.0f)
+										.MinSliderValue(1.0f)
+										.MaxSliderValue(200.0f)
+										.AllowSpin(true)
+									])
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigFormRow(
+									LOCTEXT("RoverControlModeLabel", "Control Mode"),
+									SNew(SBox)
+									.WidthOverride(180.f)
+									.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditRoverControl)
+									[
+										SNew(SComboBox<TSharedPtr<ERoverControlMode>>)
+										.OptionsSource(&RoverControlModeOptions)
+										.InitiallySelectedItem(SelectedRoverControlModeOption)
+										.OnGenerateWidget_Raw(this, &FsimulatorEditorModule::MakeRoverControlModeComboWidget)
+										.OnSelectionChanged_Raw(this, &FsimulatorEditorModule::OnRoverControlModeSelectionChanged)
+										[
+											SNew(STextBlock)
+											.Text_Raw(this, &FsimulatorEditorModule::GetRoverControlModeText)
+										]
+									])
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(0.f, 8.f, 0.f, 0.f)
+							[
+								SNew(STextBlock)
+								.Text(LOCTEXT("ImuHzNote", "Note: IMU rate capped by FPS"))
+								.AutoWrapText(true)
+							])
+					]
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f, 0.f, 0.f)
+				.HAlign(HAlign_Left)
+				[
+					SNew(SButton)
+					.Text(LOCTEXT("ApplyButtonLabel", "Apply Settings"))
+					.IsEnabled_Raw(this, &FsimulatorEditorModule::CanApplySettings)
+					.OnClicked_Lambda([this]() {
+						OnApplyClicked();
+						return FReply::Handled();
+					})
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 10.f, 0.f, 0.f)
+				[
+					SNew(STextBlock)
+					.Text_Raw(this, &FsimulatorEditorModule::GetApplyStatusText)
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 14.f, 0.f, 0.f)
+				[
+					MakeSimulatorConfigSection(
+						LOCTEXT("TerrainGenerationSectionLabel", "Terrain Generation"),
+						SNew(SRockBakingPanel))
+				]
 			]
 		];
 }
 
 void FsimulatorEditorModule::InitResolutionPresetOptions()
 {
-	if (ResolutionPresetOptions.Num() > 0) return;
+	if (ResolutionPresetOptions.Num() > 0)
+		return;
 
 	ResolutionPresetOptions.Add(MakeShared<ELunarSimResolutionPreset>(ELunarSimResolutionPreset::R640x360));
 	ResolutionPresetOptions.Add(MakeShared<ELunarSimResolutionPreset>(ELunarSimResolutionPreset::R1024x576));
@@ -671,27 +682,25 @@ void FsimulatorEditorModule::InitResolutionPresetOptions()
 	ResolutionPresetOptions.Add(MakeShared<ELunarSimResolutionPreset>(ELunarSimResolutionPreset::R1024x1024));
 }
 
-TSharedPtr<ELunarSimResolutionPreset> FsimulatorEditorModule::FindResolutionPresetOption(ELunarSimResolutionPreset InPreset) const
+TSharedPtr<ELunarSimResolutionPreset>
+FsimulatorEditorModule::FindResolutionPresetOption(ELunarSimResolutionPreset InPreset) const
 {
 	TSharedPtr<ELunarSimResolutionPreset> DefaultOption;
-	for (const TSharedPtr<ELunarSimResolutionPreset>& Option : ResolutionPresetOptions)
-	{
-		if (Option.IsValid() && *Option == ELunarSimResolutionPreset::R1024x1024)
-		{
+	for (const TSharedPtr<ELunarSimResolutionPreset>& Option : ResolutionPresetOptions) {
+		if (Option.IsValid() && *Option == ELunarSimResolutionPreset::R1024x1024) {
 			DefaultOption = Option;
 		}
-		if (Option.IsValid() && *Option == InPreset)
-		{
+		if (Option.IsValid() && *Option == InPreset) {
 			return Option;
 		}
 	}
-	return DefaultOption.IsValid() ? DefaultOption : (ResolutionPresetOptions.Num() > 0 ? ResolutionPresetOptions[0] : nullptr);
+	return DefaultOption.IsValid() ? DefaultOption
+	                               : (ResolutionPresetOptions.Num() > 0 ? ResolutionPresetOptions[0] : nullptr);
 }
 
 FString FsimulatorEditorModule::ResolutionPresetToString(ELunarSimResolutionPreset InPreset) const
 {
-	switch (InPreset)
-	{
+	switch (InPreset) {
 	case ELunarSimResolutionPreset::R640x360:
 		return TEXT("640x360");
 	case ELunarSimResolutionPreset::R1024x576:
@@ -714,15 +723,18 @@ FText FsimulatorEditorModule::GetResolutionPresetText() const
 	return FText::FromString(ResolutionPresetToString(ResolutionPreset));
 }
 
-TSharedRef<SWidget> FsimulatorEditorModule::MakeResolutionPresetComboWidget(TSharedPtr<ELunarSimResolutionPreset> InOption) const
+TSharedRef<SWidget>
+FsimulatorEditorModule::MakeResolutionPresetComboWidget(TSharedPtr<ELunarSimResolutionPreset> InOption) const
 {
 	const ELunarSimResolutionPreset Preset = InOption.IsValid() ? *InOption : ELunarSimResolutionPreset::R1024x1024;
 	return SNew(STextBlock).Text(FText::FromString(ResolutionPresetToString(Preset)));
 }
 
-void FsimulatorEditorModule::OnResolutionPresetSelectionChanged(TSharedPtr<ELunarSimResolutionPreset> NewSelection, ESelectInfo::Type SelectInfo)
+void FsimulatorEditorModule::OnResolutionPresetSelectionChanged(TSharedPtr<ELunarSimResolutionPreset> NewSelection,
+                                                                ESelectInfo::Type SelectInfo)
 {
-	if (!NewSelection.IsValid()) return;
+	if (!NewSelection.IsValid())
+		return;
 
 	SelectedResolutionPresetOption = NewSelection;
 	ResolutionPreset = *NewSelection;
@@ -730,18 +742,18 @@ void FsimulatorEditorModule::OnResolutionPresetSelectionChanged(TSharedPtr<ELuna
 
 void FsimulatorEditorModule::InitRoverControlOptions()
 {
-	if (RoverControlModeOptions.Num() > 0) return;
+	if (RoverControlModeOptions.Num() > 0)
+		return;
 
 	RoverControlModeOptions.Add(MakeShared<ERoverControlMode>(ERoverControlMode::Manual));
 	RoverControlModeOptions.Add(MakeShared<ERoverControlMode>(ERoverControlMode::RosCmdVel));
+	RoverControlModeOptions.Add(MakeShared<ERoverControlMode>(ERoverControlMode::Disabled));
 }
 
 TSharedPtr<ERoverControlMode> FsimulatorEditorModule::FindRoverControlModeOption(ERoverControlMode InMode) const
 {
-	for (const TSharedPtr<ERoverControlMode>& Option : RoverControlModeOptions)
-	{
-		if (Option.IsValid() && *Option == InMode)
-		{
+	for (const TSharedPtr<ERoverControlMode>& Option : RoverControlModeOptions) {
+		if (Option.IsValid() && *Option == InMode) {
 			return Option;
 		}
 	}
@@ -750,12 +762,13 @@ TSharedPtr<ERoverControlMode> FsimulatorEditorModule::FindRoverControlModeOption
 
 FString FsimulatorEditorModule::RoverControlModeToString(ERoverControlMode InMode) const
 {
-	switch (InMode)
-	{
+	switch (InMode) {
 	case ERoverControlMode::Manual:
 		return TEXT("WASD");
 	case ERoverControlMode::RosCmdVel:
 		return TEXT("cmd_vel");
+	case ERoverControlMode::Disabled:
+		return TEXT("Disabled");
 	default:
 		return TEXT("WASD");
 	}
@@ -766,15 +779,18 @@ FText FsimulatorEditorModule::GetRoverControlModeText() const
 	return FText::FromString(RoverControlModeToString(NormalizeEditorRoverControlMode(RoverControlMode)));
 }
 
-TSharedRef<SWidget> FsimulatorEditorModule::MakeRoverControlModeComboWidget(TSharedPtr<ERoverControlMode> InOption) const
+TSharedRef<SWidget>
+FsimulatorEditorModule::MakeRoverControlModeComboWidget(TSharedPtr<ERoverControlMode> InOption) const
 {
 	const ERoverControlMode Mode = InOption.IsValid() ? *InOption : ERoverControlMode::Manual;
 	return SNew(STextBlock).Text(FText::FromString(RoverControlModeToString(Mode)));
 }
 
-void FsimulatorEditorModule::OnRoverControlModeSelectionChanged(TSharedPtr<ERoverControlMode> NewSelection, ESelectInfo::Type SelectInfo)
+void FsimulatorEditorModule::OnRoverControlModeSelectionChanged(TSharedPtr<ERoverControlMode> NewSelection,
+                                                                ESelectInfo::Type SelectInfo)
 {
-	if (!NewSelection.IsValid()) return;
+	if (!NewSelection.IsValid())
+		return;
 
 	SelectedRoverControlModeOption = NewSelection;
 	RoverControlMode = NormalizeEditorRoverControlMode(*NewSelection);
@@ -882,7 +898,8 @@ void FsimulatorEditorModule::OnImuHzChanged(float NewValue)
 
 UWorld* FsimulatorEditorModule::GetEditorWorld() const
 {
-	if (!GEditor) return nullptr;
+	if (!GEditor)
+		return nullptr;
 	return GEditor->GetEditorWorldContext().World();
 }
 
@@ -904,18 +921,14 @@ void FsimulatorEditorModule::RefreshTargetsFromEditorWorld()
 		return;
 	}
 
-	for (TActorIterator<AActor> It(EditorWorld); It; ++It)
-	{
+	for (TActorIterator<AActor> It(EditorWorld); It; ++It) {
 		AActor* CandidateRoverActor = *It;
 		if (!IsUsableEditorActor(CandidateRoverActor, EditorWorld)) {
 			continue;
 		}
 
 		FResolvedRoverPipeline Pipeline;
-		if (!ResolveCompleteRoverPipeline(
-			CandidateRoverActor,
-			EditorWorld,
-			Pipeline)) {
+		if (!ResolveCompleteRoverPipeline(CandidateRoverActor, EditorWorld, Pipeline)) {
 			continue;
 		}
 
@@ -935,9 +948,10 @@ void FsimulatorEditorModule::RefreshTargetsFromEditorWorld()
 		if (UImuSensorPublisherComponent* ImuPublisher = TargetImuPublisher.Get()) {
 			ImuPublishHz = ImuPublisher->GetImuPublishHz();
 		}
-	}
-	else {
-		LastApplyStatus = LOCTEXT("NoCompleteRoverPipelineStatus", "No complete ESA_Rover pipeline found in the level. Place an ESA_Rover in the level.");
+	} else {
+		LastApplyStatus =
+		    LOCTEXT("NoCompleteRoverPipelineStatus",
+		            "No complete ESA_Rover pipeline found in the level. Place an ESA_Rover in the level.");
 	}
 
 	RefreshMapPublisherTargets(EditorWorld);
@@ -948,24 +962,24 @@ void FsimulatorEditorModule::RefreshMapPublisherTargets(UWorld* EditorWorld)
 	TargetMapPublishers.Empty();
 	GroundTruthMapPublisherCount = 0;
 
-	if (!EditorWorld) return;
+	if (!EditorWorld)
+		return;
 
-	for (TActorIterator<AActor> It(EditorWorld); It; ++It)
-	{
+	for (TActorIterator<AActor> It(EditorWorld); It; ++It) {
 		AActor* Actor = *It;
-		if (!IsUsableEditorActor(Actor, EditorWorld)) continue;
+		if (!IsUsableEditorActor(Actor, EditorWorld))
+			continue;
 
 		TArray<UOccupancyMapPublisherComponent*> MapPublishers;
 		Actor->GetComponents<UOccupancyMapPublisherComponent>(MapPublishers);
-		for (UOccupancyMapPublisherComponent* MapPublisher : MapPublishers)
-		{
-			if (!IsUsableComponent(MapPublisher)) continue;
+		for (UOccupancyMapPublisherComponent* MapPublisher : MapPublishers) {
+			if (!IsUsableComponent(MapPublisher))
+				continue;
 
 			++GroundTruthMapPublisherCount;
 			TargetMapPublishers.Add(MapPublisher);
 		}
 	}
-
 }
 
 bool FsimulatorEditorModule::CanApplySettings() const
@@ -978,10 +992,7 @@ bool FsimulatorEditorModule::CanApplySettings() const
 	AActor* RoverActor = TargetRoverActor.Get();
 	FResolvedRoverPipeline Pipeline;
 
-	return ResolveCompleteRoverPipeline(
-		RoverActor,
-		EditorWorld,
-		Pipeline);
+	return ResolveCompleteRoverPipeline(RoverActor, EditorWorld, Pipeline);
 }
 
 bool FsimulatorEditorModule::CanEditGroundTruthMaps() const
@@ -1046,8 +1057,8 @@ FCaptureConfig FsimulatorEditorModule::BuildCaptureConfigFromUi(const FCaptureCo
 void FsimulatorEditorModule::OnApplyClicked()
 {
 	if (IsEditorPlaySessionRunning()) {
-		LastApplyStatus = LOCTEXT("ApplyDuringPlayStatus", "Settings were not applied because PIE/simulation is running.");
-		UE_LOG(LogTemp, Warning, TEXT("Simulator config was not applied because capture configuration is locked while PIE/simulation is running."));
+		LastApplyStatus =
+		    LOCTEXT("ApplyDuringPlayStatus", "Settings were not applied because PIE/simulation is running.");
 		return;
 	}
 
@@ -1055,12 +1066,9 @@ void FsimulatorEditorModule::OnApplyClicked()
 	AActor* RoverActor = TargetRoverActor.Get();
 	FResolvedRoverPipeline Pipeline;
 
-	if (!ResolveCompleteRoverPipeline(
-		RoverActor,
-		EditorWorld,
-		Pipeline)) {
-		LastApplyStatus = LOCTEXT("ApplyNoRoverPipelineStatus", "Settings were not applied because no complete ESA_Rover pipeline was found.");
-		UE_LOG(LogTemp, Warning, TEXT("Simulator config was not applied because no complete ESA_Rover pipeline was found in the editor world."));
+	if (!ResolveCompleteRoverPipeline(RoverActor, EditorWorld, Pipeline)) {
+		LastApplyStatus = LOCTEXT("ApplyNoRoverPipelineStatus",
+		                          "Settings were not applied because no complete ESA_Rover pipeline was found.");
 		return;
 	}
 	ARobotCamRig* RobotCamRig = Pipeline.RobotCamRig;
@@ -1077,6 +1085,7 @@ void FsimulatorEditorModule::OnApplyClicked()
 
 	const FCaptureConfig NewConfig = BuildCaptureConfigFromUi(RobotCamRig->GetCaptureConfig());
 
+	const FScopedTransaction ApplyTransaction(LOCTEXT("ApplySimulatorSettingsTransaction", "Apply Simulator Settings"));
 	RoverActor->Modify();
 	RoverActor->MarkPackageDirty();
 
@@ -1099,10 +1108,10 @@ void FsimulatorEditorModule::OnApplyClicked()
 	}
 
 	int32 MapsApplied = 0;
-	for (TWeakObjectPtr<UOccupancyMapPublisherComponent>& MapPublisherPtr : TargetMapPublishers)
-	{
+	for (TWeakObjectPtr<UOccupancyMapPublisherComponent>& MapPublisherPtr : TargetMapPublishers) {
 		UOccupancyMapPublisherComponent* MapPublisher = MapPublisherPtr.Get();
-		if (!IsUsableComponent(MapPublisher)) continue;
+		if (!IsUsableComponent(MapPublisher))
+			continue;
 
 		// Map publishers consume NewConfig from the frozen dataset-run config at
 		// runtime. Count targets for status reporting; do not maintain a second flag.
@@ -1151,29 +1160,6 @@ void FsimulatorEditorModule::OnApplyClicked()
 
 	FString Status = TEXT("Applied settings.");
 
-	UE_LOG(LogTemp, Display,
-		TEXT("Simulator config applied to ESA_Rover pipeline %s / %s: StereoRosImages=%s, GroundTruthImages=%s, GroundTruthRGB=%s, GroundTruthDepth=%s, GroundTruthSegmentation=%s, GroundTruthBoundingBoxes=%s, TrajectoryCsv=%s, Resolution=%s (%dx%d), HorizontalFovDeg=%.2f, CaptureHz=%.3f, StereoBaselineCm=%.2f, GroundTruthMaps=%s, MapPublishers=%d, ImuHz=%s, RoverControlMode=%s"),
-		*RoverActor->GetActorLabel(),
-		*RobotCamRig->GetActorLabel(),
-		NewConfig.bStereoRosImages ? TEXT("true") : TEXT("false"),
-		NewConfig.bGroundTruthImages ? TEXT("true") : TEXT("false"),
-		NewConfig.bGroundTruthRgb ? TEXT("true") : TEXT("false"),
-		NewConfig.bGroundTruthDepth ? TEXT("true") : TEXT("false"),
-		NewConfig.bGroundTruthSegmentation ? TEXT("true") : TEXT("false"),
-		NewConfig.bGroundTruthBoundingBoxes ? TEXT("true") : TEXT("false"),
-		NewConfig.bTrajectoryCsv ? TEXT("true") : TEXT("false"),
-		*ResolutionPresetToString(NewConfig.ResolutionPreset),
-		NewConfig.GetResolvedWidth(),
-		NewConfig.GetResolvedHeight(),
-		NewConfig.GetResolvedHorizontalFovDeg(),
-		NewConfig.GetResolvedCaptureHz(),
-		NewConfig.StereoBaselineCm,
-		NewConfig.IsGroundTruthMapsEnabled() ? TEXT("true") : TEXT("false"),
-		MapsApplied,
-		bImuApplied ? *FString::Printf(TEXT("%.2f"), ImuPublishHz) : TEXT("not applied"),
-		bRoverModeApplied ? *RoverControlModeToString(RoverControlMode) : TEXT("not applied")
-	);
-
 	TArray<FString> SkippedSettings;
 	if (!bImuApplied) {
 		SkippedSettings.Add(TEXT("IMU Hz"));
@@ -1187,15 +1173,11 @@ void FsimulatorEditorModule::OnApplyClicked()
 
 	if (SkippedSettings.Num() > 0) {
 		Status = FString::Printf(TEXT("Applied settings. Skipped %s."), *FString::Join(SkippedSettings, TEXT(", ")));
-	}
-	else if (NewConfig.bGroundTruthImages && !NewConfig.HasAnyGroundTruthOutputType()) {
+	} else if (NewConfig.bGroundTruthImages && !NewConfig.HasAnyGroundTruthOutputType()) {
 		Status = TEXT("Applied settings. Ground Truth Images has no selected outputs.");
-	}
-	else if (RobotCamRigCount > 1) {
+	} else if (RobotCamRigCount > 1) {
 		Status = TEXT("Applied settings to first ESA_Rover pipeline.");
 	}
-
-	UE_LOG(LogTemp, Display, TEXT("%s"), *Status);
 
 	const FText StatusText = FText::FromString(Status);
 	RefreshTargetsFromEditorWorld();
@@ -1206,7 +1188,6 @@ void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
 {
 	ARobotCamRig* RobotCamRig = TargetRobotCamRig.Get();
 	if (!RobotCamRig) {
-		UE_LOG(LogTemp, Warning, TEXT("Simulator config window refreshed, but no RobotCamRig was found in the editor world. Showing default settings."));
 		return;
 	}
 
@@ -1221,10 +1202,8 @@ void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
 	bTrajectoryCsv = CurrentConfig.bTrajectoryCsv;
 	bEnableGroundTruthMaps = CurrentConfig.bGroundTruthMaps;
 	const FIntPoint ResolvedResolution = CurrentConfig.GetResolvedResolution();
-	ResolutionPreset = NormalizeEditorResolutionPreset(
-		CurrentConfig.ResolutionPreset,
-		ResolvedResolution.X,
-		ResolvedResolution.Y);
+	ResolutionPreset =
+	    NormalizeEditorResolutionPreset(CurrentConfig.ResolutionPreset, ResolvedResolution.X, ResolvedResolution.Y);
 	CameraHorizontalFovDeg = CurrentConfig.GetResolvedHorizontalFovDeg();
 	CustomCaptureHz = NormalizeEditorCaptureHz(CurrentConfig.GetResolvedCaptureHz());
 	StereoBaselineCm = FCaptureConfig::SanitizeStereoBaselineCm(CurrentConfig.StereoBaselineCm);
@@ -1235,15 +1214,13 @@ void FsimulatorEditorModule::LoadConfigFromRoverControl()
 {
 	if (URoverVehicleControllerComponent* RoverController = TargetRoverController.Get()) {
 		RoverControlMode = NormalizeEditorRoverControlMode(RoverController->GetControlMode());
-	}
-	else {
+	} else {
 		RoverControlMode = ERoverControlMode::Manual;
 	}
 
 	if (URoverCmdVelVehicleControllerComponent* CmdVelController = TargetCmdVelController.Get()) {
 		CmdVelSettings = CmdVelController->GetSettings();
-	}
-	else {
+	} else {
 		CmdVelSettings = FRoverCmdVelControllerSettings();
 	}
 

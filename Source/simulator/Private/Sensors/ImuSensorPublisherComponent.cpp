@@ -1,4 +1,5 @@
 #include "Sensors/ImuSensorPublisherComponent.h"
+#include "simulator.h"
 #include "Utils/UnrealToRosConversion.h"
 
 #include "Components/SceneComponent.h"
@@ -85,7 +86,9 @@ void UImuSensorPublisherComponent::SetupRos()
 
 	ROSNode = UTempoROSNode::Create(*NodeName, this, false);
 	if (!ROSNode) {
-		UE_LOG(LogTemp, Warning, TEXT("ImuSensorPublisherComponent: failed to create ROS node."));
+		UE_LOG(LogLunarSimROS, Error,
+			TEXT("IMU initialization failed: subsystem=ROS, resource=%s, stage=node creation, cause=TempoROS node unavailable, effect=IMU topic and static transform disabled."),
+			*NodeName);
 		return;
 	}
 
@@ -93,11 +96,6 @@ void UImuSensorPublisherComponent::SetupRos()
 	ImuQOS.CustomQueueSize(50).Reliable().Volatile();
 
 	ROSNode->AddPublisher<sensor_msgs::msg::Imu>(*ImuTopic, ImuQOS, false);
-
-	UE_LOG(LogTemp, Log, TEXT("ImuSensorPublisherComponent: publishing %s with frame_id=%s at %.2f Hz."),
-		*ImuTopic,
-		*ImuFrameId,
-		ImuPublishHz);
 }
 
 void UImuSensorPublisherComponent::SetupReusableMessage()
@@ -144,7 +142,7 @@ void UImuSensorPublisherComponent::ResolveImuMountComponent()
 	}
 
 	if (!ImuMountComponent) {
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogLunarSimROS, Warning,
 			TEXT("ImuSensorPublisherComponent: could not find IMU mount component '%s' on %s. Falling back to actor root transform."),
 			*ImuMountComponentName.ToString(),
 			*Owner->GetName());
@@ -164,11 +162,8 @@ void UImuSensorPublisherComponent::PublishStaticImuTransform()
 
 	const bool bOk = ROSNode->PublishStaticTransform(ImuRelativeTransform, ImuFrameId, BaseFrameId);
 	if (bOk) {
-		UE_LOG(LogTemp, Log, TEXT("ImuSensorPublisherComponent: published static TF %s -> %s."),
-			*BaseFrameId,
-			*ImuFrameId);
 	} else {
-		UE_LOG(LogTemp, Warning, TEXT("ImuSensorPublisherComponent: failed to publish static TF %s -> %s."),
+		UE_LOG(LogLunarSimROS, Error, TEXT("IMU initialization incomplete: subsystem=ROS TF, resource=%s -> %s, stage=static transform publication, cause=publish failed, effect=IMU output is not frame-resolved."),
 			*BaseFrameId,
 			*ImuFrameId);
 	}
