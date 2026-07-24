@@ -14,8 +14,8 @@
 
 ```bash
 git lfs install
-git clone https://github.com/exarchosgiannis/simulator57.git
-cd simulator57
+git clone https://github.com/exarchosgiannis/LunarSim-PG.git
+cd LunarSim-PG
 ```
 
 ## Set Unreal Engine path
