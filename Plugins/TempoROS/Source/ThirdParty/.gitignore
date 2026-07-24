@@ -1,8 +1,10 @@
-# Ignore everything in this directory
+# Ignore generated third-party contents in this directory.
 *
-# Except the .Build.cs files
+
+# Keep traversing directories so required module rules can be tracked.
+!*/
+
+# Keep module rules, this ignore file, and the download manifest.
 !*.Build.cs
-# And this file
 !.gitignore
-# And the manifest file
 !ttp_manifest.json

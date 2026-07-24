@@ -29,6 +29,14 @@
 		{
 			"Name": "ChaosVehiclesPlugin",
 			"Enabled": true
+		},
+		{
+			"Name": "TempoROS",
+			"Enabled": true
+		},
+		{
+			"Name": "UnrealGT",
+			"Enabled": true
 		}
 	]
 }
