@@ -1,0 +1,12 @@
+Generated terrain-aware lunar heightmap
+  preset: fresh_crater_scientific
+  seed: 12345
+  size: 1009 x 1009
+  map size: 500.000 m
+  meters per pixel: 0.496032
+Unreal Landscape import scale:
+  X Scale = 49.603175
+  Y Scale = 49.603175
+  Z Scale = 23.437500
+  craters: 820
+  actual height min/max: -19.642 m / 16.968 m

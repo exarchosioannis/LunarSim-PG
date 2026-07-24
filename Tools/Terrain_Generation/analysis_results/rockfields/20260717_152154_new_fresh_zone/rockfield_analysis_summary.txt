@@ -1,0 +1,38 @@
+MoonSim rockfield analysis
+==========================
+Terrain: heightmap
+Map: 500.000 m × 500.000 m
+
+Rock population
+  loaded rocks: 3265
+  valid positions: 3265
+  density: 0.013060 rocks/m²
+  crater-owned rocks: 1515
+  background or unowned rocks: 1750
+  random big-rock-clump rocks: 0
+  diameter min / median / mean / p95 / max: 0.260 / 0.279 / 0.303 / 0.418 / 1.006 m
+
+Crater-owned rocks by zone
+  Crater floor: 142
+  Rim: 243
+  Proximal ejecta: 783
+  Distal ejecta: 347
+
+Spatial distribution
+  nearest-neighbor mean / median / p95: 3.722 / 3.001 / 9.345 m
+  Poisson expected mean nearest-neighbor distance: 4.375 m
+  Clark-Evans R: 0.851 (clustered)
+  quadrat index of dispersion: 3.375
+
+Crater/ejecta-zone settings
+  source: rock settings: rock_settings.json
+
+Output files
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152154_new_fresh_zone/01_rockfield_overview.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152154_new_fresh_zone/02_crater_ejecta_zones.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152154_new_fresh_zone/03_rocks_grouped_by_source_crater.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152154_new_fresh_zone/04_rock_density_field.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152154_new_fresh_zone/05_large_rock_map.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152154_new_fresh_zone/merged_rocks.csv
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152154_new_fresh_zone/rockfield_metrics.csv
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152154_new_fresh_zone/rockfield_analysis.json

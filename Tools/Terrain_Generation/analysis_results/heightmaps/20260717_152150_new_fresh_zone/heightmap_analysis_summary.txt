@@ -1,0 +1,51 @@
+MoonSim heightmap and generated-crater analysis
+===============================================
+Terrain: heightmap
+Raster: 1009 x 1009 px
+Map size: 500.000 m x 500.000 m
+Pixel spacing: 0.4960 m x 0.4960 m
+
+Elevation
+  min / max: -19.643 / 16.968 m
+  relief: 36.611 m
+  mean / median: -0.001 / -2.971 m
+  standard deviation: 8.534 m
+
+Slope
+  mean / median: 7.016 / 5.662 deg
+  p95 / p99 / max: 17.556 / 27.996 / 51.335 deg
+  area at or above 5°: 56.86%
+  area at or above 10°: 20.18%
+  area at or above 15°: 7.47%
+  area at or above 20°: 3.24%
+  area at or above 30°: 0.76%
+
+Generated crater population
+  valid crater count: 820
+  crater density: 3280.000 per km^2
+  diameter min / median / max: 2.500 / 3.036 / 18.651 m
+  degradation mean / median: 0.220 / 0.225
+  craters at or above 1 m: 820
+  craters at or above 5 m: 71
+  craters at or above 10 m: 9
+  craters at or above 20 m: 0
+
+Roughness
+  moving window: 11 px (~5.456 m)
+  mean / p95 / max: 0.176 / 0.416 / 1.111 m
+
+Encoding checks
+  vertical quantization step: 0.001831 m
+  pixels at encoded minimum: 0 (0.0000%)
+  pixels at encoded maximum: 0 (0.0000%)
+  potential elevation clipping: none detected
+
+Output files
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/heightmaps/20260717_152150_new_fresh_zone/01_elevation_map.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/heightmaps/20260717_152150_new_fresh_zone/02_hillshade.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/heightmaps/20260717_152150_new_fresh_zone/03_slope_map.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/heightmaps/20260717_152150_new_fresh_zone/04_roughness_map.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/heightmaps/20260717_152150_new_fresh_zone/05_heightmap_overview.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/heightmaps/20260717_152150_new_fresh_zone/06_heightmap_statistics.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/heightmaps/20260717_152150_new_fresh_zone/heightmap_analysis.json
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/heightmaps/20260717_152150_new_fresh_zone/heightmap_metrics.csv

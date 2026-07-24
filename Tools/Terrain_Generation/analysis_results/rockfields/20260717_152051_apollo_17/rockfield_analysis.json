@@ -1,0 +1,4397 @@
+{
+  "format": "MoonSimRockfieldAnalysis",
+  "version": 1,
+  "terrain": "heightmap",
+  "inputs": {
+    "candidates": null,
+    "positions": null,
+    "instances": null,
+    "metadata_csv": null,
+    "generic_json": "/home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/generated/rockfields/20260717_152051_apollo_17/unreal_rockfield.json",
+    "rockfield_dir": null,
+    "metadata": "/home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/generated/heightmaps/20260717_152049_apollo_17/metadata.json",
+    "crater_json": "/home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/generated/heightmaps/20260717_152049_apollo_17/craters.json",
+    "heightmap": "/home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/generated/heightmaps/20260717_152049_apollo_17/heightmap.png",
+    "rock_settings": "/home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/generated/rockfields/20260717_152051_apollo_17/rock_settings.json"
+  },
+  "map": {
+    "map_size_m": 500.0,
+    "area_m2": 250000.0,
+    "area_km2": 0.25
+  },
+  "rocks": {
+    "loaded_count": 3738,
+    "valid_position_count": 3738,
+    "valid_diameter_count": 3738,
+    "density_per_m2": 0.014952,
+    "crater_owned_count": 738,
+    "background_or_unowned_count": 3000,
+    "random_big_rock_clump_count": 0,
+    "diameter_m": {
+      "min": 0.2600256622354322,
+      "max": 0.691443093471985,
+      "range": 0.43141743123655274,
+      "mean": 0.3057013366251352,
+      "median": 0.2890274196918395,
+      "std": 0.052038987146508085,
+      "p05": 0.2621286156428953,
+      "p25": 0.2714416251771854,
+      "p75": 0.3201437780230575,
+      "p95": 0.40499563531546523,
+      "p99": 0.5284902104550986
+    },
+    "counts_by_crater_zone": {
+      "DistalEjecta": 8,
+      "CraterFloor": 41,
+      "Rim": 496,
+      "ProximalEjecta": 193
+    },
+    "counts_by_size_class": {
+      "Small": 2264,
+      "Medium": 1474
+    },
+    "counts_by_material_type": {
+      "MixedBreccia": 697,
+      "RegolithCovered": 3041
+    },
+    "counts_by_source_type": {
+      "crater_ejecta_single": 174,
+      "crater_ejecta_clump": 564,
+      "background_regolith": 2760,
+      "background_clump": 240
+    },
+    "owned_rocks_by_source_crater": {
+      "2": 9,
+      "9": 2,
+      "11": 1,
+      "16": 92,
+      "32": 1,
+      "35": 3,
+      "89": 6,
+      "128": 4,
+      "134": 64,
+      "139": 64,
+      "173": 120,
+      "188": 1,
+      "191": 1,
+      "207": 16,
+      "215": 1,
+      "259": 1,
+      "273": 1,
+      "274": 351
+    },
+    "large_rock_threshold_m": 2.0,
+    "large_rock_count": 0
+  },
+  "spatial": {
+    "nearest_neighbor_distance_m": {
+      "min": 0.02157984500218291,
+      "max": 15.570729264576876,
+      "range": 15.549149419574693,
+      "mean": 3.7808143687512654,
+      "median": 3.3266225244419854,
+      "std": 2.524478529927622,
+      "p05": 0.5742494966197688,
+      "p25": 1.77859161164066,
+      "p75": 5.257870668182502,
+      "p95": 8.51222736662012,
+      "p99": 11.184244592546412
+    },
+    "poisson_expected_mean_nearest_neighbor_m": 4.089030595942422,
+    "clark_evans_r": 0.9246236436829302,
+    "clark_evans_interpretation": "approximately random",
+    "quadrat_bins": 32,
+    "quadrat_mean_count": 3.650390625,
+    "quadrat_variance_count": 11.555073161045943,
+    "quadrat_index_of_dispersion": 3.1654347022233935
+  },
+  "source_crater_distance": {
+    "normalized_radius": {
+      "min": 0.2507876971167155,
+      "max": 2.782464520596011,
+      "range": 2.5316768234792955,
+      "mean": 1.1171580723953811,
+      "median": 1.0650220339490453,
+      "std": 0.2753539417926615,
+      "p05": 0.8448044880412514,
+      "p25": 0.9524467996559065,
+      "p75": 1.2097471271364098,
+      "p95": 1.638056451679087,
+      "p99": 2.011511476529498
+    }
+  },
+  "craters": {
+    "catalog_count": 298
+  },
+  "crater_zone_settings": {
+    "source": "rock settings: rock_settings.json",
+    "values": {
+      "interior_r_min": 0.25,
+      "interior_r_max": 0.85,
+      "rim_r_min": 0.85,
+      "rim_r_max": 1.2,
+      "proximal_r_min": 1.2,
+      "proximal_r_max": 2.0,
+      "distal_r_min": 2.0,
+      "distal_r_max": 3.0,
+      "min_source_crater_diameter_meters": 3.0
+    }
+  },
+  "source_crater_figure": {
+    "minimum_source_crater_diameter_m": 5.0,
+    "selected_crater_owned_rock_count": 738,
+    "source_crater_counts": {
+      "2": 9,
+      "9": 2,
+      "11": 1,
+      "16": 92,
+      "32": 1,
+      "35": 3,
+      "89": 6,
+      "128": 4,
+      "134": 64,
+      "139": 64,
+      "173": 120,
+      "188": 1,
+      "191": 1,
+      "207": 16,
+      "215": 1,
+      "259": 1,
+      "273": 1,
+      "274": 351
+    }
+  },
+  "source_crater_catalog": {
+    "preset_name": "apollo17_scientific",
+    "map_size_meters": 500.0,
+    "heightmap_size": 1009,
+    "meters_per_pixel": 0.49603174603174605,
+    "ue_xy_scale_cm": 49.60317460317461,
+    "ue_z_scale": 17.578125,
+    "coordinate_system": {
+      "mode": "centered",
+      "top_left": "x_m=0 is left edge, y_m=0 is top edge",
+      "centered": "x_m=0,y_m=0 is map center"
+    },
+    "crater_density_model": {
+      "equation": "N_map ~ Poisson(A * K * (Dmin^(-b) - Dmax^(-b))) per segment",
+      "diameter_units": "meters",
+      "area_units": "square meters",
+      "segments": [
+        {
+          "min_diameter_m": 2.5,
+          "max_diameter_m": 50.0,
+          "K": 0.006,
+          "b": 1.8
+        },
+        {
+          "min_diameter_m": 50.0,
+          "max_diameter_m": 250.0,
+          "K": 0.02,
+          "b": 2.0
+        }
+      ],
+      "generated_count": 298
+    },
+    "terrain_generation": {
+      "base_relief_m": 4.0,
+      "floor_final_blur_px": 4.5,
+      "add_broad_landforms": true,
+      "landform_count": 32,
+      "landform_radius_min_m": 20.0,
+      "landform_radius_max_m": 180.0,
+      "landform_height_min_m": -4.0,
+      "landform_height_max_m": 6.0,
+      "landform_elongation_max": 3.5,
+      "post_regolith_roughness_m": 0.025,
+      "post_regolith_blur_px": 0.65
+    },
+    "illumination_metadata": {
+      "sun_elevation_deg": 25.0,
+      "sun_azimuth_deg": 135.0
+    },
+    "craters": [
+      {
+        "x_m": -130.6817324996478,
+        "y_m": 149.18539983758757,
+        "diameter_m": 4.126870368956755,
+        "degrade": 0.9991741207218746,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -130.6817324996478,
+          "y": 149.18539983758757
+        },
+        "DiameterMeters": 4.126870368956755,
+        "Degrade": 0.9991741207218746,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -29.114342909468746,
+        "y_m": 166.66302470389923,
+        "diameter_m": 9.68675033681444,
+        "degrade": 0.9989982667696593,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -29.114342909468746,
+          "y": 166.66302470389923
+        },
+        "DiameterMeters": 9.68675033681444,
+        "Degrade": 0.9989982667696593,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -34.76433302585542,
+        "y_m": -135.42597488604568,
+        "diameter_m": 33.447788920890964,
+        "degrade": 0.9984820030516511,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -34.76433302585542,
+          "y": -135.42597488604568
+        },
+        "DiameterMeters": 33.447788920890964,
+        "Degrade": 0.9984820030516511,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -131.34992401347273,
+        "y_m": 125.77495288600073,
+        "diameter_m": 2.9919043185909664,
+        "degrade": 0.9983915206843001,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -131.34992401347273,
+          "y": 125.77495288600073
+        },
+        "DiameterMeters": 2.9919043185909664,
+        "Degrade": 0.9983915206843001,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -164.32302764906038,
+        "y_m": 201.29340415889777,
+        "diameter_m": 4.556990289608159,
+        "degrade": 0.9974480867786174,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -164.32302764906038,
+          "y": 201.29340415889777
+        },
+        "DiameterMeters": 4.556990289608159,
+        "Degrade": 0.9974480867786174,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -13.95815298496538,
+        "y_m": 63.47692692764923,
+        "diameter_m": 2.5090947355703794,
+        "degrade": 0.9961355445975788,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -13.95815298496538,
+          "y": 63.47692692764923
+        },
+        "DiameterMeters": 2.5090947355703794,
+        "Degrade": 0.9961355445975788,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -232.17326895832957,
+        "y_m": 115.12775962155615,
+        "diameter_m": 11.560101249903495,
+        "degrade": 0.9957361840482855,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -232.17326895832957,
+          "y": 115.12775962155615
+        },
+        "DiameterMeters": 11.560101249903495,
+        "Degrade": 0.9957361840482855,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -233.30152398693104,
+        "y_m": -47.967783696167714,
+        "diameter_m": 4.138090433671434,
+        "degrade": 0.9933933346130487,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -233.30152398693104,
+          "y": -47.967783696167714
+        },
+        "DiameterMeters": 4.138090433671434,
+        "Degrade": 0.9933933346130487,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -91.78386336162097,
+        "y_m": 170.47634551477807,
+        "diameter_m": 5.234915970102192,
+        "degrade": 0.9922475898971781,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -91.78386336162097,
+          "y": 170.47634551477807
+        },
+        "DiameterMeters": 5.234915970102192,
+        "Degrade": 0.9922475898971781,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 127.81124827286646,
+        "y_m": 227.9039884638907,
+        "diameter_m": 20.378742915084878,
+        "degrade": 0.9921939457324016,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 127.81124827286646,
+          "y": 227.9039884638907
+        },
+        "DiameterMeters": 20.378742915084878,
+        "Degrade": 0.9921939457324016,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 46.15067635831417,
+        "y_m": 205.03901567915705,
+        "diameter_m": 2.546135018456952,
+        "degrade": 0.9921672185474874,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 46.15067635831417,
+          "y": 205.03901567915705
+        },
+        "DiameterMeters": 2.546135018456952,
+        "Degrade": 0.9921672185474874,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 233.33128648459342,
+        "y_m": -120.98378905376407,
+        "diameter_m": 15.889235317486055,
+        "degrade": 0.9880413414981991,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 233.33128648459342,
+          "y": -120.98378905376407
+        },
+        "DiameterMeters": 15.889235317486055,
+        "Degrade": 0.9880413414981991,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 245.9797023093821,
+        "y_m": 150.49684694640973,
+        "diameter_m": 2.804723289214041,
+        "degrade": 0.9867573237283671,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 245.9797023093821,
+          "y": 150.49684694640973
+        },
+        "DiameterMeters": 2.804723289214041,
+        "Degrade": 0.9867573237283671,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 158.43889836541803,
+        "y_m": -248.59725942647327,
+        "diameter_m": 2.6125745549332224,
+        "degrade": 0.9850391296094178,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 158.43889836541803,
+          "y": -248.59725942647327
+        },
+        "DiameterMeters": 2.6125745549332224,
+        "Degrade": 0.9850391296094178,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -219.98551737415633,
+        "y_m": -161.85456791029773,
+        "diameter_m": 3.166783848904346,
+        "degrade": 0.9845787590295034,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -219.98551737415633,
+          "y": -161.85456791029773
+        },
+        "DiameterMeters": 3.166783848904346,
+        "Degrade": 0.9845787590295034,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 75.07575913029206,
+        "y_m": 227.20598513193443,
+        "diameter_m": 5.9638044170138205,
+        "degrade": 0.9844889818486251,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 75.07575913029206,
+          "y": 227.20598513193443
+        },
+        "DiameterMeters": 5.9638044170138205,
+        "Degrade": 0.9844889818486251,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 220.08765309760082,
+        "y_m": 25.690240902947835,
+        "diameter_m": 69.55782401022037,
+        "degrade": 0.9843138832334524,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 220.08765309760082,
+          "y": 25.690240902947835
+        },
+        "DiameterMeters": 69.55782401022037,
+        "Degrade": 0.9843138832334524,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -17.699795696526024,
+        "y_m": -100.80154608235702,
+        "diameter_m": 4.214388849731068,
+        "degrade": 0.9819276121749678,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -17.699795696526024,
+          "y": -100.80154608235702
+        },
+        "DiameterMeters": 4.214388849731068,
+        "Degrade": 0.9819276121749678,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -62.781436218573305,
+        "y_m": 139.86983467145814,
+        "diameter_m": 3.79743565785201,
+        "degrade": 0.9815799931722791,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -62.781436218573305,
+          "y": 139.86983467145814
+        },
+        "DiameterMeters": 3.79743565785201,
+        "Degrade": 0.9815799931722791,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 164.083954222346,
+        "y_m": -192.45821258106238,
+        "diameter_m": 3.568824627424499,
+        "degrade": 0.9814897613833389,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 164.083954222346,
+          "y": -192.45821258106238
+        },
+        "DiameterMeters": 3.568824627424499,
+        "Degrade": 0.9814897613833389,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -247.07125591631063,
+        "y_m": -102.8710461046582,
+        "diameter_m": 2.61696463107282,
+        "degrade": 0.9798258510247746,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -247.07125591631063,
+          "y": -102.8710461046582
+        },
+        "DiameterMeters": 2.61696463107282,
+        "Degrade": 0.9798258510247746,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 216.2835140222271,
+        "y_m": -205.27968095221115,
+        "diameter_m": 4.6723465514562275,
+        "degrade": 0.9791326379679568,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 216.2835140222271,
+          "y": -205.27968095221115
+        },
+        "DiameterMeters": 4.6723465514562275,
+        "Degrade": 0.9791326379679568,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 214.64685948090198,
+        "y_m": -113.42211267423795,
+        "diameter_m": 7.203135815169353,
+        "degrade": 0.9783826399474245,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 214.64685948090198,
+          "y": -113.42211267423795
+        },
+        "DiameterMeters": 7.203135815169353,
+        "Degrade": 0.9783826399474245,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -246.77866288188716,
+        "y_m": 233.82444190703637,
+        "diameter_m": 3.0188741123348253,
+        "degrade": 0.9779505323767466,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -246.77866288188716,
+          "y": 233.82444190703637
+        },
+        "DiameterMeters": 3.0188741123348253,
+        "Degrade": 0.9779505323767466,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 48.0166383752923,
+        "y_m": -75.14955014112323,
+        "diameter_m": 3.642093113141036,
+        "degrade": 0.9778210907234708,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 48.0166383752923,
+          "y": -75.14955014112323
+        },
+        "DiameterMeters": 3.642093113141036,
+        "Degrade": 0.9778210907234708,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -219.58784775786845,
+        "y_m": -176.1505970515713,
+        "diameter_m": 2.679250666524688,
+        "degrade": 0.9769568803626587,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -219.58784775786845,
+          "y": -176.1505970515713
+        },
+        "DiameterMeters": 2.679250666524688,
+        "Degrade": 0.9769568803626587,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 136.2957893570848,
+        "y_m": 4.14020993045699,
+        "diameter_m": 10.106924702533584,
+        "degrade": 0.9760833996673448,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 136.2957893570848,
+          "y": 4.14020993045699
+        },
+        "DiameterMeters": 10.106924702533584,
+        "Degrade": 0.9760833996673448,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -81.34806014242614,
+        "y_m": -81.87439421452831,
+        "diameter_m": 2.9910659287608077,
+        "degrade": 0.9758544873317243,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -81.34806014242614,
+          "y": -81.87439421452831
+        },
+        "DiameterMeters": 2.9910659287608077,
+        "Degrade": 0.9758544873317243,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 205.78314932089404,
+        "y_m": -151.90123412581985,
+        "diameter_m": 2.828315113436964,
+        "degrade": 0.9743484549600658,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 205.78314932089404,
+          "y": -151.90123412581985
+        },
+        "DiameterMeters": 2.828315113436964,
+        "Degrade": 0.9743484549600658,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -133.79002583661492,
+        "y_m": 36.18248156688236,
+        "diameter_m": 3.422096004028689,
+        "degrade": 0.972892284775995,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -133.79002583661492,
+          "y": 36.18248156688236
+        },
+        "DiameterMeters": 3.422096004028689,
+        "Degrade": 0.972892284775995,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 5.795836304088141,
+        "y_m": -5.236290839263859,
+        "diameter_m": 2.618632891159571,
+        "degrade": 0.9727499776333192,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 5.795836304088141,
+          "y": -5.236290839263859
+        },
+        "DiameterMeters": 2.618632891159571,
+        "Degrade": 0.9727499776333192,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 118.25924184340687,
+        "y_m": 55.892813230077195,
+        "diameter_m": 2.643333536738274,
+        "degrade": 0.9723742942363413,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 118.25924184340687,
+          "y": 55.892813230077195
+        },
+        "DiameterMeters": 2.643333536738274,
+        "Degrade": 0.9723742942363413,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 184.96247761394142,
+        "y_m": -147.46703454553273,
+        "diameter_m": 15.332744416166102,
+        "degrade": 0.9722516120152489,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 184.96247761394142,
+          "y": -147.46703454553273
+        },
+        "DiameterMeters": 15.332744416166102,
+        "Degrade": 0.9722516120152489,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 70.51205218133731,
+        "y_m": 184.33354386478527,
+        "diameter_m": 2.786568770485505,
+        "degrade": 0.971075589774884,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 70.51205218133731,
+          "y": 184.33354386478527
+        },
+        "DiameterMeters": 2.786568770485505,
+        "Degrade": 0.971075589774884,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -154.12018209053628,
+        "y_m": -96.41023876655814,
+        "diameter_m": 2.8349232702851155,
+        "degrade": 0.9687265636411218,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -154.12018209053628,
+          "y": -96.41023876655814
+        },
+        "DiameterMeters": 2.8349232702851155,
+        "Degrade": 0.9687265636411218,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 199.69975447795497,
+        "y_m": 6.113993486711877,
+        "diameter_m": 23.789734010811692,
+        "degrade": 0.9678731672531233,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 199.69975447795497,
+          "y": 6.113993486711877
+        },
+        "DiameterMeters": 23.789734010811692,
+        "Degrade": 0.9678731672531233,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 98.82452599856862,
+        "y_m": 222.47234116197262,
+        "diameter_m": 12.667582482732263,
+        "degrade": 0.967579055799919,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 98.82452599856862,
+          "y": 222.47234116197262
+        },
+        "DiameterMeters": 12.667582482732263,
+        "Degrade": 0.967579055799919,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 194.66388422299423,
+        "y_m": -130.8154491506143,
+        "diameter_m": 3.059868579661354,
+        "degrade": 0.9674789878366041,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 194.66388422299423,
+          "y": -130.8154491506143
+        },
+        "DiameterMeters": 3.059868579661354,
+        "Degrade": 0.9674789878366041,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 206.7285191367842,
+        "y_m": -88.34864116057167,
+        "diameter_m": 3.1477534284705064,
+        "degrade": 0.9667569898310494,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 206.7285191367842,
+          "y": -88.34864116057167
+        },
+        "DiameterMeters": 3.1477534284705064,
+        "Degrade": 0.9667569898310494,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 52.915471119258314,
+        "y_m": 187.04539437563818,
+        "diameter_m": 4.122960276117019,
+        "degrade": 0.9659649486740787,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 52.915471119258314,
+          "y": 187.04539437563818
+        },
+        "DiameterMeters": 4.122960276117019,
+        "Degrade": 0.9659649486740787,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -154.97903796761736,
+        "y_m": -35.513610266061306,
+        "diameter_m": 2.6053213981349725,
+        "degrade": 0.9630839209407422,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -154.97903796761736,
+          "y": -35.513610266061306
+        },
+        "DiameterMeters": 2.6053213981349725,
+        "Degrade": 0.9630839209407422,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -46.97067585353554,
+        "y_m": 13.132399292472144,
+        "diameter_m": 2.646623714553494,
+        "degrade": 0.9601024668558027,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -46.97067585353554,
+          "y": 13.132399292472144
+        },
+        "DiameterMeters": 2.646623714553494,
+        "Degrade": 0.9601024668558027,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -10.841077205259353,
+        "y_m": 118.01471201098303,
+        "diameter_m": 3.8192375436685904,
+        "degrade": 0.9598926201218176,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -10.841077205259353,
+          "y": 118.01471201098303
+        },
+        "DiameterMeters": 3.8192375436685904,
+        "Degrade": 0.9598926201218176,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 24.90814285672775,
+        "y_m": 243.93036627666004,
+        "diameter_m": 2.851407099662816,
+        "degrade": 0.959536257497384,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 24.90814285672775,
+          "y": 243.93036627666004
+        },
+        "DiameterMeters": 2.851407099662816,
+        "Degrade": 0.959536257497384,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 15.809088252230879,
+        "y_m": -165.14446814866662,
+        "diameter_m": 4.712987513651058,
+        "degrade": 0.959298494201559,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 15.809088252230879,
+          "y": -165.14446814866662
+        },
+        "DiameterMeters": 4.712987513651058,
+        "Degrade": 0.959298494201559,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -197.32902216851545,
+        "y_m": -63.66950395323468,
+        "diameter_m": 5.515022478998111,
+        "degrade": 0.958945772596424,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -197.32902216851545,
+          "y": -63.66950395323468
+        },
+        "DiameterMeters": 5.515022478998111,
+        "Degrade": 0.958945772596424,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 127.00917958215604,
+        "y_m": 137.9816676089635,
+        "diameter_m": 2.938431642400287,
+        "degrade": 0.9560356980048934,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 127.00917958215604,
+          "y": 137.9816676089635
+        },
+        "DiameterMeters": 2.938431642400287,
+        "Degrade": 0.9560356980048934,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -114.41905814317442,
+        "y_m": 242.9806868940475,
+        "diameter_m": 5.359857111754526,
+        "degrade": 0.9553136907722203,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -114.41905814317442,
+          "y": 242.9806868940475
+        },
+        "DiameterMeters": 5.359857111754526,
+        "Degrade": 0.9553136907722203,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -163.04648926669574,
+        "y_m": 227.8029983391658,
+        "diameter_m": 3.420842012911012,
+        "degrade": 0.9549655141985584,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -163.04648926669574,
+          "y": 227.8029983391658
+        },
+        "DiameterMeters": 3.420842012911012,
+        "Degrade": 0.9549655141985584,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 198.09853464641895,
+        "y_m": -83.95724448607339,
+        "diameter_m": 2.8798651753445013,
+        "degrade": 0.9526979627455111,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 198.09853464641895,
+          "y": -83.95724448607339
+        },
+        "DiameterMeters": 2.8798651753445013,
+        "Degrade": 0.9526979627455111,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 230.992868378811,
+        "y_m": 103.37836969443379,
+        "diameter_m": 2.614564662609007,
+        "degrade": 0.952270814417302,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 230.992868378811,
+          "y": 103.37836969443379
+        },
+        "DiameterMeters": 2.614564662609007,
+        "Degrade": 0.952270814417302,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -215.16354042542469,
+        "y_m": 21.53585638004597,
+        "diameter_m": 3.088344149739029,
+        "degrade": 0.9515596486316679,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -215.16354042542469,
+          "y": 21.53585638004597
+        },
+        "DiameterMeters": 3.088344149739029,
+        "Degrade": 0.9515596486316679,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 147.0698352878905,
+        "y_m": -108.5671181681029,
+        "diameter_m": 2.8249777882832077,
+        "degrade": 0.9515269464340046,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 147.0698352878905,
+          "y": -108.5671181681029
+        },
+        "DiameterMeters": 2.8249777882832077,
+        "Degrade": 0.9515269464340046,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 136.62565225114446,
+        "y_m": -200.34614992867722,
+        "diameter_m": 10.904011246638595,
+        "degrade": 0.9499164595300997,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 136.62565225114446,
+          "y": -200.34614992867722
+        },
+        "DiameterMeters": 10.904011246638595,
+        "Degrade": 0.9499164595300997,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -210.27025244297727,
+        "y_m": -149.22722932974307,
+        "diameter_m": 6.989183068688896,
+        "degrade": 0.9497306339705198,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -210.27025244297727,
+          "y": -149.22722932974307
+        },
+        "DiameterMeters": 6.989183068688896,
+        "Degrade": 0.9497306339705198,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -232.8606172717394,
+        "y_m": -178.0407042658412,
+        "diameter_m": 4.059862693221888,
+        "degrade": 0.949632056032179,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -232.8606172717394,
+          "y": -178.0407042658412
+        },
+        "DiameterMeters": 4.059862693221888,
+        "Degrade": 0.949632056032179,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -82.42441671621475,
+        "y_m": 238.2766683790167,
+        "diameter_m": 4.453189621899451,
+        "degrade": 0.9485929814398419,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -82.42441671621475,
+          "y": 238.2766683790167
+        },
+        "DiameterMeters": 4.453189621899451,
+        "Degrade": 0.9485929814398419,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -104.65061090665756,
+        "y_m": 88.08693174883365,
+        "diameter_m": 3.738618575316176,
+        "degrade": 0.9466507106571733,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -104.65061090665756,
+          "y": 88.08693174883365
+        },
+        "DiameterMeters": 3.738618575316176,
+        "Degrade": 0.9466507106571733,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 244.54791940003804,
+        "y_m": -93.31624766987133,
+        "diameter_m": 5.431078763655476,
+        "degrade": 0.9455283643624802,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 244.54791940003804,
+          "y": -93.31624766987133
+        },
+        "DiameterMeters": 5.431078763655476,
+        "Degrade": 0.9455283643624802,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -37.10176065457256,
+        "y_m": -121.95042117665977,
+        "diameter_m": 3.753775487050116,
+        "degrade": 0.9454386495955014,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -37.10176065457256,
+          "y": -121.95042117665977
+        },
+        "DiameterMeters": 3.753775487050116,
+        "Degrade": 0.9454386495955014,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -193.32169658316832,
+        "y_m": -87.48460828783178,
+        "diameter_m": 6.419345180084021,
+        "degrade": 0.9453063055152493,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -193.32169658316832,
+          "y": -87.48460828783178
+        },
+        "DiameterMeters": 6.419345180084021,
+        "Degrade": 0.9453063055152493,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -58.50231959571545,
+        "y_m": 153.30441064707992,
+        "diameter_m": 3.661782888673488,
+        "degrade": 0.9441170934342205,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -58.50231959571545,
+          "y": 153.30441064707992
+        },
+        "DiameterMeters": 3.661782888673488,
+        "Degrade": 0.9441170934342205,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 56.779761837272474,
+        "y_m": 48.204144802422206,
+        "diameter_m": 3.520628076653469,
+        "degrade": 0.9427730493278782,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 56.779761837272474,
+          "y": 48.204144802422206
+        },
+        "DiameterMeters": 3.520628076653469,
+        "Degrade": 0.9427730493278782,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 142.5484102974283,
+        "y_m": 86.81882375243794,
+        "diameter_m": 2.9814795915990877,
+        "degrade": 0.9426343296157057,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 142.5484102974283,
+          "y": 86.81882375243794
+        },
+        "DiameterMeters": 2.9814795915990877,
+        "Degrade": 0.9426343296157057,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -133.11520104609897,
+        "y_m": 190.24538782738819,
+        "diameter_m": 2.77405285514805,
+        "degrade": 0.9422663645389445,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -133.11520104609897,
+          "y": 190.24538782738819
+        },
+        "DiameterMeters": 2.77405285514805,
+        "Degrade": 0.9422663645389445,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 70.82042101484689,
+        "y_m": 167.79567277920114,
+        "diameter_m": 4.551178163210397,
+        "degrade": 0.9414435653376053,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 70.82042101484689,
+          "y": 167.79567277920114
+        },
+        "DiameterMeters": 4.551178163210397,
+        "Degrade": 0.9414435653376053,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -91.89090238301245,
+        "y_m": -17.759504719807524,
+        "diameter_m": 2.9141037173587896,
+        "degrade": 0.940156860667511,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -91.89090238301245,
+          "y": -17.759504719807524
+        },
+        "DiameterMeters": 2.9141037173587896,
+        "Degrade": 0.940156860667511,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -107.96096509582864,
+        "y_m": -124.88938082841483,
+        "diameter_m": 4.757523458304734,
+        "degrade": 0.9379188738118043,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -107.96096509582864,
+          "y": -124.88938082841483
+        },
+        "DiameterMeters": 4.757523458304734,
+        "Degrade": 0.9379188738118043,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -60.460350148773756,
+        "y_m": -114.81227972890841,
+        "diameter_m": 3.8268615352810444,
+        "degrade": 0.9363756614285619,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -60.460350148773756,
+          "y": -114.81227972890841
+        },
+        "DiameterMeters": 3.8268615352810444,
+        "Degrade": 0.9363756614285619,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -142.8194043761784,
+        "y_m": 16.941387353718767,
+        "diameter_m": 8.025580760250413,
+        "degrade": 0.9360873710994777,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -142.8194043761784,
+          "y": 16.941387353718767
+        },
+        "DiameterMeters": 8.025580760250413,
+        "Degrade": 0.9360873710994777,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -116.1243365614032,
+        "y_m": 13.114373197416057,
+        "diameter_m": 2.778086616640114,
+        "degrade": 0.9353025650798801,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -116.1243365614032,
+          "y": 13.114373197416057
+        },
+        "DiameterMeters": 2.778086616640114,
+        "Degrade": 0.9353025650798801,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -245.162393415517,
+        "y_m": -80.68354059490224,
+        "diameter_m": 2.6201755304744916,
+        "degrade": 0.9345447689830503,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -245.162393415517,
+          "y": -80.68354059490224
+        },
+        "DiameterMeters": 2.6201755304744916,
+        "Degrade": 0.9345447689830503,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 90.41290626771837,
+        "y_m": -12.856180760657537,
+        "diameter_m": 2.626364038570563,
+        "degrade": 0.9331426706445455,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 90.41290626771837,
+          "y": -12.856180760657537
+        },
+        "DiameterMeters": 2.626364038570563,
+        "Degrade": 0.9331426706445455,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 116.11289409303487,
+        "y_m": -36.271830295774976,
+        "diameter_m": 3.465516759183129,
+        "degrade": 0.9321097746800154,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 116.11289409303487,
+          "y": -36.271830295774976
+        },
+        "DiameterMeters": 3.465516759183129,
+        "Degrade": 0.9321097746800154,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 192.10050674930108,
+        "y_m": -75.50811282639015,
+        "diameter_m": 3.023998651980099,
+        "degrade": 0.9315972347188924,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 192.10050674930108,
+          "y": -75.50811282639015
+        },
+        "DiameterMeters": 3.023998651980099,
+        "Degrade": 0.9315972347188924,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -138.07914075330385,
+        "y_m": -9.790014245896714,
+        "diameter_m": 4.178647750994545,
+        "degrade": 0.9309189089216277,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -138.07914075330385,
+          "y": -9.790014245896714
+        },
+        "DiameterMeters": 4.178647750994545,
+        "Degrade": 0.9309189089216277,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -221.59511577733338,
+        "y_m": -192.05552578598167,
+        "diameter_m": 3.964076077362087,
+        "degrade": 0.9292167079769427,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -221.59511577733338,
+          "y": -192.05552578598167
+        },
+        "DiameterMeters": 3.964076077362087,
+        "Degrade": 0.9292167079769427,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 27.91411358723593,
+        "y_m": -221.98164158821982,
+        "diameter_m": 5.997483781090906,
+        "degrade": 0.9273348145417589,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 27.91411358723593,
+          "y": -221.98164158821982
+        },
+        "DiameterMeters": 5.997483781090906,
+        "Degrade": 0.9273348145417589,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -98.05053505348778,
+        "y_m": -100.92170698698106,
+        "diameter_m": 3.174443199002699,
+        "degrade": 0.926902988881114,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -98.05053505348778,
+          "y": -100.92170698698106
+        },
+        "DiameterMeters": 3.174443199002699,
+        "Degrade": 0.926902988881114,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 36.17774442376998,
+        "y_m": 34.45290979444087,
+        "diameter_m": 3.804468718176554,
+        "degrade": 0.9261795014667424,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 36.17774442376998,
+          "y": 34.45290979444087
+        },
+        "DiameterMeters": 3.804468718176554,
+        "Degrade": 0.9261795014667424,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 131.34253377419122,
+        "y_m": 176.90551679739076,
+        "diameter_m": 2.626779922534563,
+        "degrade": 0.9256945796513183,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 131.34253377419122,
+          "y": 176.90551679739076
+        },
+        "DiameterMeters": 2.626779922534563,
+        "Degrade": 0.9256945796513183,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 110.52005463466139,
+        "y_m": 94.07015506829384,
+        "diameter_m": 9.79981085207887,
+        "degrade": 0.924984186448672,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 110.52005463466139,
+          "y": 94.07015506829384
+        },
+        "DiameterMeters": 9.79981085207887,
+        "Degrade": 0.924984186448672,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 65.43675139568563,
+        "y_m": 88.6638909182837,
+        "diameter_m": 3.1829883523076723,
+        "degrade": 0.9249008489187903,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 65.43675139568563,
+          "y": 88.6638909182837
+        },
+        "DiameterMeters": 3.1829883523076723,
+        "Degrade": 0.9249008489187903,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -80.99963131196276,
+        "y_m": -12.516185896226887,
+        "diameter_m": 5.216097801892399,
+        "degrade": 0.9226002001258234,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -80.99963131196276,
+          "y": -12.516185896226887
+        },
+        "DiameterMeters": 5.216097801892399,
+        "Degrade": 0.9226002001258234,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 28.150016435593614,
+        "y_m": -34.61753379259457,
+        "diameter_m": 3.5644633025018635,
+        "degrade": 0.9223582568147274,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 28.150016435593614,
+          "y": -34.61753379259457
+        },
+        "DiameterMeters": 3.5644633025018635,
+        "Degrade": 0.9223582568147274,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 66.24579816684957,
+        "y_m": 175.3105609073029,
+        "diameter_m": 6.794071193584218,
+        "degrade": 0.9184400325512165,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 66.24579816684957,
+          "y": 175.3105609073029
+        },
+        "DiameterMeters": 6.794071193584218,
+        "Degrade": 0.9184400325512165,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -195.45788605537768,
+        "y_m": -89.64988910832355,
+        "diameter_m": 3.627803208254985,
+        "degrade": 0.9151860869313891,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -195.45788605537768,
+          "y": -89.64988910832355
+        },
+        "DiameterMeters": 3.627803208254985,
+        "Degrade": 0.9151860869313891,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -168.88908458049855,
+        "y_m": -37.4364466047752,
+        "diameter_m": 2.6992031616355576,
+        "degrade": 0.9138027381027726,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -168.88908458049855,
+          "y": -37.4364466047752
+        },
+        "DiameterMeters": 2.6992031616355576,
+        "Degrade": 0.9138027381027726,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -213.07107018816464,
+        "y_m": 201.88274786412433,
+        "diameter_m": 5.0649001527769455,
+        "degrade": 0.9137313583680868,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -213.07107018816464,
+          "y": 201.88274786412433
+        },
+        "DiameterMeters": 5.0649001527769455,
+        "Degrade": 0.9137313583680868,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -129.2392690400535,
+        "y_m": 97.9773113436396,
+        "diameter_m": 29.679036151101325,
+        "degrade": 0.913456973187206,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -129.2392690400535,
+          "y": 97.9773113436396
+        },
+        "DiameterMeters": 29.679036151101325,
+        "Degrade": 0.913456973187206,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 74.30325386766134,
+        "y_m": 50.03744369946543,
+        "diameter_m": 2.649102995788875,
+        "degrade": 0.9133573843620781,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 74.30325386766134,
+          "y": 50.03744369946543
+        },
+        "DiameterMeters": 2.649102995788875,
+        "Degrade": 0.9133573843620781,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -105.07454580971131,
+        "y_m": 57.05472275389013,
+        "diameter_m": 7.601151387760444,
+        "degrade": 0.912984549060411,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -105.07454580971131,
+          "y": 57.05472275389013
+        },
+        "DiameterMeters": 7.601151387760444,
+        "Degrade": 0.912984549060411,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -129.630246775942,
+        "y_m": -156.0897433905456,
+        "diameter_m": 11.040648457955754,
+        "degrade": 0.9123251706601236,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -129.630246775942,
+          "y": -156.0897433905456
+        },
+        "DiameterMeters": 11.040648457955754,
+        "Degrade": 0.9123251706601236,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 145.92274400868422,
+        "y_m": 33.2516468667846,
+        "diameter_m": 6.802471672559528,
+        "degrade": 0.9122119758755224,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 145.92274400868422,
+          "y": 33.2516468667846
+        },
+        "DiameterMeters": 6.802471672559528,
+        "Degrade": 0.9122119758755224,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 155.27254675295296,
+        "y_m": 1.8325323654350143,
+        "diameter_m": 4.516379937359857,
+        "degrade": 0.9106124262154185,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 155.27254675295296,
+          "y": 1.8325323654350143
+        },
+        "DiameterMeters": 4.516379937359857,
+        "Degrade": 0.9106124262154185,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 47.96391178511533,
+        "y_m": 84.77577183102272,
+        "diameter_m": 2.7556896196975997,
+        "degrade": 0.9096045398273986,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 47.96391178511533,
+          "y": 84.77577183102272
+        },
+        "DiameterMeters": 2.7556896196975997,
+        "Degrade": 0.9096045398273986,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 212.39445501248878,
+        "y_m": 138.35241853362544,
+        "diameter_m": 3.118854012905738,
+        "degrade": 0.9088071450897454,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 212.39445501248878,
+          "y": 138.35241853362544
+        },
+        "DiameterMeters": 3.118854012905738,
+        "Degrade": 0.9088071450897454,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -164.29277589745158,
+        "y_m": 219.8005046134029,
+        "diameter_m": 3.778274095930697,
+        "degrade": 0.9071365327150137,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -164.29277589745158,
+          "y": 219.8005046134029
+        },
+        "DiameterMeters": 3.778274095930697,
+        "Degrade": 0.9071365327150137,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 83.97812550110609,
+        "y_m": -42.84009607253557,
+        "diameter_m": 3.2193810353452,
+        "degrade": 0.9059806392601161,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 83.97812550110609,
+          "y": -42.84009607253557
+        },
+        "DiameterMeters": 3.2193810353452,
+        "Degrade": 0.9059806392601161,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -96.47247452041026,
+        "y_m": -77.63557859707115,
+        "diameter_m": 2.505877018867907,
+        "degrade": 0.9028759690005048,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -96.47247452041026,
+          "y": -77.63557859707115
+        },
+        "DiameterMeters": 2.505877018867907,
+        "Degrade": 0.9028759690005048,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 43.78461636375022,
+        "y_m": -199.85798385313973,
+        "diameter_m": 6.030496149311697,
+        "degrade": 0.9017101565304619,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 43.78461636375022,
+          "y": -199.85798385313973
+        },
+        "DiameterMeters": 6.030496149311697,
+        "Degrade": 0.9017101565304619,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 248.16486737639747,
+        "y_m": -236.68212881823746,
+        "diameter_m": 2.6388541243237444,
+        "degrade": 0.9002273545092224,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 248.16486737639747,
+          "y": -236.68212881823746
+        },
+        "DiameterMeters": 2.6388541243237444,
+        "Degrade": 0.9002273545092224,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 219.840639438361,
+        "y_m": 130.5925357295825,
+        "diameter_m": 5.240708763843177,
+        "degrade": 0.8999970460466978,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 219.840639438361,
+          "y": 130.5925357295825
+        },
+        "DiameterMeters": 5.240708763843177,
+        "Degrade": 0.8999970460466978,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 26.81654917515897,
+        "y_m": -64.49848033537282,
+        "diameter_m": 3.3709139653027806,
+        "degrade": 0.8973487788374338,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 26.81654917515897,
+          "y": -64.49848033537282
+        },
+        "DiameterMeters": 3.3709139653027806,
+        "Degrade": 0.8973487788374338,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 152.9752689472299,
+        "y_m": 34.71855300816674,
+        "diameter_m": 3.4757594458823418,
+        "degrade": 0.8966202104348765,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 152.9752689472299,
+          "y": 34.71855300816674
+        },
+        "DiameterMeters": 3.4757594458823418,
+        "Degrade": 0.8966202104348765,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 144.37365887680227,
+        "y_m": -176.9069517053274,
+        "diameter_m": 2.6097792494968695,
+        "degrade": 0.8931714340856788,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 144.37365887680227,
+          "y": -176.9069517053274
+        },
+        "DiameterMeters": 2.6097792494968695,
+        "Degrade": 0.8931714340856788,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 5.654486671201937,
+        "y_m": 226.89625749111002,
+        "diameter_m": 3.0393228947697875,
+        "degrade": 0.8924217005627947,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 5.654486671201937,
+          "y": 226.89625749111002
+        },
+        "DiameterMeters": 3.0393228947697875,
+        "Degrade": 0.8924217005627947,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 168.90515269468096,
+        "y_m": -22.68719388267388,
+        "diameter_m": 2.5060272170777846,
+        "degrade": 0.8916825438265489,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 168.90515269468096,
+          "y": -22.68719388267388
+        },
+        "DiameterMeters": 2.5060272170777846,
+        "Degrade": 0.8916825438265489,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -8.571961103667263,
+        "y_m": -248.57432157450916,
+        "diameter_m": 4.250460327787127,
+        "degrade": 0.8897741496272389,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -8.571961103667263,
+          "y": -248.57432157450916
+        },
+        "DiameterMeters": 4.250460327787127,
+        "Degrade": 0.8897741496272389,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -229.30049846141043,
+        "y_m": -10.723128634050994,
+        "diameter_m": 2.9215296557309234,
+        "degrade": 0.8894699610849406,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -229.30049846141043,
+          "y": -10.723128634050994
+        },
+        "DiameterMeters": 2.9215296557309234,
+        "Degrade": 0.8894699610849406,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 50.87971135172961,
+        "y_m": 214.16605806791392,
+        "diameter_m": 3.4528937345433897,
+        "degrade": 0.8885419004017948,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 50.87971135172961,
+          "y": 214.16605806791392
+        },
+        "DiameterMeters": 3.4528937345433897,
+        "Degrade": 0.8885419004017948,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 14.828541744458391,
+        "y_m": 77.24360003352984,
+        "diameter_m": 11.909437508245961,
+        "degrade": 0.8880383335536869,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 14.828541744458391,
+          "y": 77.24360003352984
+        },
+        "DiameterMeters": 11.909437508245961,
+        "Degrade": 0.8880383335536869,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 187.985067197222,
+        "y_m": -102.2696594199931,
+        "diameter_m": 3.2060313219280494,
+        "degrade": 0.8857101171452019,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 187.985067197222,
+          "y": -102.2696594199931
+        },
+        "DiameterMeters": 3.2060313219280494,
+        "Degrade": 0.8857101171452019,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 217.25123556547027,
+        "y_m": -244.5183021422218,
+        "diameter_m": 5.929114078763951,
+        "degrade": 0.8850400017315936,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 217.25123556547027,
+          "y": -244.5183021422218
+        },
+        "DiameterMeters": 5.929114078763951,
+        "Degrade": 0.8850400017315936,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -179.13429933782604,
+        "y_m": -75.39898633007397,
+        "diameter_m": 5.042549897501187,
+        "degrade": 0.8844912442787795,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -179.13429933782604,
+          "y": -75.39898633007397
+        },
+        "DiameterMeters": 5.042549897501187,
+        "Degrade": 0.8844912442787795,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -150.7749457628409,
+        "y_m": 241.59862787980876,
+        "diameter_m": 3.0046484632528387,
+        "degrade": 0.8822702674750462,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -150.7749457628409,
+          "y": 241.59862787980876
+        },
+        "DiameterMeters": 3.0046484632528387,
+        "Degrade": 0.8822702674750462,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 143.30594458694924,
+        "y_m": 30.112895461544838,
+        "diameter_m": 4.152198186563985,
+        "degrade": 0.882077461764853,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 143.30594458694924,
+          "y": 30.112895461544838
+        },
+        "DiameterMeters": 4.152198186563985,
+        "Degrade": 0.882077461764853,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 152.13725734436906,
+        "y_m": -219.65020601119883,
+        "diameter_m": 6.00034493835515,
+        "degrade": 0.8810355545403917,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 152.13725734436906,
+          "y": -219.65020601119883
+        },
+        "DiameterMeters": 6.00034493835515,
+        "Degrade": 0.8810355545403917,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 190.70239010068326,
+        "y_m": 71.3276467115308,
+        "diameter_m": 3.2184557757163335,
+        "degrade": 0.8803231527256262,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 190.70239010068326,
+          "y": 71.3276467115308
+        },
+        "DiameterMeters": 3.2184557757163335,
+        "Degrade": 0.8803231527256262,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -89.43255299978159,
+        "y_m": 203.04218250782105,
+        "diameter_m": 3.184853713633901,
+        "degrade": 0.8802311249901423,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -89.43255299978159,
+          "y": 203.04218250782105
+        },
+        "DiameterMeters": 3.184853713633901,
+        "Degrade": 0.8802311249901423,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -161.96288607687427,
+        "y_m": 99.04422683526167,
+        "diameter_m": 2.7197736892479143,
+        "degrade": 0.8798596658182638,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -161.96288607687427,
+          "y": 99.04422683526167
+        },
+        "DiameterMeters": 2.7197736892479143,
+        "Degrade": 0.8798596658182638,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -24.015934808703776,
+        "y_m": 34.187704782829485,
+        "diameter_m": 3.2049547339471793,
+        "degrade": 0.8793757393088314,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -24.015934808703776,
+          "y": 34.187704782829485
+        },
+        "DiameterMeters": 3.2049547339471793,
+        "Degrade": 0.8793757393088314,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 226.63642008749702,
+        "y_m": -220.83460451487923,
+        "diameter_m": 12.61612937348056,
+        "degrade": 0.879306162699315,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 226.63642008749702,
+          "y": -220.83460451487923
+        },
+        "DiameterMeters": 12.61612937348056,
+        "Degrade": 0.879306162699315,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 142.13071557020044,
+        "y_m": -131.61021799087302,
+        "diameter_m": 3.361849770218643,
+        "degrade": 0.8792418929063215,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 142.13071557020044,
+          "y": -131.61021799087302
+        },
+        "DiameterMeters": 3.361849770218643,
+        "Degrade": 0.8792418929063215,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -12.665240283668936,
+        "y_m": -172.3398078565495,
+        "diameter_m": 3.6730445662640703,
+        "degrade": 0.8791760897398817,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -12.665240283668936,
+          "y": -172.3398078565495
+        },
+        "DiameterMeters": 3.6730445662640703,
+        "Degrade": 0.8791760897398817,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -98.89279147020187,
+        "y_m": 4.228350094008391,
+        "diameter_m": 2.956145605181511,
+        "degrade": 0.8791568686592043,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -98.89279147020187,
+          "y": 4.228350094008391
+        },
+        "DiameterMeters": 2.956145605181511,
+        "Degrade": 0.8791568686592043,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 160.5690001694424,
+        "y_m": 137.15835261322115,
+        "diameter_m": 3.5975642197779094,
+        "degrade": 0.8776134226509494,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 160.5690001694424,
+          "y": 137.15835261322115
+        },
+        "DiameterMeters": 3.5975642197779094,
+        "Degrade": 0.8776134226509494,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -128.57625245537324,
+        "y_m": 13.00318011935434,
+        "diameter_m": 3.5284708325792673,
+        "degrade": 0.8773991634399241,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -128.57625245537324,
+          "y": 13.00318011935434
+        },
+        "DiameterMeters": 3.5284708325792673,
+        "Degrade": 0.8773991634399241,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 143.49666347263013,
+        "y_m": -148.19451859912675,
+        "diameter_m": 26.742324040411447,
+        "degrade": 0.8766122348029615,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 143.49666347263013,
+          "y": -148.19451859912675
+        },
+        "DiameterMeters": 26.742324040411447,
+        "Degrade": 0.8766122348029615,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 124.5252415643929,
+        "y_m": -80.09403650595127,
+        "diameter_m": 2.7824977335720846,
+        "degrade": 0.875921172559458,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 124.5252415643929,
+          "y": -80.09403650595127
+        },
+        "DiameterMeters": 2.7824977335720846,
+        "Degrade": 0.875921172559458,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 202.2595127215679,
+        "y_m": -100.06399038402171,
+        "diameter_m": 6.0796333710889385,
+        "degrade": 0.8758479636253005,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 202.2595127215679,
+          "y": -100.06399038402171
+        },
+        "DiameterMeters": 6.0796333710889385,
+        "Degrade": 0.8758479636253005,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 51.03387101947095,
+        "y_m": 100.05617336024449,
+        "diameter_m": 4.221817391263001,
+        "degrade": 0.8757339048237389,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 51.03387101947095,
+          "y": 100.05617336024449
+        },
+        "DiameterMeters": 4.221817391263001,
+        "Degrade": 0.8757339048237389,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 241.68297275561088,
+        "y_m": -203.40462960066108,
+        "diameter_m": 2.781918466329294,
+        "degrade": 0.8749924562706503,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 241.68297275561088,
+          "y": -203.40462960066108
+        },
+        "DiameterMeters": 2.781918466329294,
+        "Degrade": 0.8749924562706503,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -172.2803903936021,
+        "y_m": -173.10599816770372,
+        "diameter_m": 3.2512190224567985,
+        "degrade": 0.873767476544481,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -172.2803903936021,
+          "y": -173.10599816770372
+        },
+        "DiameterMeters": 3.2512190224567985,
+        "Degrade": 0.873767476544481,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 28.648836784773607,
+        "y_m": 231.73845397775386,
+        "diameter_m": 63.636818796459636,
+        "degrade": 0.8732354274538249,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 28.648836784773607,
+          "y": 231.73845397775386
+        },
+        "DiameterMeters": 63.636818796459636,
+        "Degrade": 0.8732354274538249,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -172.3605286492108,
+        "y_m": 120.85964912760068,
+        "diameter_m": 5.835932458433611,
+        "degrade": 0.8714826879410499,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -172.3605286492108,
+          "y": 120.85964912760068
+        },
+        "DiameterMeters": 5.835932458433611,
+        "Degrade": 0.8714826879410499,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 127.22760747968732,
+        "y_m": 121.82212693279473,
+        "diameter_m": 3.7142181433996595,
+        "degrade": 0.870510837956028,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 127.22760747968732,
+          "y": 121.82212693279473
+        },
+        "DiameterMeters": 3.7142181433996595,
+        "Degrade": 0.870510837956028,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 245.45194125118798,
+        "y_m": 57.39966665985662,
+        "diameter_m": 5.021889641401697,
+        "degrade": 0.8697302079693545,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 245.45194125118798,
+          "y": 57.39966665985662
+        },
+        "DiameterMeters": 5.021889641401697,
+        "Degrade": 0.8697302079693545,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 208.29104130738608,
+        "y_m": 6.365790322980274,
+        "diameter_m": 4.635196776283548,
+        "degrade": 0.8696832619377531,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 208.29104130738608,
+          "y": 6.365790322980274
+        },
+        "DiameterMeters": 4.635196776283548,
+        "Degrade": 0.8696832619377531,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -212.57249101222953,
+        "y_m": 23.75861046993799,
+        "diameter_m": 62.64580472630227,
+        "degrade": 0.8690175924823279,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -212.57249101222953,
+          "y": 23.75861046993799
+        },
+        "DiameterMeters": 62.64580472630227,
+        "Degrade": 0.8690175924823279,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 179.84031773162076,
+        "y_m": -179.66652329172888,
+        "diameter_m": 3.6760461929197454,
+        "degrade": 0.8689831930531007,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 179.84031773162076,
+          "y": -179.66652329172888
+        },
+        "DiameterMeters": 3.6760461929197454,
+        "Degrade": 0.8689831930531007,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 159.60450834313332,
+        "y_m": 14.463310340382122,
+        "diameter_m": 4.090615079479279,
+        "degrade": 0.8667903487501706,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 159.60450834313332,
+          "y": 14.463310340382122
+        },
+        "DiameterMeters": 4.090615079479279,
+        "Degrade": 0.8667903487501706,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 189.5643543773877,
+        "y_m": 231.98881582909462,
+        "diameter_m": 4.822093401750423,
+        "degrade": 0.8665762485215409,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 189.5643543773877,
+          "y": 231.98881582909462
+        },
+        "DiameterMeters": 4.822093401750423,
+        "Degrade": 0.8665762485215409,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -159.43053724657352,
+        "y_m": -105.72378621036421,
+        "diameter_m": 2.5890703798065697,
+        "degrade": 0.8661975675437454,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -159.43053724657352,
+          "y": -105.72378621036421
+        },
+        "DiameterMeters": 2.5890703798065697,
+        "Degrade": 0.8661975675437454,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 83.8487567402118,
+        "y_m": 140.94016860674265,
+        "diameter_m": 3.174551200650712,
+        "degrade": 0.8641629641268478,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 83.8487567402118,
+          "y": 140.94016860674265
+        },
+        "DiameterMeters": 3.174551200650712,
+        "Degrade": 0.8641629641268478,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 95.5711936307381,
+        "y_m": 176.0110031594039,
+        "diameter_m": 3.3106902863432985,
+        "degrade": 0.8640736697138821,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 95.5711936307381,
+          "y": 176.0110031594039
+        },
+        "DiameterMeters": 3.3106902863432985,
+        "Degrade": 0.8640736697138821,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -137.00051177581867,
+        "y_m": 171.41957696652491,
+        "diameter_m": 2.651263595960999,
+        "degrade": 0.8608482973980508,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -137.00051177581867,
+          "y": 171.41957696652491
+        },
+        "DiameterMeters": 2.651263595960999,
+        "Degrade": 0.8608482973980508,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 190.50289634476258,
+        "y_m": -230.86815575775256,
+        "diameter_m": 4.62328062840548,
+        "degrade": 0.8596401184912301,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 190.50289634476258,
+          "y": -230.86815575775256
+        },
+        "DiameterMeters": 4.62328062840548,
+        "Degrade": 0.8596401184912301,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -206.84118624250715,
+        "y_m": -224.77792855368762,
+        "diameter_m": 3.8322515944946063,
+        "degrade": 0.8590301247145952,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -206.84118624250715,
+          "y": -224.77792855368762
+        },
+        "DiameterMeters": 3.8322515944946063,
+        "Degrade": 0.8590301247145952,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 41.79526285160193,
+        "y_m": -65.20526025674604,
+        "diameter_m": 2.542083935460183,
+        "degrade": 0.8589013521783109,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 41.79526285160193,
+          "y": -65.20526025674604
+        },
+        "DiameterMeters": 2.542083935460183,
+        "Degrade": 0.8589013521783109,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -181.19372682282642,
+        "y_m": 6.214519843680989,
+        "diameter_m": 3.0059912794985437,
+        "degrade": 0.858712495617391,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -181.19372682282642,
+          "y": 6.214519843680989
+        },
+        "DiameterMeters": 3.0059912794985437,
+        "Degrade": 0.858712495617391,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 148.3872416959652,
+        "y_m": -0.3426095904025033,
+        "diameter_m": 3.2236548326062757,
+        "degrade": 0.858558095702493,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 148.3872416959652,
+          "y": -0.3426095904025033
+        },
+        "DiameterMeters": 3.2236548326062757,
+        "Degrade": 0.858558095702493,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -55.79776190390251,
+        "y_m": 159.5741763521358,
+        "diameter_m": 8.809164214803422,
+        "degrade": 0.8568724631794964,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -55.79776190390251,
+          "y": 159.5741763521358
+        },
+        "DiameterMeters": 8.809164214803422,
+        "Degrade": 0.8568724631794964,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 186.69139932770645,
+        "y_m": -120.33194275930515,
+        "diameter_m": 4.4406092545519265,
+        "degrade": 0.8534337718137706,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 186.69139932770645,
+          "y": -120.33194275930515
+        },
+        "DiameterMeters": 4.4406092545519265,
+        "Degrade": 0.8534337718137706,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -75.1399238317158,
+        "y_m": 205.72030400855857,
+        "diameter_m": 2.6886648079244284,
+        "degrade": 0.8532349798787979,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -75.1399238317158,
+          "y": 205.72030400855857
+        },
+        "DiameterMeters": 2.6886648079244284,
+        "Degrade": 0.8532349798787979,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -177.37369575850687,
+        "y_m": 104.1700481607349,
+        "diameter_m": 10.565017359315547,
+        "degrade": 0.8531288841492456,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -177.37369575850687,
+          "y": 104.1700481607349
+        },
+        "DiameterMeters": 10.565017359315547,
+        "Degrade": 0.8531288841492456,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 248.40624015684108,
+        "y_m": -35.256040184311274,
+        "diameter_m": 2.5264632579068955,
+        "degrade": 0.8519950801355436,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 248.40624015684108,
+          "y": -35.256040184311274
+        },
+        "DiameterMeters": 2.5264632579068955,
+        "Degrade": 0.8519950801355436,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -152.14564209122682,
+        "y_m": 85.82096148691585,
+        "diameter_m": 4.284514609203115,
+        "degrade": 0.8519765822234845,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -152.14564209122682,
+          "y": 85.82096148691585
+        },
+        "DiameterMeters": 4.284514609203115,
+        "Degrade": 0.8519765822234845,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 152.56065740988635,
+        "y_m": 133.1513806690366,
+        "diameter_m": 5.045177498583933,
+        "degrade": 0.8515045642261285,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 152.56065740988635,
+          "y": 133.1513806690366
+        },
+        "DiameterMeters": 5.045177498583933,
+        "Degrade": 0.8515045642261285,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -106.53512400945354,
+        "y_m": 223.7474326582461,
+        "diameter_m": 3.0315249220673404,
+        "degrade": 0.8506312146141193,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -106.53512400945354,
+          "y": 223.7474326582461
+        },
+        "DiameterMeters": 3.0315249220673404,
+        "Degrade": 0.8506312146141193,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -228.58988026802112,
+        "y_m": 24.65630079650532,
+        "diameter_m": 7.068107212798277,
+        "degrade": 0.8501987592113116,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -228.58988026802112,
+          "y": 24.65630079650532
+        },
+        "DiameterMeters": 7.068107212798277,
+        "Degrade": 0.8501987592113116,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 11.990661663666742,
+        "y_m": -65.40673267202658,
+        "diameter_m": 4.642826757941085,
+        "degrade": 0.8500217804198783,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 11.990661663666742,
+          "y": -65.40673267202658
+        },
+        "DiameterMeters": 4.642826757941085,
+        "Degrade": 0.8500217804198783,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -25.77439292174421,
+        "y_m": -70.79152293171802,
+        "diameter_m": 2.6951349281323846,
+        "degrade": 0.8486996469025425,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -25.77439292174421,
+          "y": -70.79152293171802
+        },
+        "DiameterMeters": 2.6951349281323846,
+        "Degrade": 0.8486996469025425,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -227.99567652235652,
+        "y_m": -128.74358381040562,
+        "diameter_m": 6.263851254501359,
+        "degrade": 0.8478099516802211,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -227.99567652235652,
+          "y": -128.74358381040562
+        },
+        "DiameterMeters": 6.263851254501359,
+        "Degrade": 0.8478099516802211,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 159.38846587697162,
+        "y_m": -6.821623362995979,
+        "diameter_m": 4.163271003210317,
+        "degrade": 0.8477533023132406,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 159.38846587697162,
+          "y": -6.821623362995979
+        },
+        "DiameterMeters": 4.163271003210317,
+        "Degrade": 0.8477533023132406,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -116.34306639879273,
+        "y_m": -232.35109160464867,
+        "diameter_m": 2.7302944437689565,
+        "degrade": 0.8473384511351415,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -116.34306639879273,
+          "y": -232.35109160464867
+        },
+        "DiameterMeters": 2.7302944437689565,
+        "Degrade": 0.8473384511351415,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -86.6494370245685,
+        "y_m": 146.00815241570086,
+        "diameter_m": 4.056515055015707,
+        "degrade": 0.8443522942063622,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -86.6494370245685,
+          "y": 146.00815241570086
+        },
+        "DiameterMeters": 4.056515055015707,
+        "Degrade": 0.8443522942063622,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -211.24305610515714,
+        "y_m": 30.3657376292781,
+        "diameter_m": 4.956504501569931,
+        "degrade": 0.8434303401283327,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -211.24305610515714,
+          "y": 30.3657376292781
+        },
+        "DiameterMeters": 4.956504501569931,
+        "Degrade": 0.8434303401283327,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -56.512626827733556,
+        "y_m": -233.6443628047627,
+        "diameter_m": 3.1473359398311946,
+        "degrade": 0.842695169749126,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -56.512626827733556,
+          "y": -233.6443628047627
+        },
+        "DiameterMeters": 3.1473359398311946,
+        "Degrade": 0.842695169749126,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -159.83737412878975,
+        "y_m": -53.043972837098266,
+        "diameter_m": 4.029832715021002,
+        "degrade": 0.8426704802715206,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -159.83737412878975,
+          "y": -53.043972837098266
+        },
+        "DiameterMeters": 4.029832715021002,
+        "Degrade": 0.8426704802715206,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -161.35388254524563,
+        "y_m": -138.85559304406652,
+        "diameter_m": 3.40157367638896,
+        "degrade": 0.8423657009612082,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -161.35388254524563,
+          "y": -138.85559304406652
+        },
+        "DiameterMeters": 3.40157367638896,
+        "Degrade": 0.8423657009612082,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 133.39128641270293,
+        "y_m": -228.89427258115686,
+        "diameter_m": 2.8937795660350165,
+        "degrade": 0.8419907196710199,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 133.39128641270293,
+          "y": -228.89427258115686
+        },
+        "DiameterMeters": 2.8937795660350165,
+        "Degrade": 0.8419907196710199,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 71.67209426812497,
+        "y_m": 196.41896606729404,
+        "diameter_m": 3.5974218572556107,
+        "degrade": 0.8411088305479766,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 71.67209426812497,
+          "y": 196.41896606729404
+        },
+        "DiameterMeters": 3.5974218572556107,
+        "Degrade": 0.8411088305479766,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -194.7130931784854,
+        "y_m": 122.83792354641105,
+        "diameter_m": 74.20899519337392,
+        "degrade": 0.8407879658683091,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -194.7130931784854,
+          "y": 122.83792354641105
+        },
+        "DiameterMeters": 74.20899519337392,
+        "Degrade": 0.8407879658683091,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -85.65224368149083,
+        "y_m": -123.8558739349499,
+        "diameter_m": 2.5090591266882227,
+        "degrade": 0.8401690916234688,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -85.65224368149083,
+          "y": -123.8558739349499
+        },
+        "DiameterMeters": 2.5090591266882227,
+        "Degrade": 0.8401690916234688,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -186.42446001324038,
+        "y_m": -210.59918549700814,
+        "diameter_m": 9.950610226613037,
+        "degrade": 0.8389511862549834,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -186.42446001324038,
+          "y": -210.59918549700814
+        },
+        "DiameterMeters": 9.950610226613037,
+        "Degrade": 0.8389511862549834,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 56.59618688367681,
+        "y_m": -177.65891528628663,
+        "diameter_m": 3.2849317456933873,
+        "degrade": 0.8384580457930677,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 56.59618688367681,
+          "y": -177.65891528628663
+        },
+        "DiameterMeters": 3.2849317456933873,
+        "Degrade": 0.8384580457930677,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -14.848071099473117,
+        "y_m": -223.63174329279585,
+        "diameter_m": 2.8842621878881114,
+        "degrade": 0.8379711961361678,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -14.848071099473117,
+          "y": -223.63174329279585
+        },
+        "DiameterMeters": 2.8842621878881114,
+        "Degrade": 0.8379711961361678,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -128.72297473493734,
+        "y_m": -196.28669864867538,
+        "diameter_m": 2.812449711756048,
+        "degrade": 0.8359577950686339,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -128.72297473493734,
+          "y": -196.28669864867538
+        },
+        "DiameterMeters": 2.812449711756048,
+        "Degrade": 0.8359577950686339,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -112.54245275504076,
+        "y_m": -182.57850188860075,
+        "diameter_m": 2.954731790890167,
+        "degrade": 0.8351087074723811,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -112.54245275504076,
+          "y": -182.57850188860075
+        },
+        "DiameterMeters": 2.954731790890167,
+        "Degrade": 0.8351087074723811,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -62.62977585427731,
+        "y_m": -242.65632059972552,
+        "diameter_m": 3.5237101959622,
+        "degrade": 0.834782177089822,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -62.62977585427731,
+          "y": -242.65632059972552
+        },
+        "DiameterMeters": 3.5237101959622,
+        "Degrade": 0.834782177089822,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -199.59685073651696,
+        "y_m": 243.99684123801075,
+        "diameter_m": 12.676361613879026,
+        "degrade": 0.8343838639019812,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -199.59685073651696,
+          "y": 243.99684123801075
+        },
+        "DiameterMeters": 12.676361613879026,
+        "Degrade": 0.8343838639019812,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -32.127078039632266,
+        "y_m": -73.21758511008224,
+        "diameter_m": 2.5664944502268323,
+        "degrade": 0.8340127203464649,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -32.127078039632266,
+          "y": -73.21758511008224
+        },
+        "DiameterMeters": 2.5664944502268323,
+        "Degrade": 0.8340127203464649,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -16.941741787988462,
+        "y_m": 104.60684810741503,
+        "diameter_m": 6.807890986120865,
+        "degrade": 0.831946500211836,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -16.941741787988462,
+          "y": 104.60684810741503
+        },
+        "DiameterMeters": 6.807890986120865,
+        "Degrade": 0.831946500211836,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 0.06506806382060404,
+        "y_m": 142.71134498499282,
+        "diameter_m": 2.618484626911154,
+        "degrade": 0.8309525998814167,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 0.06506806382060404,
+          "y": 142.71134498499282
+        },
+        "DiameterMeters": 2.618484626911154,
+        "Degrade": 0.8309525998814167,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -128.86525477663525,
+        "y_m": -152.11443834188464,
+        "diameter_m": 3.4389915252968306,
+        "degrade": 0.8303355242978646,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -128.86525477663525,
+          "y": -152.11443834188464
+        },
+        "DiameterMeters": 3.4389915252968306,
+        "Degrade": 0.8303355242978646,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -93.71863622419141,
+        "y_m": -50.70809867295313,
+        "diameter_m": 5.454096495986287,
+        "degrade": 0.8302821643178332,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -93.71863622419141,
+          "y": -50.70809867295313
+        },
+        "DiameterMeters": 5.454096495986287,
+        "Degrade": 0.8302821643178332,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -141.9263550647267,
+        "y_m": -218.97847721742852,
+        "diameter_m": 4.164336546763593,
+        "degrade": 0.8298522652720861,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -141.9263550647267,
+          "y": -218.97847721742852
+        },
+        "DiameterMeters": 4.164336546763593,
+        "Degrade": 0.8298522652720861,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 82.3166446764979,
+        "y_m": -215.0900506620899,
+        "diameter_m": 15.503124006050141,
+        "degrade": 0.829435132874126,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 82.3166446764979,
+          "y": -215.0900506620899
+        },
+        "DiameterMeters": 15.503124006050141,
+        "Degrade": 0.829435132874126,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -11.555322547121875,
+        "y_m": -142.6525445372087,
+        "diameter_m": 3.309436160823804,
+        "degrade": 0.8290346800450747,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -11.555322547121875,
+          "y": -142.6525445372087
+        },
+        "DiameterMeters": 3.309436160823804,
+        "Degrade": 0.8290346800450747,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 30.458945202137954,
+        "y_m": -233.65802693926153,
+        "diameter_m": 8.331291066090225,
+        "degrade": 0.8286013981791776,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 30.458945202137954,
+          "y": -233.65802693926153
+        },
+        "DiameterMeters": 8.331291066090225,
+        "Degrade": 0.8286013981791776,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -17.546538512468857,
+        "y_m": -63.560878374484105,
+        "diameter_m": 19.50814839830409,
+        "degrade": 0.8274695125072191,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -17.546538512468857,
+          "y": -63.560878374484105
+        },
+        "DiameterMeters": 19.50814839830409,
+        "Degrade": 0.8274695125072191,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 95.26598360631817,
+        "y_m": -25.57377336626442,
+        "diameter_m": 3.033395459835986,
+        "degrade": 0.8273929361492213,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 95.26598360631817,
+          "y": -25.57377336626442
+        },
+        "DiameterMeters": 3.033395459835986,
+        "Degrade": 0.8273929361492213,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -57.33660441605036,
+        "y_m": 41.31549468782964,
+        "diameter_m": 4.749276043560476,
+        "degrade": 0.8272874285963969,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -57.33660441605036,
+          "y": 41.31549468782964
+        },
+        "DiameterMeters": 4.749276043560476,
+        "Degrade": 0.8272874285963969,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -133.1864223954128,
+        "y_m": 85.11300801522663,
+        "diameter_m": 3.896588643124895,
+        "degrade": 0.8263857425417533,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -133.1864223954128,
+          "y": 85.11300801522663
+        },
+        "DiameterMeters": 3.896588643124895,
+        "Degrade": 0.8263857425417533,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -83.76728276608557,
+        "y_m": -47.44335549341389,
+        "diameter_m": 6.3749143896869604,
+        "degrade": 0.8262314530383532,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -83.76728276608557,
+          "y": -47.44335549341389
+        },
+        "DiameterMeters": 6.3749143896869604,
+        "Degrade": 0.8262314530383532,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 155.46394075590695,
+        "y_m": -81.2867460403815,
+        "diameter_m": 3.1023658743114173,
+        "degrade": 0.8235215568393195,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 155.46394075590695,
+          "y": -81.2867460403815
+        },
+        "DiameterMeters": 3.1023658743114173,
+        "Degrade": 0.8235215568393195,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -11.82349852700375,
+        "y_m": 65.74738830634476,
+        "diameter_m": 3.43328652882096,
+        "degrade": 0.8216779634238233,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -11.82349852700375,
+          "y": 65.74738830634476
+        },
+        "DiameterMeters": 3.43328652882096,
+        "Degrade": 0.8216779634238233,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -82.62656688314706,
+        "y_m": 83.90919852126513,
+        "diameter_m": 6.0567925439193075,
+        "degrade": 0.8216651726161048,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -82.62656688314706,
+          "y": 83.90919852126513
+        },
+        "DiameterMeters": 6.0567925439193075,
+        "Degrade": 0.8216651726161048,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -226.9939459690064,
+        "y_m": -35.80108850555237,
+        "diameter_m": 3.6892980355462166,
+        "degrade": 0.820995256418384,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -226.9939459690064,
+          "y": -35.80108850555237
+        },
+        "DiameterMeters": 3.6892980355462166,
+        "Degrade": 0.820995256418384,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -132.67953371690396,
+        "y_m": 0.002711686787222334,
+        "diameter_m": 5.323863063949456,
+        "degrade": 0.820690286267542,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -132.67953371690396,
+          "y": 0.002711686787222334
+        },
+        "DiameterMeters": 5.323863063949456,
+        "Degrade": 0.820690286267542,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 67.34401812516944,
+        "y_m": 197.65711641252466,
+        "diameter_m": 6.071289270820073,
+        "degrade": 0.8200372138299002,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 67.34401812516944,
+          "y": 197.65711641252466
+        },
+        "DiameterMeters": 6.071289270820073,
+        "Degrade": 0.8200372138299002,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -244.2806703258351,
+        "y_m": 138.13900277851548,
+        "diameter_m": 2.509677630820021,
+        "degrade": 0.8178239695242678,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -244.2806703258351,
+          "y": 138.13900277851548
+        },
+        "DiameterMeters": 2.509677630820021,
+        "Degrade": 0.8178239695242678,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -9.875206093666833,
+        "y_m": 209.81587596531216,
+        "diameter_m": 2.9911536327626838,
+        "degrade": 0.817791274577983,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -9.875206093666833,
+          "y": 209.81587596531216
+        },
+        "DiameterMeters": 2.9911536327626838,
+        "Degrade": 0.817791274577983,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 125.9744576016754,
+        "y_m": -82.8917516048383,
+        "diameter_m": 6.729798807490579,
+        "degrade": 0.8177773658814157,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 125.9744576016754,
+          "y": -82.8917516048383
+        },
+        "DiameterMeters": 6.729798807490579,
+        "Degrade": 0.8177773658814157,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 175.97482746914721,
+        "y_m": 225.9862951663539,
+        "diameter_m": 4.17452726859647,
+        "degrade": 0.8155471847855119,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 175.97482746914721,
+          "y": 225.9862951663539
+        },
+        "DiameterMeters": 4.17452726859647,
+        "Degrade": 0.8155471847855119,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 198.86497269116717,
+        "y_m": 51.04635904190218,
+        "diameter_m": 2.7556738117881943,
+        "degrade": 0.8155345283209395,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 198.86497269116717,
+          "y": 51.04635904190218
+        },
+        "DiameterMeters": 2.7556738117881943,
+        "Degrade": 0.8155345283209395,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 78.25715982268463,
+        "y_m": -70.46722499480558,
+        "diameter_m": 40.05367254854157,
+        "degrade": 0.8148835087640476,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 78.25715982268463,
+          "y": -70.46722499480558
+        },
+        "DiameterMeters": 40.05367254854157,
+        "Degrade": 0.8148835087640476,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -56.55900621342181,
+        "y_m": -108.72108997279912,
+        "diameter_m": 5.556207079153333,
+        "degrade": 0.8142536320200284,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -56.55900621342181,
+          "y": -108.72108997279912
+        },
+        "DiameterMeters": 5.556207079153333,
+        "Degrade": 0.8142536320200284,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 57.369579533362526,
+        "y_m": -199.51826410084954,
+        "diameter_m": 3.157014853969678,
+        "degrade": 0.8136784109140582,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 57.369579533362526,
+          "y": -199.51826410084954
+        },
+        "DiameterMeters": 3.157014853969678,
+        "Degrade": 0.8136784109140582,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -166.0321726807955,
+        "y_m": -35.74545757802011,
+        "diameter_m": 3.721080568478208,
+        "degrade": 0.8130019685387885,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -166.0321726807955,
+          "y": -35.74545757802011
+        },
+        "DiameterMeters": 3.721080568478208,
+        "Degrade": 0.8130019685387885,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -176.87815583929995,
+        "y_m": 127.13238867291204,
+        "diameter_m": 2.9701822443433477,
+        "degrade": 0.8127007275818778,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -176.87815583929995,
+          "y": 127.13238867291204
+        },
+        "DiameterMeters": 2.9701822443433477,
+        "Degrade": 0.8127007275818778,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 132.32883681048435,
+        "y_m": -227.43016866010063,
+        "diameter_m": 3.719868468428469,
+        "degrade": 0.8119404876462708,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 132.32883681048435,
+          "y": -227.43016866010063
+        },
+        "DiameterMeters": 3.719868468428469,
+        "Degrade": 0.8119404876462708,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -86.34106469806801,
+        "y_m": 109.52388842786496,
+        "diameter_m": 3.0693499403642575,
+        "degrade": 0.8115537892066634,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -86.34106469806801,
+          "y": 109.52388842786496
+        },
+        "DiameterMeters": 3.0693499403642575,
+        "Degrade": 0.8115537892066634,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 117.26537683270254,
+        "y_m": -99.31698168344337,
+        "diameter_m": 9.42859010890052,
+        "degrade": 0.8110761771084463,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 117.26537683270254,
+          "y": -99.31698168344337
+        },
+        "DiameterMeters": 9.42859010890052,
+        "Degrade": 0.8110761771084463,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 230.32723473492268,
+        "y_m": -85.85132267732033,
+        "diameter_m": 14.730627385906036,
+        "degrade": 0.8110542130954936,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 230.32723473492268,
+          "y": -85.85132267732033
+        },
+        "DiameterMeters": 14.730627385906036,
+        "Degrade": 0.8110542130954936,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 0.6547525174565578,
+        "y_m": 162.2232940432885,
+        "diameter_m": 2.6143056167433993,
+        "degrade": 0.8107049268823002,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 0.6547525174565578,
+          "y": 162.2232940432885
+        },
+        "DiameterMeters": 2.6143056167433993,
+        "Degrade": 0.8107049268823002,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -83.00059382165841,
+        "y_m": 10.28866527210971,
+        "diameter_m": 2.8571595064697304,
+        "degrade": 0.8103920373839659,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -83.00059382165841,
+          "y": 10.28866527210971
+        },
+        "DiameterMeters": 2.8571595064697304,
+        "Degrade": 0.8103920373839659,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 245.64830189530016,
+        "y_m": -43.66416752286685,
+        "diameter_m": 3.501646436530793,
+        "degrade": 0.8089388416345623,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 245.64830189530016,
+          "y": -43.66416752286685
+        },
+        "DiameterMeters": 3.501646436530793,
+        "Degrade": 0.8089388416345623,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -31.586822345012195,
+        "y_m": -61.6078368983911,
+        "diameter_m": 2.6361123369378907,
+        "degrade": 0.8076560397771679,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -31.586822345012195,
+          "y": -61.6078368983911
+        },
+        "DiameterMeters": 2.6361123369378907,
+        "Degrade": 0.8076560397771679,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 240.61062506991954,
+        "y_m": 97.55371848441331,
+        "diameter_m": 3.2353667455957154,
+        "degrade": 0.8073676002541276,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 240.61062506991954,
+          "y": 97.55371848441331
+        },
+        "DiameterMeters": 3.2353667455957154,
+        "Degrade": 0.8073676002541276,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 103.42052106712964,
+        "y_m": 42.65560212258913,
+        "diameter_m": 2.622926234678634,
+        "degrade": 0.8047112143994826,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 103.42052106712964,
+          "y": 42.65560212258913
+        },
+        "DiameterMeters": 2.622926234678634,
+        "Degrade": 0.8047112143994826,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 77.4313759200117,
+        "y_m": 58.78832522075993,
+        "diameter_m": 4.941379197603331,
+        "degrade": 0.8017212070260955,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 77.4313759200117,
+          "y": 58.78832522075993
+        },
+        "DiameterMeters": 4.941379197603331,
+        "Degrade": 0.8017212070260955,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -190.2440995704062,
+        "y_m": -222.15966902408707,
+        "diameter_m": 9.05679075550527,
+        "degrade": 0.800395722657727,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -190.2440995704062,
+          "y": -222.15966902408707
+        },
+        "DiameterMeters": 9.05679075550527,
+        "Degrade": 0.800395722657727,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -99.81550617290358,
+        "y_m": -239.20864857558573,
+        "diameter_m": 2.8842539218988668,
+        "degrade": 0.7988337497093765,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -99.81550617290358,
+          "y": -239.20864857558573
+        },
+        "DiameterMeters": 2.8842539218988668,
+        "Degrade": 0.7988337497093765,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 169.65540650236687,
+        "y_m": 215.0678756633272,
+        "diameter_m": 5.435827099804935,
+        "degrade": 0.7985228110461855,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 169.65540650236687,
+          "y": 215.0678756633272
+        },
+        "DiameterMeters": 5.435827099804935,
+        "Degrade": 0.7985228110461855,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -90.02018080039136,
+        "y_m": 38.580806203260124,
+        "diameter_m": 5.68233548505749,
+        "degrade": 0.7984957051982426,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -90.02018080039136,
+          "y": 38.580806203260124
+        },
+        "DiameterMeters": 5.68233548505749,
+        "Degrade": 0.7984957051982426,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 7.944347512198533,
+        "y_m": 91.71547928129706,
+        "diameter_m": 8.833914124213964,
+        "degrade": 0.797359907318241,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 7.944347512198533,
+          "y": 91.71547928129706
+        },
+        "DiameterMeters": 8.833914124213964,
+        "Degrade": 0.797359907318241,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 169.91630090558897,
+        "y_m": 89.43034385431821,
+        "diameter_m": 3.8352139174960604,
+        "degrade": 0.7972882272821685,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 169.91630090558897,
+          "y": 89.43034385431821
+        },
+        "DiameterMeters": 3.8352139174960604,
+        "Degrade": 0.7972882272821685,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 137.25789665771896,
+        "y_m": -95.26198213425229,
+        "diameter_m": 5.198306876738599,
+        "degrade": 0.7970228391759514,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 137.25789665771896,
+          "y": -95.26198213425229
+        },
+        "DiameterMeters": 5.198306876738599,
+        "Degrade": 0.7970228391759514,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -58.729874652191654,
+        "y_m": 88.72940938411728,
+        "diameter_m": 4.820483491485166,
+        "degrade": 0.7965028042126276,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -58.729874652191654,
+          "y": 88.72940938411728
+        },
+        "DiameterMeters": 4.820483491485166,
+        "Degrade": 0.7965028042126276,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 202.84617857317932,
+        "y_m": -62.073002269295586,
+        "diameter_m": 7.634335370271336,
+        "degrade": 0.7957358532844553,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 202.84617857317932,
+          "y": -62.073002269295586
+        },
+        "DiameterMeters": 7.634335370271336,
+        "Degrade": 0.7957358532844553,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 132.9947324956117,
+        "y_m": -55.395528668787335,
+        "diameter_m": 6.852958978482229,
+        "degrade": 0.7952559699526495,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 132.9947324956117,
+          "y": -55.395528668787335
+        },
+        "DiameterMeters": 6.852958978482229,
+        "Degrade": 0.7952559699526495,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 95.00074912446007,
+        "y_m": 20.476980917178537,
+        "diameter_m": 10.269704666829869,
+        "degrade": 0.7948707160522428,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 95.00074912446007,
+          "y": 20.476980917178537
+        },
+        "DiameterMeters": 10.269704666829869,
+        "Degrade": 0.7948707160522428,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -83.64105637906371,
+        "y_m": -160.09077565262493,
+        "diameter_m": 4.623182938715148,
+        "degrade": 0.7944946039287302,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -83.64105637906371,
+          "y": -160.09077565262493
+        },
+        "DiameterMeters": 4.623182938715148,
+        "Degrade": 0.7944946039287302,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -123.51734993022961,
+        "y_m": -42.578925006357224,
+        "diameter_m": 3.050035139123925,
+        "degrade": 0.7940918910289463,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -123.51734993022961,
+          "y": -42.578925006357224
+        },
+        "DiameterMeters": 3.050035139123925,
+        "Degrade": 0.7940918910289463,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -55.743787872003736,
+        "y_m": -101.63500690016681,
+        "diameter_m": 4.004864237610865,
+        "degrade": 0.7933109262546725,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -55.743787872003736,
+          "y": -101.63500690016681
+        },
+        "DiameterMeters": 4.004864237610865,
+        "Degrade": 0.7933109262546725,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 17.665833347420858,
+        "y_m": -201.79354830336905,
+        "diameter_m": 3.0539243831121494,
+        "degrade": 0.7911445491932859,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 17.665833347420858,
+          "y": -201.79354830336905
+        },
+        "DiameterMeters": 3.0539243831121494,
+        "Degrade": 0.7911445491932859,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -171.63004123055237,
+        "y_m": 68.29489512824091,
+        "diameter_m": 7.442017381219997,
+        "degrade": 0.7911289406146722,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -171.63004123055237,
+          "y": 68.29489512824091
+        },
+        "DiameterMeters": 7.442017381219997,
+        "Degrade": 0.7911289406146722,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -148.7312410172292,
+        "y_m": 37.48857374091233,
+        "diameter_m": 3.3120588002561444,
+        "degrade": 0.7904973810871481,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -148.7312410172292,
+          "y": 37.48857374091233
+        },
+        "DiameterMeters": 3.3120588002561444,
+        "Degrade": 0.7904973810871481,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -207.4036980658544,
+        "y_m": 44.3771214624428,
+        "diameter_m": 11.637155854350976,
+        "degrade": 0.7884855075293871,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -207.4036980658544,
+          "y": 44.3771214624428
+        },
+        "DiameterMeters": 11.637155854350976,
+        "Degrade": 0.7884855075293871,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -206.4835096144757,
+        "y_m": 147.59694616243962,
+        "diameter_m": 4.259024389348631,
+        "degrade": 0.7871264583826878,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -206.4835096144757,
+          "y": 147.59694616243962
+        },
+        "DiameterMeters": 4.259024389348631,
+        "Degrade": 0.7871264583826878,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -31.11696983834915,
+        "y_m": -238.78803436579636,
+        "diameter_m": 7.688805169649436,
+        "degrade": 0.7867406254688661,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -31.11696983834915,
+          "y": -238.78803436579636
+        },
+        "DiameterMeters": 7.688805169649436,
+        "Degrade": 0.7867406254688661,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -195.37752835174544,
+        "y_m": -181.5168563278798,
+        "diameter_m": 2.6016045587458443,
+        "degrade": 0.785721540350037,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -195.37752835174544,
+          "y": -181.5168563278798
+        },
+        "DiameterMeters": 2.6016045587458443,
+        "Degrade": 0.785721540350037,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 32.64103655936049,
+        "y_m": -13.509843797089474,
+        "diameter_m": 4.38501268239196,
+        "degrade": 0.7851862746152949,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 32.64103655936049,
+          "y": -13.509843797089474
+        },
+        "DiameterMeters": 4.38501268239196,
+        "Degrade": 0.7851862746152949,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -184.67282087660345,
+        "y_m": -14.649032761668735,
+        "diameter_m": 3.287529320883614,
+        "degrade": 0.7847857078224699,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -184.67282087660345,
+          "y": -14.649032761668735
+        },
+        "DiameterMeters": 3.287529320883614,
+        "Degrade": 0.7847857078224699,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -87.08936786467137,
+        "y_m": -107.37599763184386,
+        "diameter_m": 3.2185717463784402,
+        "degrade": 0.78463008194585,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -87.08936786467137,
+          "y": -107.37599763184386
+        },
+        "DiameterMeters": 3.2185717463784402,
+        "Degrade": 0.78463008194585,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -128.94656394492677,
+        "y_m": -114.56073016575729,
+        "diameter_m": 2.6820389328543968,
+        "degrade": 0.7844593397322672,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -128.94656394492677,
+          "y": -114.56073016575729
+        },
+        "DiameterMeters": 2.6820389328543968,
+        "Degrade": 0.7844593397322672,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -238.41197323255776,
+        "y_m": 178.2683022709337,
+        "diameter_m": 4.296859954332695,
+        "degrade": 0.7824671203990183,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -238.41197323255776,
+          "y": 178.2683022709337
+        },
+        "DiameterMeters": 4.296859954332695,
+        "Degrade": 0.7824671203990183,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -45.70699239055327,
+        "y_m": 79.31473172329049,
+        "diameter_m": 2.5992365011254126,
+        "degrade": 0.7824521426358227,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -45.70699239055327,
+          "y": 79.31473172329049
+        },
+        "DiameterMeters": 2.5992365011254126,
+        "Degrade": 0.7824521426358227,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -122.53034462752865,
+        "y_m": -186.38188669535904,
+        "diameter_m": 4.404685812970003,
+        "degrade": 0.7821363810596349,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -122.53034462752865,
+          "y": -186.38188669535904
+        },
+        "DiameterMeters": 4.404685812970003,
+        "Degrade": 0.7821363810596349,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 30.62108493399279,
+        "y_m": 51.543327573659894,
+        "diameter_m": 2.617451356013061,
+        "degrade": 0.7814637511975387,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 30.62108493399279,
+          "y": 51.543327573659894
+        },
+        "DiameterMeters": 2.617451356013061,
+        "Degrade": 0.7814637511975387,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -55.28940565665013,
+        "y_m": -220.9496052188828,
+        "diameter_m": 2.830472218083651,
+        "degrade": 0.7810814302180684,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -55.28940565665013,
+          "y": -220.9496052188828
+        },
+        "DiameterMeters": 2.830472218083651,
+        "Degrade": 0.7810814302180684,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -180.61954119180584,
+        "y_m": 10.523969223352822,
+        "diameter_m": 3.2225439303793757,
+        "degrade": 0.7804313724715154,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -180.61954119180584,
+          "y": 10.523969223352822
+        },
+        "DiameterMeters": 3.2225439303793757,
+        "Degrade": 0.7804313724715154,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -160.98807112364528,
+        "y_m": -45.716743590073264,
+        "diameter_m": 3.5556067484766194,
+        "degrade": 0.7803522107239844,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -160.98807112364528,
+          "y": -45.716743590073264
+        },
+        "DiameterMeters": 3.5556067484766194,
+        "Degrade": 0.7803522107239844,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 129.88390795367354,
+        "y_m": 78.91419452782162,
+        "diameter_m": 2.598023362972882,
+        "degrade": 0.7797101981814543,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 129.88390795367354,
+          "y": 78.91419452782162
+        },
+        "DiameterMeters": 2.598023362972882,
+        "Degrade": 0.7797101981814543,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -155.6220543422399,
+        "y_m": 88.82730525966082,
+        "diameter_m": 4.581761183894249,
+        "degrade": 0.7778388769757835,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -155.6220543422399,
+          "y": 88.82730525966082
+        },
+        "DiameterMeters": 4.581761183894249,
+        "Degrade": 0.7778388769757835,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -173.54931003460706,
+        "y_m": -61.96846374681775,
+        "diameter_m": 12.51332629342766,
+        "degrade": 0.7778011437959644,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -173.54931003460706,
+          "y": -61.96846374681775
+        },
+        "DiameterMeters": 12.51332629342766,
+        "Degrade": 0.7778011437959644,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -88.30341051549217,
+        "y_m": 93.28036547742028,
+        "diameter_m": 4.449485050213898,
+        "degrade": 0.7772991795008198,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -88.30341051549217,
+          "y": 93.28036547742028
+        },
+        "DiameterMeters": 4.449485050213898,
+        "Degrade": 0.7772991795008198,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -67.1379295417897,
+        "y_m": 121.8724724081348,
+        "diameter_m": 14.872593426754749,
+        "degrade": 0.7768856313172116,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -67.1379295417897,
+          "y": 121.8724724081348
+        },
+        "DiameterMeters": 14.872593426754749,
+        "Degrade": 0.7768856313172116,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 61.717900677992304,
+        "y_m": 204.20028512936017,
+        "diameter_m": 3.2526763024738377,
+        "degrade": 0.7751674235931652,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 61.717900677992304,
+          "y": 204.20028512936017
+        },
+        "DiameterMeters": 3.2526763024738377,
+        "Degrade": 0.7751674235931652,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 110.4958127327991,
+        "y_m": 50.933063904271535,
+        "diameter_m": 2.977720813895478,
+        "degrade": 0.7736897492828917,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 110.4958127327991,
+          "y": 50.933063904271535
+        },
+        "DiameterMeters": 2.977720813895478,
+        "Degrade": 0.7736897492828917,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -169.1676393281178,
+        "y_m": -123.72059130959528,
+        "diameter_m": 3.1145337226535816,
+        "degrade": 0.7728198568076085,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -169.1676393281178,
+          "y": -123.72059130959528
+        },
+        "DiameterMeters": 3.1145337226535816,
+        "Degrade": 0.7728198568076085,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -213.50695165808992,
+        "y_m": 235.48469839706394,
+        "diameter_m": 4.292611807710353,
+        "degrade": 0.7716454014297114,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -213.50695165808992,
+          "y": 235.48469839706394
+        },
+        "DiameterMeters": 4.292611807710353,
+        "Degrade": 0.7716454014297114,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 68.37358422266857,
+        "y_m": -93.19872812472008,
+        "diameter_m": 2.6811836859851312,
+        "degrade": 0.7715435482036928,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 68.37358422266857,
+          "y": -93.19872812472008
+        },
+        "DiameterMeters": 2.6811836859851312,
+        "Degrade": 0.7715435482036928,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -1.1872927542167986,
+        "y_m": 122.64030648157365,
+        "diameter_m": 4.00866270500605,
+        "degrade": 0.7711604232854554,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -1.1872927542167986,
+          "y": 122.64030648157365
+        },
+        "DiameterMeters": 4.00866270500605,
+        "Degrade": 0.7711604232854554,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 157.69152704393275,
+        "y_m": 85.33771375922254,
+        "diameter_m": 3.210215762855672,
+        "degrade": 0.770795408271427,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 157.69152704393275,
+          "y": 85.33771375922254
+        },
+        "DiameterMeters": 3.210215762855672,
+        "Degrade": 0.770795408271427,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 54.81415655458085,
+        "y_m": 114.12151287835565,
+        "diameter_m": 2.7685285191922486,
+        "degrade": 0.769669505566703,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 54.81415655458085,
+          "y": 114.12151287835565
+        },
+        "DiameterMeters": 2.7685285191922486,
+        "Degrade": 0.769669505566703,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -218.86573666175863,
+        "y_m": 200.6569635928468,
+        "diameter_m": 4.244304102356665,
+        "degrade": 0.7693687687936326,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -218.86573666175863,
+          "y": 200.6569635928468
+        },
+        "DiameterMeters": 4.244304102356665,
+        "Degrade": 0.7693687687936326,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -36.27910697949173,
+        "y_m": 12.093478185294941,
+        "diameter_m": 2.701257995026166,
+        "degrade": 0.7680365397219868,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -36.27910697949173,
+          "y": 12.093478185294941
+        },
+        "DiameterMeters": 2.701257995026166,
+        "Degrade": 0.7680365397219868,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -67.38709280417382,
+        "y_m": 219.76026932182333,
+        "diameter_m": 3.9374329019873944,
+        "degrade": 0.7664123862039096,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -67.38709280417382,
+          "y": 219.76026932182333
+        },
+        "DiameterMeters": 3.9374329019873944,
+        "Degrade": 0.7664123862039096,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -220.40640905682608,
+        "y_m": -225.5610662806885,
+        "diameter_m": 5.159881244837133,
+        "degrade": 0.7661567207332024,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -220.40640905682608,
+          "y": -225.5610662806885
+        },
+        "DiameterMeters": 5.159881244837133,
+        "Degrade": 0.7661567207332024,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -221.1489501279919,
+        "y_m": -167.20238391870396,
+        "diameter_m": 4.261487456400133,
+        "degrade": 0.7658155698906155,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -221.1489501279919,
+          "y": -167.20238391870396
+        },
+        "DiameterMeters": 4.261487456400133,
+        "Degrade": 0.7658155698906155,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -35.699429132924394,
+        "y_m": -111.24239890888131,
+        "diameter_m": 17.96971374601597,
+        "degrade": 0.7657285183503575,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -35.699429132924394,
+          "y": -111.24239890888131
+        },
+        "DiameterMeters": 17.96971374601597,
+        "Degrade": 0.7657285183503575,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -117.45294609640493,
+        "y_m": 232.36319121929165,
+        "diameter_m": 115.74195067324142,
+        "degrade": 0.7655703473329409,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -117.45294609640493,
+          "y": 232.36319121929165
+        },
+        "DiameterMeters": 115.74195067324142,
+        "Degrade": 0.7655703473329409,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -235.47378971865473,
+        "y_m": -73.83689037263474,
+        "diameter_m": 6.333547060347813,
+        "degrade": 0.7651011768841433,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -235.47378971865473,
+          "y": -73.83689037263474
+        },
+        "DiameterMeters": 6.333547060347813,
+        "Degrade": 0.7651011768841433,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -62.99417827712796,
+        "y_m": 141.86160510865864,
+        "diameter_m": 3.4404538480263493,
+        "degrade": 0.7646986875680737,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -62.99417827712796,
+          "y": 141.86160510865864
+        },
+        "DiameterMeters": 3.4404538480263493,
+        "Degrade": 0.7646986875680737,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 205.25810267602083,
+        "y_m": 87.04138198746091,
+        "diameter_m": 5.346260847156146,
+        "degrade": 0.7645018288738925,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 205.25810267602083,
+          "y": 87.04138198746091
+        },
+        "DiameterMeters": 5.346260847156146,
+        "Degrade": 0.7645018288738925,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 199.8827081105145,
+        "y_m": 206.44876846176135,
+        "diameter_m": 3.3409768862488964,
+        "degrade": 0.7635028929933796,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 199.8827081105145,
+          "y": 206.44876846176135
+        },
+        "DiameterMeters": 3.3409768862488964,
+        "Degrade": 0.7635028929933796,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -51.247528764214735,
+        "y_m": -141.28825103435116,
+        "diameter_m": 2.5666656622624675,
+        "degrade": 0.7631474589884406,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -51.247528764214735,
+          "y": -141.28825103435116
+        },
+        "DiameterMeters": 2.5666656622624675,
+        "Degrade": 0.7631474589884406,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 142.45131046983653,
+        "y_m": 214.4460662943835,
+        "diameter_m": 5.083019325536669,
+        "degrade": 0.761063905652754,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 142.45131046983653,
+          "y": 214.4460662943835
+        },
+        "DiameterMeters": 5.083019325536669,
+        "Degrade": 0.761063905652754,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 244.43969980522184,
+        "y_m": -122.07075391537975,
+        "diameter_m": 3.9880015745329414,
+        "degrade": 0.7607910631579565,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 244.43969980522184,
+          "y": -122.07075391537975
+        },
+        "DiameterMeters": 3.9880015745329414,
+        "Degrade": 0.7607910631579565,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 241.5042082133287,
+        "y_m": 198.0347873183548,
+        "diameter_m": 5.839296310762043,
+        "degrade": 0.7607574951367811,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 241.5042082133287,
+          "y": 198.0347873183548
+        },
+        "DiameterMeters": 5.839296310762043,
+        "Degrade": 0.7607574951367811,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 169.49287439759036,
+        "y_m": 240.31651903126573,
+        "diameter_m": 4.248382983042803,
+        "degrade": 0.7604808251308001,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 169.49287439759036,
+          "y": 240.31651903126573
+        },
+        "DiameterMeters": 4.248382983042803,
+        "Degrade": 0.7604808251308001,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -133.2156427657568,
+        "y_m": -217.40648741505365,
+        "diameter_m": 2.631364388111661,
+        "degrade": 0.7591370178297983,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -133.2156427657568,
+          "y": -217.40648741505365
+        },
+        "DiameterMeters": 2.631364388111661,
+        "Degrade": 0.7591370178297983,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -148.25334907235606,
+        "y_m": 111.41459522319417,
+        "diameter_m": 4.0893258691725105,
+        "degrade": 0.7589883371094475,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -148.25334907235606,
+          "y": 111.41459522319417
+        },
+        "DiameterMeters": 4.0893258691725105,
+        "Degrade": 0.7589883371094475,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 38.96542368236976,
+        "y_m": 52.85274416748098,
+        "diameter_m": 5.243440975806091,
+        "degrade": 0.7582462778544161,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 38.96542368236976,
+          "y": 52.85274416748098
+        },
+        "DiameterMeters": 5.243440975806091,
+        "Degrade": 0.7582462778544161,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -35.90767453376375,
+        "y_m": -175.2335668744333,
+        "diameter_m": 3.428431149157959,
+        "degrade": 0.7572272506553215,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -35.90767453376375,
+          "y": -175.2335668744333
+        },
+        "DiameterMeters": 3.428431149157959,
+        "Degrade": 0.7572272506553215,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -19.311774889888767,
+        "y_m": 165.6691045114763,
+        "diameter_m": 6.940536603734146,
+        "degrade": 0.7556972870366626,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -19.311774889888767,
+          "y": 165.6691045114763
+        },
+        "DiameterMeters": 6.940536603734146,
+        "Degrade": 0.7556972870366626,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 7.332755021718242,
+        "y_m": 134.98168109414507,
+        "diameter_m": 3.7677595220883857,
+        "degrade": 0.7545009987915436,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 7.332755021718242,
+          "y": 134.98168109414507
+        },
+        "DiameterMeters": 3.7677595220883857,
+        "Degrade": 0.7545009987915436,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -8.28927944039205,
+        "y_m": -101.77732874034379,
+        "diameter_m": 5.704564207454628,
+        "degrade": 0.7544592498228612,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -8.28927944039205,
+          "y": -101.77732874034379
+        },
+        "DiameterMeters": 5.704564207454628,
+        "Degrade": 0.7544592498228612,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -179.80297688745023,
+        "y_m": 179.587459506985,
+        "diameter_m": 6.1218595452784195,
+        "degrade": 0.7534502275191128,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -179.80297688745023,
+          "y": 179.587459506985
+        },
+        "DiameterMeters": 6.1218595452784195,
+        "Degrade": 0.7534502275191128,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 247.01685376535892,
+        "y_m": -48.683935653001555,
+        "diameter_m": 3.592754490922166,
+        "degrade": 0.7531022936113116,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 247.01685376535892,
+          "y": -48.683935653001555
+        },
+        "DiameterMeters": 3.592754490922166,
+        "Degrade": 0.7531022936113116,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -89.77004204152834,
+        "y_m": -195.68261826079208,
+        "diameter_m": 3.257774628281396,
+        "degrade": 0.7525969347168001,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -89.77004204152834,
+          "y": -195.68261826079208
+        },
+        "DiameterMeters": 3.257774628281396,
+        "Degrade": 0.7525969347168001,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 197.08796754763392,
+        "y_m": 77.85910596264114,
+        "diameter_m": 13.696828938967437,
+        "degrade": 0.752079495034429,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 197.08796754763392,
+          "y": 77.85910596264114
+        },
+        "DiameterMeters": 13.696828938967437,
+        "Degrade": 0.752079495034429,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 111.23089578084563,
+        "y_m": 33.528986073541944,
+        "diameter_m": 5.456143227142449,
+        "degrade": 0.7520584864068183,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 111.23089578084563,
+          "y": 33.528986073541944
+        },
+        "DiameterMeters": 5.456143227142449,
+        "Degrade": 0.7520584864068183,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": -91.74646391454783,
+        "y_m": 169.97658317906797,
+        "diameter_m": 2.745260056405664,
+        "degrade": 0.7515195268482021,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": -91.74646391454783,
+          "y": 169.97658317906797
+        },
+        "DiameterMeters": 2.745260056405664,
+        "Degrade": 0.7515195268482021,
+        "Morph": "NORMAL"
+      },
+      {
+        "x_m": 52.33044573658918,
+        "y_m": -92.72354849315866,
+        "diameter_m": 2.525829135674809,
+        "degrade": 0.751498165089394,
+        "morph": "NORMAL",
+        "center_meters": {
+          "x": 52.33044573658918,
+          "y": -92.72354849315866
+        },
+        "DiameterMeters": 2.525829135674809,
+        "Degrade": 0.751498165089394,
+        "Morph": "NORMAL"
+      }
+    ]
+  },
+  "output_files": [
+    "/home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152051_apollo_17/01_rockfield_overview.png",
+    "/home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152051_apollo_17/02_crater_ejecta_zones.png",
+    "/home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152051_apollo_17/03_rocks_grouped_by_source_crater.png",
+    "/home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152051_apollo_17/04_rock_density_field.png",
+    "/home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152051_apollo_17/05_large_rock_map.png",
+    "/home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152051_apollo_17/merged_rocks.csv",
+    "/home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152051_apollo_17/rockfield_metrics.csv"
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "generator": "heightmap_scientific.py",
+  "format": "MoonSimHeightmapPackage",
+  "format_version": 1,
+  "units": "meters until 16-bit export",
+  "preset": "custom_scientific",
+  "seed": 24680,
+  "heightmap_size_px": 1009,
+  "map_size_m": 500.0,
+  "meters_per_pixel": 0.49603174603174605,
+  "coordinate_system": {
+    "heightmap": "x_m=0 is left edge, y_m=0 is top edge",
+    "craters": "centered coordinates, x/y in -map_size_m/2..+map_size_m/2"
+  },
+  "unreal_import": {
+    "x_scale_cm": 49.60317460317461,
+    "y_scale_cm": 49.60317460317461,
+    "z_scale": 21.484375,
+    "encoded_min_m": -55.0,
+    "encoded_max_m": 55.0,
+    "encoded_height_range_m": 110.0
+  },
+  "actual_height_stats_m": {
+    "min": -28.533294677734375,
+    "max": 26.432750701904297,
+    "mean": -4.911200335300236e-07,
+    "std": 10.993439674377441,
+    "p01": -26.67581558227539,
+    "p99": 22.784305572509766
+  },
+  "crater_density_model": {
+    "equation": "N_map ~ Poisson(A * K * (Dmin^(-b) - Dmax^(-b))) per segment",
+    "diameter_units": "meters",
+    "area_units": "square meters",
+    "segments": [
+      {
+        "min_diameter_m": 2.5,
+        "max_diameter_m": 50.0,
+        "K": 0.06,
+        "b": 2.6
+      },
+      {
+        "min_diameter_m": 50.0,
+        "max_diameter_m": 250.0,
+        "K": 0.1,
+        "b": 2.1
+      }
+    ],
+    "generated_count": 1320
+  },
+  "settings": {
+    "preset": "custom_scientific",
+    "seed": 24680,
+    "size": 1009,
+    "map_size_m": 500.0,
+    "height_range_m": 110.0,
+    "base_relief_m": 6.5,
+    "floor_final_blur_px": 3.8,
+    "add_broad_landforms": true,
+    "landform_count": 48,
+    "landform_radius_min_m": 16.0,
+    "landform_radius_max_m": 220.0,
+    "landform_height_min_m": -5.5,
+    "landform_height_max_m": 9.0,
+    "landform_elongation_max": 4.2,
+    "crater_segments": [
+      {
+        "min_diameter_m": 2.5,
+        "max_diameter_m": 50.0,
+        "K": 0.06,
+        "b": 2.6
+      },
+      {
+        "min_diameter_m": 50.0,
+        "max_diameter_m": 250.0,
+        "K": 0.1,
+        "b": 2.1
+      }
+    ],
+    "degradation_min": 0.6,
+    "degradation_max": 1.0,
+    "allow_overlaps": true,
+    "simple_depth_ratio": 0.08,
+    "rim_height_ratio": 0.013,
+    "rim_width_radius_ratio": 0.1,
+    "ejecta_height_ratio": 0.003,
+    "ejecta_decay_exponent": 3.0,
+    "crater_outer_radius_ratio": 2.65,
+    "crater_edge_falloff_m": 8.0,
+    "max_rim_irregularity": 0.11,
+    "rim_strength": 0.75,
+    "ejecta_strength": 0.4,
+    "fresh_blockiness": 0.2,
+    "secondary_chain_probability": 0.08,
+    "slope_crater_loss_strength": 0.5,
+    "local_reference_radius_ratio": 0.45,
+    "min_local_reference_blur_px": 2.0,
+    "max_local_reference_blur_px": 80.0,
+    "max_degraded_crater_blur_px": 3.5,
+    "post_regolith_roughness_m": 0.045,
+    "post_regolith_blur_px": 0.65,
+    "final_global_blur_px": 0.0,
+    "dither_lsb": 0.35,
+    "sun_azimuth_deg": 135.0,
+    "sun_elevation_deg": 25.0,
+    "crater_floor_roughness_m": 0.0,
+    "crater_floor_roughness_blur_px": 1.4,
+    "crater_floor_roughness_min_diameter_m": 35.0
+  },
+  "output_files": {
+    "heightmap": "heightmap.png",
+    "metadata": "metadata.json",
+    "craters": "craters.json",
+    "generation_summary": "generation_summary.txt"
+  }
+}

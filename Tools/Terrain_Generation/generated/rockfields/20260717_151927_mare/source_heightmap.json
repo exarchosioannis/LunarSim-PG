@@ -1,0 +1,8 @@
+{
+  "format": "MoonSimRockfieldSourceHeightmap",
+  "version": 1,
+  "heightmap_run": "20260717_151924_mare",
+  "heightmap": "../../heightmaps/20260717_151924_mare/heightmap.png",
+  "metadata": "../../heightmaps/20260717_151924_mare/metadata.json",
+  "craters": "../../heightmaps/20260717_151924_mare/craters.json"
+}

@@ -1,0 +1,38 @@
+MoonSim rockfield analysis
+==========================
+Terrain: heightmap
+Map: 500.000 m × 500.000 m
+
+Rock population
+  loaded rocks: 8898
+  valid positions: 8898
+  density: 0.035592 rocks/m²
+  crater-owned rocks: 6398
+  background or unowned rocks: 2500
+  random big-rock-clump rocks: 0
+  diameter min / median / mean / p95 / max: 0.260 / 0.302 / 0.336 / 0.526 / 1.679 m
+
+Crater-owned rocks by zone
+  Crater floor: 1104
+  Rim: 2324
+  Proximal ejecta: 2711
+  Distal ejecta: 259
+
+Spatial distribution
+  nearest-neighbor mean / median / p95: 2.260 / 1.635 / 6.243 m
+  Poisson expected mean nearest-neighbor distance: 2.650 m
+  Clark-Evans R: 0.853 (clustered)
+  quadrat index of dispersion: 20.221
+
+Crater/ejecta-zone settings
+  source: rock settings: rock_settings.json
+
+Output files
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152122_polar_highlands/01_rockfield_overview.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152122_polar_highlands/02_crater_ejecta_zones.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152122_polar_highlands/03_rocks_grouped_by_source_crater.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152122_polar_highlands/04_rock_density_field.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152122_polar_highlands/05_large_rock_map.png
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152122_polar_highlands/merged_rocks.csv
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152122_polar_highlands/rockfield_metrics.csv
+  /home/jeanluc/Documents/UnrealProjects/MoonSim 5.7/Tools/analysis_results/rockfields/20260717_152122_polar_highlands/rockfield_analysis.json
