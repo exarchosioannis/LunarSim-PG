@@ -59,6 +59,9 @@ docker compose -f docker/docker-compose.yml up -d
 ```bash
 docker exec -it sim_ros bash
 source /opt/ros/humble/setup.bash
+cd /ws/ros2_ws
+colcon build --symlink-install
+source install/setup.bash
 ```
 
 ### Stop
