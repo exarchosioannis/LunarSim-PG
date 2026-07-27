@@ -3,7 +3,19 @@
 #include "Editor.h"
 #include "EngineUtils.h"
 #include "Components/ChildActorComponent.h"
+#include "Components/LightComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/CollisionProfile.h"
+#include "Engine/DirectionalLight.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
+#include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "Materials/MaterialInterface.h"
+#include "Misc/PackageName.h"
+#include "UObject/UObjectGlobals.h"
+#include "UObject/UObjectIterator.h"
+#include "UObject/UnrealType.h"
 #include "Maps/OccupancyMapPublisherComponent.h"
 #include "Robots/RoverGroundTruthPublisherComponent.h"
 #include "Sensors/ImuSensorPublisherComponent.h"
@@ -177,6 +189,540 @@ bool ResolveCompleteRoverPipeline(AActor* RoverActor, UWorld* EditorWorld, FReso
 	return OutPipeline.IsComplete();
 }
 
+const TCHAR* SphereMeshPath = TEXT("/Engine/BasicShapes/Sphere.Sphere");
+
+const TCHAR* SunMaterialPath =
+	TEXT(
+		"/Game/Brushify/Maps/Moon/MaterialOverrides/"
+		"M_SunGlow.M_SunGlow"
+	);
+
+const TCHAR* EarthMaterialPath =
+	TEXT("/Game/3D_Models/Earth/Earth/Earth.Earth");
+
+const TCHAR* SkyMaterialPath =
+	TEXT(
+		"/Game/Brushify/Maps/Moon/MaterialOverrides/"
+		"MI_SkyHDR_Inst.MI_SkyHDR_Inst"
+	);
+
+const TArray<FString>& GetSunGlowBlueprintClassPaths()
+{
+	static const TArray<FString> Paths = {
+		TEXT(
+			"/Game/Blueprints/BP_SunGLowController."
+			"BP_SunGLowController_C"
+		)
+	};
+
+	return Paths;
+}
+
+const TArray<FString>& GetGroundTruthBlueprintClassPaths()
+{
+	static const TArray<FString> Paths = {
+		TEXT(
+			"/Game/UnrealGT/BP_GroundTruthMapPublisher."
+			"BP_GroundTruthMapPublisher_C"
+		)
+	};
+
+	return Paths;
+}
+
+const TArray<FString>& GetRoverBlueprintClassPaths()
+{
+	static const TArray<FString> Paths = {
+		TEXT("/Game/ESA_Rover.ESA_Rover_C"),
+		TEXT("/Game/ESA_Rover/ESA_Rover.ESA_Rover_C"),
+		TEXT("/Game/Rover/ESA_Rover.ESA_Rover_C"),
+		TEXT("/Game/Rovers/ESA_Rover.ESA_Rover_C"),
+		TEXT("/Game/Robots/ESA_Rover.ESA_Rover_C"),
+		TEXT("/Game/Vehicles/ESA_Rover.ESA_Rover_C"),
+		TEXT("/Game/Vehicles/Rover/ESA_Rover.ESA_Rover_C"),
+		TEXT("/Game/Blueprints/ESA_Rover.ESA_Rover_C"),
+		TEXT("/Game/Blueprints/Robots/ESA_Rover.ESA_Rover_C"),
+		TEXT("/Game/BP_RoverVehicle.BP_RoverVehicle_C"),
+		TEXT("/Game/Robots/BP_RoverVehicle.BP_RoverVehicle_C"),
+		TEXT("/Game/Blueprints/BP_RoverVehicle.BP_RoverVehicle_C")
+	};
+
+	return Paths;
+}
+
+FText WorldSetupStatus = LOCTEXT("WorldSetupReadyStatus", "World setup ready.");
+
+template <typename ActorType> ActorType* FindActorByLabel(UWorld* World, const FString& ActorLabel)
+{
+	if (!World)
+		return nullptr;
+
+	for (TActorIterator<ActorType> It(World); It; ++It) {
+		ActorType* Actor = *It;
+		if (!IsValid(Actor) || Actor->IsActorBeingDestroyed())
+			continue;
+
+#if WITH_EDITOR
+		if (Actor->GetActorLabel().Equals(ActorLabel, ESearchCase::IgnoreCase))
+			return Actor;
+#endif
+	}
+
+	return nullptr;
+}
+
+UClass* FindLoadedActorClass(const TArray<FString>& CandidateClassNames)
+{
+	for (TObjectIterator<UClass> It; It; ++It) {
+		UClass* ActorClass = *It;
+		if (!IsValid(ActorClass) || !ActorClass->IsChildOf(AActor::StaticClass()) ||
+		    ActorClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists)) {
+			continue;
+		}
+
+		if (CandidateClassNames.Contains(ActorClass->GetName()))
+			return ActorClass;
+	}
+
+	return nullptr;
+}
+
+UClass* LoadFirstActorClass(const TArray<FString>& CandidateClassPaths,
+                            const TArray<FString>& CandidateClassNames, const FString& ActorDescription)
+{
+	if (UClass* LoadedClass = FindLoadedActorClass(CandidateClassNames))
+		return LoadedClass;
+
+	for (const FString& CandidatePath : CandidateClassPaths) {
+		const FString PackageName = FPackageName::ObjectPathToPackageName(CandidatePath);
+		if (!FPackageName::DoesPackageExist(PackageName))
+			continue;
+
+		UClass* ActorClass = LoadClass<AActor>(nullptr, *CandidatePath);
+		if (ActorClass && ActorClass->IsChildOf(AActor::StaticClass()))
+			return ActorClass;
+	}
+
+	UE_LOG(LogTemp, Error, TEXT("MoonSim: Could not load the %s Blueprint class."), *ActorDescription);
+	return nullptr;
+}
+
+AActor* CreateOrUpdateBlueprintActor(UWorld* World, const TArray<FString>& CandidateClassPaths,
+                                     const TArray<FString>& CandidateClassNames, const FString& ActorLabel,
+                                     const FVector& Location, const FRotator& Rotation, const FName& FolderPath)
+{
+	if (!World)
+		return nullptr;
+
+	AActor* Actor = FindActorByLabel<AActor>(World, ActorLabel);
+	if (!Actor) {
+		UClass* ActorClass = LoadFirstActorClass(CandidateClassPaths, CandidateClassNames, ActorLabel);
+		if (!ActorClass)
+			return nullptr;
+
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.OverrideLevel = World->PersistentLevel;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		Actor = World->SpawnActor<AActor>(ActorClass, Location, Rotation, SpawnParameters);
+	}
+
+	if (!Actor)
+		return nullptr;
+
+	Actor->Modify();
+	Actor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+#if WITH_EDITOR
+	Actor->SetActorLabel(ActorLabel);
+#endif
+
+	Actor->SetFolderPath(FolderPath);
+	Actor->SetActorLocation(Location);
+	Actor->SetActorRotation(Rotation);
+	Actor->MarkPackageDirty();
+
+	return Actor;
+}
+
+AStaticMeshActor* CreateOrUpdateEnvironmentSphere(UWorld* World, const FString& ActorLabel,
+                                                  const TCHAR* MaterialPath, const FVector& Location,
+                                                  const FVector& Scale, bool bMovable)
+{
+	if (!World)
+		return nullptr;
+
+	AStaticMeshActor* Actor = FindActorByLabel<AStaticMeshActor>(World, ActorLabel);
+	if (!Actor) {
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.OverrideLevel = World->PersistentLevel;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		Actor = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), Location,
+		                                              FRotator::ZeroRotator, SpawnParameters);
+	}
+
+	if (!Actor)
+		return nullptr;
+
+	UStaticMesh* SphereMesh = LoadObject<UStaticMesh>(nullptr, SphereMeshPath);
+	UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, MaterialPath);
+	if (!SphereMesh || !Material) {
+		UE_LOG(LogTemp, Error, TEXT("MoonSim: Could not load the mesh or material for '%s'."), *ActorLabel);
+		return nullptr;
+	}
+
+	Actor->Modify();
+	Actor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+#if WITH_EDITOR
+	Actor->SetActorLabel(ActorLabel);
+#endif
+
+	Actor->SetFolderPath(TEXT("Moon Environment"));
+	Actor->SetActorLocation(Location);
+	Actor->SetActorRotation(FRotator::ZeroRotator);
+	Actor->SetActorScale3D(Scale);
+	Actor->SetActorEnableCollision(false);
+
+	UStaticMeshComponent* MeshComponent = Actor->GetStaticMeshComponent();
+	if (!MeshComponent)
+		return nullptr;
+
+	MeshComponent->Modify();
+	MeshComponent->SetMobility(EComponentMobility::Movable);
+	MeshComponent->SetStaticMesh(SphereMesh);
+	MeshComponent->SetMaterial(0, Material);
+	MeshComponent->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MeshComponent->SetGenerateOverlapEvents(false);
+	MeshComponent->SetCastShadow(false);
+	MeshComponent->bCastDynamicShadow = false;
+	MeshComponent->bCastStaticShadow = false;
+	MeshComponent->bCastContactShadow = false;
+	MeshComponent->bAffectDistanceFieldLighting = false;
+	MeshComponent->bAffectDynamicIndirectLighting = false;
+	MeshComponent->SetMobility(bMovable ? EComponentMobility::Movable : EComponentMobility::Static);
+	MeshComponent->MarkRenderStateDirty();
+	Actor->MarkPackageDirty();
+
+	return Actor;
+}
+
+ADirectionalLight* CreateOrUpdateMoonDirectionalLight(UWorld* World)
+{
+	if (!World)
+		return nullptr;
+
+	ADirectionalLight* Light = FindActorByLabel<ADirectionalLight>(World, TEXT("DirectionalLight"));
+	const bool bWasCreated = (Light == nullptr);
+
+	if (!Light) {
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.OverrideLevel = World->PersistentLevel;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		Light = World->SpawnActor<ADirectionalLight>(ADirectionalLight::StaticClass(),
+		                                                FVector(0.0, 0.0, 1000.0),
+		                                                FRotator(-35.0, -145.0, 0.0), SpawnParameters);
+	}
+
+	if (!Light)
+		return nullptr;
+
+	Light->Modify();
+
+#if WITH_EDITOR
+	Light->SetActorLabel(TEXT("DirectionalLight"));
+#endif
+
+	Light->SetFolderPath(TEXT("Moon Environment"));
+
+	ULightComponent* LightComponent = Light->GetLightComponent();
+	if (LightComponent) {
+		LightComponent->Modify();
+		LightComponent->SetMobility(EComponentMobility::Movable);
+		if (bWasCreated) {
+			LightComponent->SetIntensity(10.0f);
+			LightComponent->SetLightColor(FLinearColor::White, false);
+			LightComponent->SetCastShadows(true);
+		}
+		LightComponent->MarkRenderStateDirty();
+	}
+
+	Light->MarkPackageDirty();
+	return Light;
+}
+
+FString NormalizeBlueprintPropertyName(const FString& PropertyName)
+{
+	FString NormalizedName = PropertyName;
+	NormalizedName.ReplaceInline(TEXT(" "), TEXT(""));
+	NormalizedName.ReplaceInline(TEXT("_"), TEXT(""));
+	return NormalizedName.ToLower();
+}
+
+FObjectPropertyBase* FindBlueprintActorReferenceProperty(AActor* TargetActor, const FName& InternalName,
+                                                         const FString& DisplayName)
+{
+	if (!TargetActor)
+		return nullptr;
+
+	if (FObjectPropertyBase* ExactProperty =
+	        FindFProperty<FObjectPropertyBase>(TargetActor->GetClass(), InternalName)) {
+		if (ExactProperty->PropertyClass && ExactProperty->PropertyClass->IsChildOf(AActor::StaticClass()))
+			return ExactProperty;
+	}
+
+	const FString NormalizedInternalName = NormalizeBlueprintPropertyName(InternalName.ToString());
+	const FString NormalizedDisplayName = NormalizeBlueprintPropertyName(DisplayName);
+
+	for (TFieldIterator<FObjectPropertyBase> It(TargetActor->GetClass()); It; ++It) {
+		FObjectPropertyBase* Property = *It;
+		if (!Property || !Property->PropertyClass ||
+		    !Property->PropertyClass->IsChildOf(AActor::StaticClass())) {
+			continue;
+		}
+
+		const FString CandidateInternalName = NormalizeBlueprintPropertyName(Property->GetName());
+		const FString CandidateDisplayName =
+		    NormalizeBlueprintPropertyName(Property->GetDisplayNameText().ToString());
+
+		if (CandidateInternalName == NormalizedInternalName ||
+		    CandidateInternalName == NormalizedDisplayName ||
+		    CandidateDisplayName == NormalizedInternalName ||
+		    CandidateDisplayName == NormalizedDisplayName) {
+			return Property;
+		}
+	}
+
+	UE_LOG(LogTemp, Error,
+	       TEXT("MoonSim: Could not find actor-reference property '%s' / '%s' on '%s'."),
+	       *InternalName.ToString(), *DisplayName, *TargetActor->GetActorLabel());
+
+	for (TFieldIterator<FObjectPropertyBase> It(TargetActor->GetClass()); It; ++It) {
+		FObjectPropertyBase* Property = *It;
+		if (!Property || !Property->PropertyClass ||
+		    !Property->PropertyClass->IsChildOf(AActor::StaticClass())) {
+			continue;
+		}
+
+		UE_LOG(LogTemp, Warning,
+		       TEXT("MoonSim: Available actor property on '%s': internal='%s', display='%s', type='%s'."),
+		       *TargetActor->GetActorLabel(), *Property->GetName(),
+		       *Property->GetDisplayNameText().ToString(), *Property->PropertyClass->GetName());
+	}
+
+	return nullptr;
+}
+
+bool SetBlueprintActorReferenceValue(AActor* TargetActor, FObjectPropertyBase* Property,
+                                     AActor* ReferencedActor)
+{
+	if (!TargetActor || !Property)
+		return false;
+
+	if (ReferencedActor && !ReferencedActor->IsA(Property->PropertyClass)) {
+		UE_LOG(LogTemp, Error,
+		       TEXT("MoonSim: Actor '%s' is not compatible with property '%s' on '%s'; expected '%s'."),
+		       *ReferencedActor->GetActorLabel(), *Property->GetName(), *TargetActor->GetActorLabel(),
+		       *Property->PropertyClass->GetName());
+		return false;
+	}
+
+	Property->SetObjectPropertyValue_InContainer(TargetActor, ReferencedActor);
+	return Property->GetObjectPropertyValue_InContainer(TargetActor) == ReferencedActor;
+}
+
+bool ConfigureSunGlowController(AActor* SunGlowController, ADirectionalLight* DirectionalLight,
+                                AStaticMeshActor* Sun, AActor* Rover)
+{
+	if (!SunGlowController)
+		return false;
+
+	SunGlowController->SetActorTickEnabled(false);
+
+	FObjectPropertyBase* DirectionalLightProperty = FindBlueprintActorReferenceProperty(
+	    SunGlowController, TEXT("DirectionalLight"), TEXT("Directional Light"));
+	FObjectPropertyBase* SunProperty = FindBlueprintActorReferenceProperty(
+	    SunGlowController, TEXT("SunGlowSPhere"), TEXT("Sun Glow Sphere"));
+	FObjectPropertyBase* FollowActorProperty = FindBlueprintActorReferenceProperty(
+	    SunGlowController, TEXT("FollowActor"), TEXT("Follow Actor"));
+
+	if (!DirectionalLightProperty || !SunProperty || !FollowActorProperty)
+		return false;
+
+	SunGlowController->Modify();
+
+	const bool bDirectionalLightSet =
+	    SetBlueprintActorReferenceValue(SunGlowController, DirectionalLightProperty, DirectionalLight);
+	const bool bSunSet =
+	    SetBlueprintActorReferenceValue(SunGlowController, SunProperty, Sun);
+	const bool bFollowActorSet =
+	    SetBlueprintActorReferenceValue(SunGlowController, FollowActorProperty, Rover);
+
+#if WITH_EDITOR
+	SunGlowController->PostEditChange();
+
+	DirectionalLightProperty = FindBlueprintActorReferenceProperty(
+	    SunGlowController, TEXT("DirectionalLight"), TEXT("Directional Light"));
+	SunProperty = FindBlueprintActorReferenceProperty(
+	    SunGlowController, TEXT("SunGlowSPhere"), TEXT("Sun Glow Sphere"));
+	FollowActorProperty = FindBlueprintActorReferenceProperty(
+	    SunGlowController, TEXT("FollowActor"), TEXT("Follow Actor"));
+
+	if (DirectionalLightProperty)
+		SetBlueprintActorReferenceValue(SunGlowController, DirectionalLightProperty, DirectionalLight);
+	if (SunProperty)
+		SetBlueprintActorReferenceValue(SunGlowController, SunProperty, Sun);
+	if (FollowActorProperty)
+		SetBlueprintActorReferenceValue(SunGlowController, FollowActorProperty, Rover);
+#endif
+
+	const bool bDirectionalLightPersisted =
+	    DirectionalLightProperty &&
+	    DirectionalLightProperty->GetObjectPropertyValue_InContainer(SunGlowController) == DirectionalLight;
+	const bool bSunPersisted =
+	    SunProperty &&
+	    SunProperty->GetObjectPropertyValue_InContainer(SunGlowController) == Sun;
+	const bool bFollowActorPersisted =
+	    FollowActorProperty &&
+	    FollowActorProperty->GetObjectPropertyValue_InContainer(SunGlowController) == Rover;
+
+	const bool bComplete =
+	    bDirectionalLightSet && bSunSet && bFollowActorSet &&
+	    bDirectionalLightPersisted && bSunPersisted && bFollowActorPersisted &&
+	    DirectionalLight && Sun && Rover;
+
+	SunGlowController->SetActorTickEnabled(bComplete);
+	SunGlowController->MarkPackageDirty();
+
+	if (DirectionalLight && bDirectionalLightPersisted) {
+		UE_LOG(LogTemp, Warning, TEXT("MoonSim: Assigned %s.DirectionalLight = %s."),
+		       *SunGlowController->GetActorLabel(), *DirectionalLight->GetActorLabel());
+	}
+
+	if (Sun && bSunPersisted) {
+		UE_LOG(LogTemp, Warning, TEXT("MoonSim: Assigned %s.SunGlowSPhere = %s."),
+		       *SunGlowController->GetActorLabel(), *Sun->GetActorLabel());
+	}
+
+	if (Rover && bFollowActorPersisted) {
+		UE_LOG(LogTemp, Warning, TEXT("MoonSim: Assigned %s.FollowActor = %s."),
+		       *SunGlowController->GetActorLabel(), *Rover->GetActorLabel());
+	}
+
+	return bComplete;
+}
+
+AActor* FindExistingCompleteRover(UWorld* World)
+{
+	if (!World)
+		return nullptr;
+
+	for (TActorIterator<AActor> It(World); It; ++It) {
+		AActor* Candidate = *It;
+		FResolvedRoverPipeline Pipeline;
+		if (ResolveCompleteRoverPipeline(Candidate, World, Pipeline))
+			return Candidate;
+	}
+
+	return nullptr;
+}
+
+bool CreateOrUpdateMoonEnvironment(UWorld* World, FString& OutStatus)
+{
+	if (!World) {
+		OutStatus = TEXT("Moon environment failed: no editor world.");
+		return false;
+	}
+
+	ADirectionalLight* DirectionalLight = CreateOrUpdateMoonDirectionalLight(World);
+	AStaticMeshActor* Earth = CreateOrUpdateEnvironmentSphere(
+	    World, TEXT("Earth"), EarthMaterialPath, FVector(2040.0, -32560.0, 200.0), FVector::OneVector, false);
+	AStaticMeshActor* Sky = CreateOrUpdateEnvironmentSphere(World, TEXT("Sky"), SkyMaterialPath,
+	                                                        FVector(0.0, 0.0, 0.0),
+	                                                        FVector(10000.0, 10000.0, 10000.0), false);
+	AStaticMeshActor* Sun = CreateOrUpdateEnvironmentSphere(World, TEXT("Sun"), SunMaterialPath,
+	                                                        FVector(572.863499, 13052.0, 241.965723),
+	                                                        FVector(10.0, 10.0, 10.0), true);
+
+	AActor* SunGlowController = CreateOrUpdateBlueprintActor(
+	    World, GetSunGlowBlueprintClassPaths(), {TEXT("BP_SunGLowController_C")}, TEXT("BP_SunGLowController"),
+	    FVector::ZeroVector, FRotator::ZeroRotator, TEXT("Moon Environment"));
+
+	if (DirectionalLight && Sun) {
+		Sun->Modify();
+		Sun->AttachToActor(DirectionalLight, FAttachmentTransformRules::KeepWorldTransform);
+		Sun->MarkPackageDirty();
+	}
+
+	ConfigureSunGlowController(
+	    SunGlowController, DirectionalLight, Sun, FindExistingCompleteRover(World));
+
+	const bool bSuccess = DirectionalLight && Earth && Sky && Sun && SunGlowController;
+	OutStatus = bSuccess
+	                ? TEXT("Created/updated DirectionalLight, Earth, Sky, Sun, and BP_SunGLowController.")
+	                : TEXT("Moon environment was only partially created. Check the Output Log and asset paths.");
+	return bSuccess;
+}
+
+AActor* CreateOrUpdateRoverActor(UWorld* World)
+{
+	if (!World)
+		return nullptr;
+
+	for (TActorIterator<AActor> It(World); It; ++It) {
+		AActor* Candidate = *It;
+		FResolvedRoverPipeline Pipeline;
+		if (ResolveCompleteRoverPipeline(Candidate, World, Pipeline)) {
+			Candidate->Modify();
+#if WITH_EDITOR
+			Candidate->SetActorLabel(TEXT("ESA_Rover"));
+#endif
+			Candidate->SetFolderPath(TEXT("MoonSim Rover"));
+			Candidate->SetActorLocation(FVector::ZeroVector);
+			Candidate->SetActorRotation(FRotator::ZeroRotator);
+			Candidate->MarkPackageDirty();
+			return Candidate;
+		}
+	}
+
+	return CreateOrUpdateBlueprintActor(World, GetRoverBlueprintClassPaths(),
+	                                    {TEXT("ESA_Rover_C"), TEXT("BP_RoverVehicle_C")}, TEXT("ESA_Rover"),
+	                                    FVector::ZeroVector, FRotator::ZeroRotator, TEXT("MoonSim Rover"));
+}
+
+bool CreateOrUpdateRoverAndGroundTruth(UWorld* World, FString& OutStatus)
+{
+	if (!World) {
+		OutStatus = TEXT("Rover setup failed: no editor world.");
+		return false;
+	}
+
+	AActor* Rover = CreateOrUpdateRoverActor(World);
+	AActor* GroundTruth = CreateOrUpdateBlueprintActor(
+	    World, GetGroundTruthBlueprintClassPaths(), {TEXT("BP_GroundTruthMapPublisher_C")},
+	    TEXT("BP_GroundTruthMapPublisher"), FVector::ZeroVector, FRotator::ZeroRotator,
+	    TEXT("MoonSim Ground Truth"));
+
+	ADirectionalLight* DirectionalLight =
+	    FindActorByLabel<ADirectionalLight>(World, TEXT("DirectionalLight"));
+	AStaticMeshActor* Sun = FindActorByLabel<AStaticMeshActor>(World, TEXT("Sun"));
+	AActor* SunGlowController =
+	    FindActorByLabel<AActor>(World, TEXT("BP_SunGLowController"));
+
+	ConfigureSunGlowController(SunGlowController, DirectionalLight, Sun, Rover);
+
+	FResolvedRoverPipeline Pipeline;
+	const bool bRoverComplete = ResolveCompleteRoverPipeline(Rover, World, Pipeline);
+	const bool bSuccess = bRoverComplete && GroundTruth;
+	OutStatus = bSuccess
+	                ? TEXT("Created/updated ESA_Rover and BP_GroundTruthMapPublisher")
+	                : TEXT("Rover/Ground Truth setup was only partially created. Check the Output Log and asset paths.");
+	return bSuccess;
+}
+
 TSharedRef<SWidget> MakeSimulatorConfigSection(const FText& Title, const TSharedRef<SWidget>& Body)
 {
 	return SNew(SBorder)
@@ -315,6 +861,93 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 					SNew(STextBlock)
 					.Text(LOCTEXT("SimulatorConfigTitle", "Simulator Config"))
 					.Font(FCoreStyle::GetDefaultFontStyle("Bold", 14))
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f, 0.f, 10.f)
+				[
+					MakeSimulatorConfigSection(
+						LOCTEXT("WorldSetupSectionLabel", "World Setup"),
+						SNew(SVerticalBox)
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.f, 0.f, 0.f, 8.f)
+						[
+							SNew(SButton)
+							.Text(LOCTEXT("CreateMoonEnvironmentButtonLabel", "Create / Update Sky, Earth and Sun"))
+							.IsEnabled_Lambda([]() {
+								return !IsEditorPlaySessionRunning();
+							})
+							.OnClicked_Lambda([this]() {
+								UWorld* EditorWorld = GetEditorWorld();
+								if (!EditorWorld) {
+									WorldSetupStatus = LOCTEXT("WorldSetupNoWorldStatus", "No editor world available.");
+									return FReply::Handled();
+								}
+
+								const FScopedTransaction Transaction(
+								    LOCTEXT("CreateMoonEnvironmentTransaction", "Create Moon Environment"));
+								EditorWorld->Modify();
+
+								FString Status;
+								CreateOrUpdateMoonEnvironment(EditorWorld, Status);
+								WorldSetupStatus = FText::FromString(Status);
+								EditorWorld->MarkPackageDirty();
+
+								if (GEditor)
+									GEditor->RedrawLevelEditingViewports();
+
+								return FReply::Handled();
+							})
+						]
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.f, 0.f, 0.f, 8.f)
+						[
+							SNew(SButton)
+							.Text(LOCTEXT("CreateRoverGroundTruthButtonLabel", "Create / Update Rover + Ground Truth"))
+							.IsEnabled_Lambda([]() {
+								return !IsEditorPlaySessionRunning();
+							})
+							.OnClicked_Lambda([this]() {
+								UWorld* EditorWorld = GetEditorWorld();
+								if (!EditorWorld) {
+									WorldSetupStatus = LOCTEXT("RoverSetupNoWorldStatus", "No editor world available.");
+									return FReply::Handled();
+								}
+
+								const FScopedTransaction Transaction(
+								    LOCTEXT("CreateRoverGroundTruthTransaction", "Create Rover and Ground Truth"));
+								EditorWorld->Modify();
+
+								FString Status;
+								const bool bSuccess = CreateOrUpdateRoverAndGroundTruth(EditorWorld, Status);
+								WorldSetupStatus = FText::FromString(Status);
+								EditorWorld->MarkPackageDirty();
+
+								if (bSuccess)
+									RefreshTargetsFromEditorWorld();
+
+								if (GEditor)
+									GEditor->RedrawLevelEditingViewports();
+
+								return FReply::Handled();
+							})
+						]
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						[
+							SNew(STextBlock)
+							.Text_Lambda([]() {
+								return WorldSetupStatus;
+							})
+							.AutoWrapText(true)
+						]
+					)
 				]
 
 				+ SVerticalBox::Slot()
