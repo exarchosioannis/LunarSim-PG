@@ -6,34 +6,68 @@
 - Unreal Engine 5.7.x already installed
 - Git
 - Git LFS
-- `curl`
-- `jq`
 - Docker
 
-## Clone
+## First-Time Setup
+
+### Git LFS
 
 ```bash
 git lfs install
+```
+
+### Clone
+
+```bash
 git clone https://github.com/exarchosgiannis/LunarSim-PG.git
 cd LunarSim-PG
 ```
 
-## Set Unreal Engine path
-
-Set `UE_ROOT` to the absolute path of the Unreal Engine installation:
+### Unreal Engine
 
 ```bash
-export UE_ROOT=/absolute/path/to/UnrealEngine-5.7.4
+export UE_ROOT=/absolute/path/to/UnrealEngine-5.7.x
 ```
 
-## Prepare, build and open
+### Setup
 
 ```bash
 ./setup.sh
+```
+
+### Build
+
+```bash
 ./build.sh
+```
+
+### Open
+
+```bash
 ./open_project.sh
 ```
 
-- `setup.sh` pulls Git LFS files and prepares TempoROS.
-- `build.sh` compiles the Unreal Editor project.
-- `open_project.sh` opens `LunarSimPG.uproject`.
+### ROS 2
+
+```bash
+docker compose -f docker/docker-compose.yml build
+docker compose -f docker/docker-compose.yml up -d
+```
+
+### Enter
+
+```bash
+docker exec -it sim_ros bash
+source /opt/ros/humble/setup.bash
+```
+
+### Stop
+
+```bash
+docker compose -f docker/docker-compose.yml down
+```
+
+### Notes
+
+- Docker and Docker Compose must already be installed.
+- The default Linux configuration uses Vulkan SM6, so opening the Unreal Editor requires a compatible GPU and driver.
