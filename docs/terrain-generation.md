@@ -43,7 +43,7 @@ Presets are implemented in `moonsim.sh`. All values remain editable in the GUI.
 
 Heightmap sizes offered by the GUI are 1009, 2017, and 4033 pixels. 
 
-The presets are entry points into a scientifically informed procedural model. For the crater population, degradation, landform, crater-shape, and roughness equations—and the distinction between literature-constrained and procedural parameters—see [Terrain generation model](terrain-generation-model.md).
+The presets are entry points into a scientifically informed procedural model. For the crater population, degradation, landform, crater-shape, and roughness equations—and the distinction between literature-constrained and procedural parameters see [Terrain generation model](terrain-generation-model.md).
 
 
 ## Reproducibility and crater generation
@@ -66,8 +66,6 @@ The editable K values control abundance. Each crater record includes centered
 position, diameter, degradation, and morphology data. The heightmap generator
 uses the selected preset to produce crater shape, degradation, broad
 landforms, and surface roughness.
-
-For more information on the heighmap generation model check: xxxxxxxxxxxxxx
 
 ## Rockfield generation
 
