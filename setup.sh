@@ -18,9 +18,53 @@ require_file() {
     [[ -f "$1" ]] || fail "required file not found: $1"
 }
 
-for command in git git-lfs curl jq; do
+for command in git git-lfs curl jq python3; do
     require_command "$command"
 done
+
+PYTHON_IMPORT_TEST='import tkinter, numpy, PIL, matplotlib, scipy'
+PYTHON_APT_PACKAGES=(
+    python3-tk
+    python3-numpy
+    python3-pil
+    python3-matplotlib
+    python3-scipy
+)
+
+check_python_dependencies() {
+    python3 -c "$PYTHON_IMPORT_TEST" >/dev/null 2>&1
+}
+
+install_python_dependencies() {
+    if check_python_dependencies; then
+        printf 'MoonSim terrain-tool Python dependencies are available.\n'
+        return
+    fi
+
+    printf 'Installing MoonSim terrain-tool Python dependencies...\n'
+
+    [[ -r /etc/os-release ]] ||
+        fail "cannot identify the operating system; install: ${PYTHON_APT_PACKAGES[*]}"
+
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    [[ "${ID:-}" == "ubuntu" ]] ||
+        fail "automatic Python dependency installation is supported on Ubuntu only. Install: ${PYTHON_APT_PACKAGES[*]}"
+
+    local -a privilege=()
+    if [[ "$EUID" -ne 0 ]]; then
+        require_command sudo
+        privilege=(sudo)
+    fi
+
+    "${privilege[@]}" apt-get update
+    "${privilege[@]}" apt-get install -y "${PYTHON_APT_PACKAGES[@]}"
+
+    check_python_dependencies ||
+        fail "Python dependencies were installed, but the active python3 still cannot import tkinter, numpy, PIL, matplotlib, and scipy"
+}
+
+install_python_dependencies
 
 [[ -n "${UE_ROOT:-}" ]] ||
     fail "UE_ROOT is not set. Export it to your Unreal Engine 5.7.x directory."

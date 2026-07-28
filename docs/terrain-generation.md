@@ -1,22 +1,14 @@
 # Terrain generation
 
 The MoonSim asset generator creates deterministic heightmap and rockfield
-packages for later import into Unreal Editor. It is a graphical desktop tool;
-there is no headless wrapper around the full workflow.
+packages for later import into Unreal Editor trhough a graphical desktop tool.
 
 ## Requirements
+Terrain generation: Python 3 with `tkinter`, `NumPy`, `Pillow`.
 
-The launcher imports `tkinter`, NumPy, and Pillow. Matplotlib is required by
-the analysis dialogs. These dependencies are not installed by `setup.sh`, and
-the repository does not provide a Python requirements file.
+Terrain analysis: Python 3 with `Matplotlib` and `SciPy`. 
 
-Verify an existing environment with:
-
-```bash
-python3 -c 'import tkinter, numpy, PIL, matplotlib'
-```
-
-Exact Ubuntu package installation commands are **To be documented**.
+`setup.sh` checks these imports and installs missing packages withapt
 
 ## Start the GUI
 
@@ -26,9 +18,16 @@ Working directory: repository root on a graphical desktop.
 ./Tools/Terrain_Generation/moonsim.sh
 ```
 
-The launcher has no command-line options; `--help` is not supported. Choose a
-preset, edit settings if needed, then generate a heightmap before generating a
-rockfield from that heightmap run.
+Useful launcher options are:
+
+./Tools/Terrain_Generation/moonsim.sh `--help`
+
+./Tools/Terrain_Generation/moonsim.sh `--check-deps`
+
+Choose a preset, edit settings if needed, generate a heightmap, and then generate a rockfield from that heightmap run.
+
+For a complete walkthrough of the GUI, generated files, and Unreal Engine
+import process, see [Terrain generator workflow](terrain-generator-workflow.md).
 
 ## Regional presets
 
@@ -42,8 +41,10 @@ Presets are implemented in `moonsim.sh`. All values remain editable in the GUI.
 | New Fresh Zone | `fresh_crater_scientific` / `new_fresh_zone` | 12345 | 1009 | 500 m / 120 m fixed | 0.080 / 0.015 | Fresh-crater and ejecta-focused profile |
 | Custom | `custom_scientific` / `custom` | 24680 | 1009 | 500 m / 110 m fixed | 0.060 / 0.100 | Highland-like profile with enabled big-rock clumps |
 
-Heightmap sizes offered by the GUI are 1009, 2017, and 4033 pixels. The map
-size and height range are numeric entries rather than a verified fixed range.
+Heightmap sizes offered by the GUI are 1009, 2017, and 4033 pixels. 
+
+The presets are entry points into a scientifically informed procedural model. For the crater population, degradation, landform, crater-shape, and roughness equations—and the distinction between literature-constrained and procedural parameters—see [Terrain generation model](terrain-generation-model.md).
+
 
 ## Reproducibility and crater generation
 
@@ -65,6 +66,8 @@ The editable K values control abundance. Each crater record includes centered
 position, diameter, degradation, and morphology data. The heightmap generator
 uses the selected preset to produce crater shape, degradation, broad
 landforms, and surface roughness.
+
+For more information on the heighmap generation model check: xxxxxxxxxxxxxx
 
 ## Rockfield generation
 
@@ -99,31 +102,23 @@ The complete GUI rock schema is:
 | Materials | `background_material`, `floor_material`, `old_ejecta_material`, `fresh_ejecta_material` |
 
 `rock_settings.json` is the authoritative per-run record of exact values.
-Allowed numeric ranges are **Not yet verified** beyond validation performed by
-the generator.
 
-## Minimal heightmap command
+Rock positions are generated with a crater-first statistical model combining empirical boulder scaling, crater freshness, radial ejecta zones, power-law sizes, and procedural background and clumping terms. See [Rock distribution model](rock-distribution-model.md) for the equations, scientific sources, GUI preset values, and limitations.
 
-The GUI is canonical, but the underlying heightmap CLI is implemented and its
-help output has been validated. From the repository root:
 
-```bash
-python3 Tools/Terrain_Generation/heightmap_generator.py \
-  --out Tools/Terrain_Generation/generated/heightmaps/manual_mare_seed_25654 \
-  --preset mare_scientific \
-  --seed 25654 \
-  --size 1009 \
-  --map-size-m 500 \
-  --height-range-m 80 \
-  --range-mode fixed
-```
+## Advanced command-line use
 
-This writes the four-file heightmap package described below. Use the GUI to
-create the matching compact rockfield package and Unreal-import copy.
+The GUI is the canonical workflow. The underlying Python scripts expose theirown `--help` output for testing, automation, and advanced use:
 
-`rockfield_generator.py` also supports directory inputs and `--out-root` for
-batch rockfield generation. A batch wrapper for heightmap profiles is not
-present.
+python3 Tools/Terrain_Generation/heightmap_generator.py `--help`
+
+python3 Tools/Terrain_Generation/rockfield_generator.py `--help`
+
+python3 Tools/Terrain_Generation/heightmap_analysis.py `--help`
+
+python3 Tools/Terrain_Generation/rockfield_analysis.py `--help`
+
+These commands do not replace all GUI packaging and Unreal-copy steps.
 
 ## Generated packages
 
@@ -152,7 +147,7 @@ Tools/Terrain_Generation/
 | `metadata.json` | Format/version, units, profile, seed, dimensions, meters per pixel, coordinate descriptions, actual height statistics, generator settings, output filenames, and Unreal X/Y/Z import scales |
 | `craters.json` | Terrain-generation and fixed preview-illumination metadata plus centered crater records |
 | `generation_summary.txt` | Human-readable settings, statistics, and Unreal scale summary |
-| `unreal_rockfield.json` | `MoonSimOfflineRockField` v1 with centered-meter rock instances |
+| `unreal_rockfield.json` | Unreal-ready rock placement data for the generated terrain |
 | `rock_settings.json` | Exact rock generator settings selected for the run |
 | `source_heightmap.json` | Linkage to the source heightmap package |
 
@@ -160,27 +155,17 @@ The heightmap coordinate description is top-left based, while crater and
 rockfield X/Y coordinates are centered about the map origin. See
 [Coordinate frames](coordinate-frames.md).
 
-The terrain generator does not produce occupancy, elevation-grid, slope-grid,
-crater-zone-image, or rock-density-image files. Occupancy, elevation, and slope
-products are generated from the Unreal scene during Play In Editor; see
-[Output format](output-format.md).
+The analysis dialogs can create elevation and slope visualization PNGs from a heightmap, plus crater/ejecta-zone and rock-density visualization PNGs from a rockfield. They also write metrics, summaries, and CSV files under analysis_results/.
+
+These are offline analysis products, not the simulator dataset modalities generated from the Unreal scene during Play In Editor and defined in [Output format](output-format.md)
 
 ## Import into Unreal
 
-1. Import the `unreal_import/heightmaps/<run>.png` file as a Landscape
-   heightmap.
-2. Use the X/Y/Z import scales recorded under `unreal_import` in the matching
-   `metadata.json`.
-3. Open **Window > Simulator > Simulator Config**.
-4. In **Terrain Generation**, select
-   `unreal_import/rockfields/<run>.json`.
-5. Keep or change the default rock mesh folder `/Game/Meshes/Rocks`, then bake.
+1. Open the target level and remove the existing Landscape if it is being replaced.
+2. In Landscape Mode > Manage > New, choose Import from File and select `unreal_import/heightmaps/<run>.png.`
+3. Enter the X/Y/Z scales from the matching `metadata.json` under `unreal_import`, then import the Landscape.
+4. Assign `M_Landscape_Material_Moon_Inst`. In Landscape Paint mode, create the layers from the assigned material, assign the LayerInfo for SoftSand, and fill that layer.
+5. Open Window > Simulator > Simulator Config. In Terrain Generation,select `unreal_import/rockfields/<run>.json`, choose the rock mesh folder (default `/Game/Meshes/Rocks`), and bake the rocks.
 
-The Rock Baker accepts `MoonSimOfflineRockField` version 1, meters, and
-`centered_map_meters`. Each rock requires `x_m`, `y_m`, and `diameter_m`; it
-uses optional `instance_id`, yaw, tilt, tilt axis, and burial fields. Baking is
-disabled during Play In Editor.
 
-The generator's 135-degree azimuth and 25-degree elevation values describe
-hillshade-preview metadata only. Set Unreal lighting independently; automatic
-illumination transfer is not implemented.
+The generator's 135-degree azimuth and 25-degree elevation values describe hillshade-preview metadata only. Set Unreal lighting independently; automatic illumination transfer is not implemented.

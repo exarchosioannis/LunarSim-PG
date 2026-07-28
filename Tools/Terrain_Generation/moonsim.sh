@@ -1,13 +1,67 @@
 #!/usr/bin/env bash
-# MoonSim asset generator GUI v25 — clean packaged layout
-# Robustly finds Unreal rockfield JSON even when the rock generator writes it to the old project Heightmaps/final folder.
-# Heightmap size is now a dropdown with common Unreal-friendly values.
-# Complete run packages live in generated/heightmaps and generated/rockfields.
-# Unreal receives only copies in unreal_import/heightmaps and unreal_import/rockfields.
-# Rock generation requires the user-visible crater JSON and metadata JSON inputs.
-# Analysis products are separated into analysis_results/heightmaps and analysis_results/rockfields.
-# Includes dedicated heightmap-analysis and rockfield-analysis dialogs.
+
 set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+Usage: moonsim.sh [OPTION]
+
+Launch the MoonSim terrain asset generator GUI.
+
+Options:
+  -h, --help       Show this help and exit.
+  --check-deps     Verify the Python modules used by generation and analysis.
+
+The supported end-to-end workflow is graphical.
+EOF
+}
+
+check_dependencies() {
+    command -v python3 >/dev/null 2>&1 || {
+        printf 'Error: python3 is not installed.\n' >&2
+        return 1
+    }
+
+    python3 -c 'import tkinter, numpy, PIL, matplotlib, scipy' >/dev/null 2>&1 || {
+        cat >&2 <<'EOF'
+Error: MoonSim terrain-tool Python dependencies are missing.
+On Ubuntu, install them with:
+  sudo apt-get update
+  sudo apt-get install -y python3-tk python3-numpy python3-pil python3-matplotlib python3-scipy
+EOF
+        return 1
+    }
+}
+
+case "${1:-}" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    --check-deps)
+        [[ "$#" -eq 1 ]] || {
+            printf 'Error: --check-deps does not accept additional arguments.\n' >&2
+            exit 2
+        }
+        check_dependencies
+        printf 'MoonSim terrain-tool Python dependencies are available.\n'
+        exit 0
+        ;;
+    "")
+        ;;
+    *)
+        printf 'Error: unknown option: %s\n\n' "$1" >&2
+        usage >&2
+        exit 2
+        ;;
+esac
+
+check_dependencies
+
+if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
+    printf 'Error: no graphical desktop display was detected (DISPLAY and WAYLAND_DISPLAY are unset).\n' >&2
+    exit 1
+fi
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$SCRIPT_DIR"
