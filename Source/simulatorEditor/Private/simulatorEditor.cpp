@@ -865,93 +865,6 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 
 				+ SVerticalBox::Slot()
 				.AutoHeight()
-				.Padding(0.f, 0.f, 0.f, 10.f)
-				[
-					MakeSimulatorConfigSection(
-						LOCTEXT("WorldSetupSectionLabel", "World Setup"),
-						SNew(SVerticalBox)
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						.Padding(0.f, 0.f, 0.f, 8.f)
-						[
-							SNew(SButton)
-							.Text(LOCTEXT("CreateMoonEnvironmentButtonLabel", "Create / Update Sky, Earth and Sun"))
-							.IsEnabled_Lambda([]() {
-								return !IsEditorPlaySessionRunning();
-							})
-							.OnClicked_Lambda([this]() {
-								UWorld* EditorWorld = GetEditorWorld();
-								if (!EditorWorld) {
-									WorldSetupStatus = LOCTEXT("WorldSetupNoWorldStatus", "No editor world available.");
-									return FReply::Handled();
-								}
-
-								const FScopedTransaction Transaction(
-								    LOCTEXT("CreateMoonEnvironmentTransaction", "Create Moon Environment"));
-								EditorWorld->Modify();
-
-								FString Status;
-								CreateOrUpdateMoonEnvironment(EditorWorld, Status);
-								WorldSetupStatus = FText::FromString(Status);
-								EditorWorld->MarkPackageDirty();
-
-								if (GEditor)
-									GEditor->RedrawLevelEditingViewports();
-
-								return FReply::Handled();
-							})
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						.Padding(0.f, 0.f, 0.f, 8.f)
-						[
-							SNew(SButton)
-							.Text(LOCTEXT("CreateRoverGroundTruthButtonLabel", "Create / Update Rover + Ground Truth"))
-							.IsEnabled_Lambda([]() {
-								return !IsEditorPlaySessionRunning();
-							})
-							.OnClicked_Lambda([this]() {
-								UWorld* EditorWorld = GetEditorWorld();
-								if (!EditorWorld) {
-									WorldSetupStatus = LOCTEXT("RoverSetupNoWorldStatus", "No editor world available.");
-									return FReply::Handled();
-								}
-
-								const FScopedTransaction Transaction(
-								    LOCTEXT("CreateRoverGroundTruthTransaction", "Create Rover and Ground Truth"));
-								EditorWorld->Modify();
-
-								FString Status;
-								const bool bSuccess = CreateOrUpdateRoverAndGroundTruth(EditorWorld, Status);
-								WorldSetupStatus = FText::FromString(Status);
-								EditorWorld->MarkPackageDirty();
-
-								if (bSuccess)
-									RefreshTargetsFromEditorWorld();
-
-								if (GEditor)
-									GEditor->RedrawLevelEditingViewports();
-
-								return FReply::Handled();
-							})
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							SNew(STextBlock)
-							.Text_Lambda([]() {
-								return WorldSetupStatus;
-							})
-							.AutoWrapText(true)
-						]
-					)
-				]
-
-				+ SVerticalBox::Slot()
-				.AutoHeight()
 				.Padding(0.f, 0.f, 0.f, 8.f)
 				[
 					SNew(STextBlock)
@@ -1013,6 +926,17 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 										.Text(LOCTEXT("GroundTruthRosMapsLabel", "Ground Truth ROS Maps"))
 										.AutoWrapText(true)
 									])
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(18.f, 0.f, 0.f, 3.f)
+							[
+								SNew(STextBlock)
+								.Text(LOCTEXT("GroundTruthRosMapsHelpText", "May reduce runtime performance while ground-truth maps are being computed."))
+								.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
+								.ColorAndOpacity(FSlateColor::UseSubduedForeground())
+								.AutoWrapText(true)
 							])
 					]
 
@@ -1097,6 +1021,17 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 										.Text(LOCTEXT("GroundTruthBoundingBoxesLabel", "Bounding Boxes"))
 									],
 									18.f)
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(36.f, 0.f, 0.f, 3.f)
+							[
+								SNew(STextBlock)
+								.Text(LOCTEXT("GroundTruthBoundingBoxesHelpText", "May significantly reduce capture performance in dense scenes."))
+								.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
+								.ColorAndOpacity(FSlateColor::UseSubduedForeground())
+								.AutoWrapText(true)
 							])
 					]
 				]
@@ -1239,6 +1174,17 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 
 							+ SVerticalBox::Slot()
 							.AutoHeight()
+							.Padding(36.f, 0.f, 0.f, 3.f)
+							[
+								SNew(STextBlock)
+								.Text(LOCTEXT("ImuHzNote", "IMU publishing rate is limited by the simulation FPS."))
+								.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
+								.ColorAndOpacity(FSlateColor::UseSubduedForeground())
+								.AutoWrapText(true)
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
 							[
 								MakeSimulatorConfigFormRow(
 									LOCTEXT("RoverControlModeLabel", "Control Mode"),
@@ -1256,15 +1202,6 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 											.Text_Raw(this, &FsimulatorEditorModule::GetRoverControlModeText)
 										]
 									])
-							]
-
-							+ SVerticalBox::Slot()
-							.AutoHeight()
-							.Padding(0.f, 8.f, 0.f, 0.f)
-							[
-								SNew(STextBlock)
-								.Text(LOCTEXT("ImuHzNote", "Note: IMU rate capped by FPS"))
-								.AutoWrapText(true)
 							])
 					]
 				]
@@ -1289,6 +1226,93 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 				[
 					SNew(STextBlock)
 					.Text_Raw(this, &FsimulatorEditorModule::GetApplyStatusText)
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(0.f, 0.f, 0.f, 10.f)
+				[
+					MakeSimulatorConfigSection(
+						LOCTEXT("WorldSetupSectionLabel", "World Setup"),
+						SNew(SVerticalBox)
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.f, 0.f, 0.f, 8.f)
+						[
+							SNew(SButton)
+							.Text(LOCTEXT("CreateMoonEnvironmentButtonLabel", "Create / Update Sky, Earth and Sun"))
+							.IsEnabled_Lambda([]() {
+								return !IsEditorPlaySessionRunning();
+							})
+							.OnClicked_Lambda([this]() {
+								UWorld* EditorWorld = GetEditorWorld();
+								if (!EditorWorld) {
+									WorldSetupStatus = LOCTEXT("WorldSetupNoWorldStatus", "No editor world available.");
+									return FReply::Handled();
+								}
+
+								const FScopedTransaction Transaction(
+								    LOCTEXT("CreateMoonEnvironmentTransaction", "Create Moon Environment"));
+								EditorWorld->Modify();
+
+								FString Status;
+								CreateOrUpdateMoonEnvironment(EditorWorld, Status);
+								WorldSetupStatus = FText::FromString(Status);
+								EditorWorld->MarkPackageDirty();
+
+								if (GEditor)
+									GEditor->RedrawLevelEditingViewports();
+
+								return FReply::Handled();
+							})
+						]
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						.Padding(0.f, 0.f, 0.f, 8.f)
+						[
+							SNew(SButton)
+							.Text(LOCTEXT("CreateRoverGroundTruthButtonLabel", "Create / Update Rover + Ground Truth"))
+							.IsEnabled_Lambda([]() {
+								return !IsEditorPlaySessionRunning();
+							})
+							.OnClicked_Lambda([this]() {
+								UWorld* EditorWorld = GetEditorWorld();
+								if (!EditorWorld) {
+									WorldSetupStatus = LOCTEXT("RoverSetupNoWorldStatus", "No editor world available.");
+									return FReply::Handled();
+								}
+
+								const FScopedTransaction Transaction(
+								    LOCTEXT("CreateRoverGroundTruthTransaction", "Create Rover and Ground Truth"));
+								EditorWorld->Modify();
+
+								FString Status;
+								const bool bSuccess = CreateOrUpdateRoverAndGroundTruth(EditorWorld, Status);
+								WorldSetupStatus = FText::FromString(Status);
+								EditorWorld->MarkPackageDirty();
+
+								if (bSuccess)
+									RefreshTargetsFromEditorWorld();
+
+								if (GEditor)
+									GEditor->RedrawLevelEditingViewports();
+
+								return FReply::Handled();
+							})
+						]
+
+						+ SVerticalBox::Slot()
+						.AutoHeight()
+						[
+							SNew(STextBlock)
+							.Text_Lambda([]() {
+								return WorldSetupStatus;
+							})
+							.AutoWrapText(true)
+						]
+					)
 				]
 
 				+ SVerticalBox::Slot()

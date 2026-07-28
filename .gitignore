@@ -56,19 +56,9 @@ Thumbs.db
 
 # Bags
 bags/
-# Unreal Starter Content
-Content/StarterContent/
 
 # Local backup
 *.bak
 
-# Local test Unreal assets
-Content/Levels/
-Content/Materials/
-Content/sAh_SandMaterialPack_2/
-
 # Local docs
 /documentation/
-backup/
-Tools/Demos/
-/Source/LunarVLA
