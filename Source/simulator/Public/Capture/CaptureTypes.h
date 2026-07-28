@@ -104,7 +104,7 @@ struct SIMULATOR_API FCaptureConfig
 	bool bGroundTruthSegmentation = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Outputs|Ground Truth")
-	bool bGroundTruthBoundingBoxes = true;
+	bool bGroundTruthBoundingBoxes = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Outputs")
 	bool bTrajectoryCsv = true;

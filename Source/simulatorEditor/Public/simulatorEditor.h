@@ -108,7 +108,7 @@ private:
 	bool bGroundTruthRgb = true;
 	bool bGroundTruthDepth = true;
 	bool bGroundTruthSegmentation = true;
-	bool bGroundTruthBoundingBoxes = true;
+	bool bGroundTruthBoundingBoxes = false;
 	bool bTrajectoryCsv = true;
 	bool bEnableGroundTruthMaps = true;
 	float ImuPublishHz = 100.0f;

@@ -1091,6 +1091,7 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 									.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditGroundTruthOutput)
 									.IsChecked_Raw(this, &FsimulatorEditorModule::GetGroundTruthBoundingBoxesCheckState)
 									.OnCheckStateChanged_Raw(this, &FsimulatorEditorModule::OnGroundTruthBoundingBoxesChanged)
+									.ToolTipText(LOCTEXT("GroundTruthBoundingBoxesTooltip", "Bounding boxes can significantly reduce capture performance in dense scenes. Enable only when needed."))
 									[
 										SNew(STextBlock)
 										.Text(LOCTEXT("GroundTruthBoundingBoxesLabel", "Bounding Boxes"))

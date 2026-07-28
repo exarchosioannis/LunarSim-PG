@@ -1,75 +1,88 @@
 # LunarSim-PG
 
-LunarSim-PG is an Unreal Engine 5 lunar rover simulator for closed-loop ROS 2
-operation and ground-truth-rich dataset capture. It combines reusable lunar
-levels, a procedural heightmap and rockfield tool, rover and stereo-camera
-simulation, ROS 2 interfaces, and run-organized dataset export.
+LunarSim-PG is a high-fidelity lunar rover simulation framework built on
+Unreal Engine 5 and integrated with ROS 2. It combines realistic lunar
+rendering, rover and stereo-camera simulation, science-parameterized procedural
+terrain generation, and synchronized sensor and ground-truth data in a single
+platform.
 
-## Key features
+LunarSim-PG is designed to support the development and evaluation of rover
+perception and navigation algorithms. It can be used both for closed-loop ROS 2
+experiments and for offline synthetic dataset generation, including visual
+odometry, SLAM, obstacle detection, semantic segmentation, and traversability
+research.
 
-- Unreal Engine rover simulation with manual or ROS 2 `cmd_vel` control.
-- Stereo RGB images, camera calibration, IMU, poses, odometry, paths, TF,
-  simulation time, occupancy grids, and elevation point clouds over ROS 2.
-- Offline RGB, encoded depth, color-coded segmentation, bounding-box, pose,
-  calibration, occupancy, elevation, and slope outputs.
-- Seeded terrain heightmap, crater-catalogue, and crater-aware rockfield
-  generation.
-- Editor tools for simulator configuration, world setup, and rockfield baking.
+## Core capabilities
+
+- **High-fidelity lunar simulation** — Unreal Engine 5 rendering with
+  lunar-specific terrain, materials, illumination, and shadows, together with
+  a controllable wheeled rover and stereo-camera system.
+
+- **ROS 2 integration** — Publish time-stamped stereo images, camera
+  calibration, simulated IMU, ground-truth rover state, maps, transforms, and
+  simulation time, while accepting rover commands through ROS 2.
+
+- **Ground-truth data generation** — Capture visual, geometric, semantic, pose,
+  trajectory, and terrain outputs organized by capture frame and simulation
+  timestamp for perception, navigation, mapping, and dataset-generation
+  workflows.
+
+- **Procedural lunar terrain generation** — Generate reproducible terrain from
+  regional profiles and random seeds, with configurable crater populations,
+  degradation states, rock abundance, and crater-coupled rock placement.
 
 ## Requirements
 
-| Component | Verified requirement |
+| Component | Requirement |
 | --- | --- |
-| Operating system | Ubuntu 24.04 |
-| Unreal Engine | 5.7.x |
-| ROS 2 | Humble, provided through the project Docker image |
-| Host tools | Git, Git LFS, `curl`, `jq`, Docker Engine, Docker Compose v2 |
-| Rendering | Linux Vulkan SM6-capable GPU and driver; exact hardware and VRAM requirements are not yet verified |
+| Operating system | Ubuntu 22.04 or 24.04 |
+| Unreal Engine | 5.7.x ([click here](https://dev.epicgames.com/documentation/unreal-engine/linux-development-quickstart-for-unreal-engine?application_version=5.7)) |
+| ROS 2 | Humble, through the included Docker environment |
 
 ## Quick start
 
-Run from a terminal:
+Install Unreal Engine 5.7.x before starting. See the
+[installation guide](docs/installation.md) for detailed prerequisites and
+troubleshooting.
+
+### 1. Clone the repository
 
 ```bash
 git lfs install
 git clone https://github.com/exarchosgiannis/LunarSim-PG.git
 cd LunarSim-PG
 git lfs pull
+```
+
+LunarSim-PG stores its large Unreal Engine assets with Git LFS. These commands
+download the actual assets instead of leaving Git LFS pointer files.
+
+### 2. Set the Unreal Engine path
+
+```bash
 export UE_ROOT=/path/to/UnrealEngine-5.7.x
-./setup.sh
-./build.sh
-./open_project.sh
 ```
 
 Replace `/path/to/UnrealEngine-5.7.x` with the engine root containing
 `Engine/Build/Build.version`.
 
-See the [installation guide](docs/installation.md) for prerequisites and clean
-builds, or follow the [complete quickstart](docs/quickstart.md) to start Play In
-Editor, connect ROS 2, view an image, and control the rover.
+### 3. Prepare, build, and open the project
 
-## Verify the installation
+```bash
+./setup.sh
+./build.sh
+./open_project.sh
+```
 
-After the editor opens:
+- `setup.sh` prepares dependencies and validates the Unreal Engine path.
+- `build.sh` compiles the Unreal Editor project.
+- `open_project.sh` opens `LunarSimPG.uproject` in Unreal Editor.
 
-1. Open **Window > Simulator > Simulator Config**.
-2. Apply the desired settings while Play In Editor is stopped.
-3. Start Play In Editor.
-4. Start the ROS container as described in the
-   [quickstart](docs/quickstart.md), then run:
-
-   ```bash
-   ros2 topic echo /clock --once
-   ```
-
-A successful check prints one `rosgraph_msgs/msg/Clock` message while Play In
-Editor is running. Camera images require capture to be started separately.
 
 ## Documentation
 
 - [Documentation home](docs/README.md)
 - [Installation](docs/installation.md)
-- [Quickstart](docs/quickstart.md)
 - [Simulator configuration](docs/configuration.md)
 - [Terrain generation](docs/terrain-generation.md)
 - [ROS 2 interface](docs/ros2-interface.md)
@@ -79,14 +92,10 @@ Editor is running. Camera images require capture to be started separately.
 
 ## Current scope
 
-- The documented runtime is the Unreal Editor on Ubuntu; packaged, headless,
-  and non-Linux workflows are not present in the repository.
-- No terramechanics, dust, or thermal simulation subsystem is present in the
-  current source.
-- Stereo images and IMU samples are ROS 2 streams. The offline dataset writer
-  saves one ground-truth camera view and trajectory CSV files; record a rosbag
-  for ROS-only streams.
-- Terrain profile, seed, and preview illumination metadata are not copied into
-  Unreal session metadata. Preserve the terrain-generation package with a
-  dataset when those values are required for reproducibility.
-- No automated dataset completeness or synchronization validator is included.
+LunarSim-PG focuses on visual and geometric simulation for rover perception
+and navigation, supporting both ROS 2-based experiments and synthetic dataset
+generation.
+
+It is not intended as a mission-analysis or terramechanics simulator.
+Terrain–wheel interaction, dust dynamics, and thermal modelling are outside
+the scope of the current framework.

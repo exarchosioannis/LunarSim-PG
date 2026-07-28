@@ -7,8 +7,6 @@ Use this page to find the canonical guide for each task. The root
 
 - [Installation](installation.md) — prepare Ubuntu, Unreal Engine, Git LFS, and
   the ROS 2 Docker environment.
-- [Quickstart](quickstart.md) — build, launch, verify ROS 2, view an image, and
-  control the rover.
 - [Troubleshooting](troubleshooting.md) — diagnose setup, build, rendering,
   ROS 2, and capture failures.
 

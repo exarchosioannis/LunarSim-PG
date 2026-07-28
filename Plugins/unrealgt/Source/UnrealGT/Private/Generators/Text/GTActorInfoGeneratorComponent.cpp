@@ -9,33 +9,11 @@
 #include <Engine/Engine.h>
 #include <Engine/StaticMesh.h>
 #include <Engine/TextureRenderTarget2D.h>
-#include <Engine/World.h>
 #include <EngineUtils.h>
-#include "StaticMeshResources.h"
 
 #include "GTFileUtilities.h"
 #include "Generators/Image/GTImageGeneratorBase.h"
 #include "Generators/Image/GTSceneCaptureComponent2D.h"
-
-namespace
-{
-void ApplyLinkedCameraCalibration(
-    UGTSceneCaptureComponent2D* TargetCapture,
-    const UGTSceneCaptureComponent2D* SourceCapture)
-{
-    if (!TargetCapture || !SourceCapture)
-    {
-        return;
-    }
-
-    TargetCapture->SetResolution(SourceCapture->Resolution);
-    TargetCapture->ProjectionType = ECameraProjectionMode::Perspective;
-    TargetCapture->FOVAngle = SourceCapture->FOVAngle;
-    TargetCapture->Overscan = 0.0f;
-    TargetCapture->bUseCustomProjectionMatrix = false;
-    TargetCapture->CustomProjectionMatrix.SetIdentity();
-}
-}
 
 UGTActorInfoGeneratorComponent::UGTActorInfoGeneratorComponent()
     : Super()
@@ -107,9 +85,8 @@ bool UGTActorInfoGeneratorComponent::WarmUpCaptureNoOutput(FString& OutError)
         return false;
     }
 
-    ApplyLinkedCameraCalibration(
-        SegmentationSceneCapture,
-        LinkedImageGeneratorComponent->GetSceneCaptureComponent());
+    SegmentationSceneCapture->SetResolution(
+        LinkedImageGeneratorComponent->GetSceneCaptureComponent()->Resolution);
     SegmentationSceneCapture->UpdateTextureTarget();
     if (!IsValid(SegmentationSceneCapture->TextureTarget) ||
         !SegmentationSceneCapture->TextureTarget->GameThread_GetRenderTargetResource())
@@ -154,17 +131,19 @@ void UGTActorInfoGeneratorComponent::GenerateDataInternal(
     UGTImageGeneratorBase* LinkedImageGeneratorComponent =
         Cast<UGTImageGeneratorBase>(LinkedImageGenerator.GetComponent(GetOwner()));
 
-    if (bAccurateBoundingBoxes && LinkedImageGeneratorComponent)
+    if (bAccurateBoundingBoxes && LinkedImageGenerator.GetComponent(GetOwner()))
     {
-        ApplyLinkedCameraCalibration(
-            SegmentationSceneCapture,
-            LinkedImageGeneratorComponent->GetSceneCaptureComponent());
+        SegmentationSceneCapture->SetResolution(
+            LinkedImageGeneratorComponent->GetSceneCaptureComponent()->Resolution);
         SegmentationSceneCapture->CaptureImage(CachedSegmentation);
     }
 
     TArray<AActor*> TrackedActors;
     FString Result = Header;
 
+    int32 InstancedComponentsConsidered = 0;
+    int32 InstancesConsidered = 0;
+    int32 InstancesWritten = 0;
 
     for (TActorIterator<AActor> ActorItr(GetWorld()); ActorItr; ++ActorItr)
     {
@@ -200,6 +179,8 @@ void UGTActorInfoGeneratorComponent::GenerateDataInternal(
                         continue;
                     }
 
+                    InstancedComponentsConsidered++;
+
                     const int32 InstanceCount = InstancedComponent->GetInstanceCount();
                     const FBox LocalBounds =
                         InstancedComponent->GetStaticMesh()->GetBoundingBox();
@@ -211,6 +192,8 @@ void UGTActorInfoGeneratorComponent::GenerateDataInternal(
                     const FVector LocalCenter = LocalBounds.GetCenter();
                     for (int32 InstanceIndex = 0; InstanceIndex < InstanceCount; InstanceIndex++)
                     {
+                        InstancesConsidered++;
+
                         FTransform InstanceTransform;
                         if (!InstancedComponent->GetInstanceTransform(
                                 InstanceIndex, InstanceTransform, true))
@@ -246,36 +229,6 @@ void UGTActorInfoGeneratorComponent::GenerateDataInternal(
                             !IsScreenBoundingBoxVisible(ScreenBoundingBox))
                         {
                             continue;
-                        }
-
-                        if (bClipInstancedBoundingBoxesAgainstLandscape)
-                        {
-                            FBox2D LandscapeClippedBox;
-                            const bool bGotLandscapeClippedBox =
-                                GetLandscapeClippedInstancedStaticMeshScreenBoundingBox(
-                                    LocalBounds,
-                                    InstanceTransform,
-                                    InstancedComponent,
-                                    LinkedImageGeneratorComponent,
-                                    LandscapeClippedBox);
-
-                            if (bGotLandscapeClippedBox)
-                            {
-                                ScreenBoundingBox = LandscapeClippedBox;
-                                // Check again after clipping. The visible/above-landscape part may be too small.
-                                if (bOnlyTrackOnScreenActors &&
-                                    !IsScreenBoundingBoxVisible(ScreenBoundingBox))
-                                {
-                                    continue;
-                                }
-                            }
-                            else if (bFallbackToProjectedBoxWhenLandscapeClipFails)
-                            {
-                            }
-                            else
-                            {
-                                continue;
-                            }
                         }
 
                         FVector2D ScreenLocation(-1.f, -1.f);
@@ -314,6 +267,7 @@ void UGTActorInfoGeneratorComponent::GenerateDataInternal(
                             ScreenBoundingBoxNormalized);
 
                         CachedInstancedBoundingBoxes.Add(ScreenBoundingBox);
+                        InstancesWritten++;
                     }
                 }
 
@@ -395,6 +349,20 @@ void UGTActorInfoGeneratorComponent::GenerateDataInternal(
     const auto Data = FGTFileUtilities::StringToCharArray(CurrentResult);
 
     DataReadyDelegate.Broadcast(Data, TimeStamp, FrameIndex);
+
+    if (bTrackInstancedStaticMeshInstances)
+    {
+        UE_LOG(
+            LogTemp,
+            Log,
+            TEXT(
+                "UnrealGT ActorInfo frame %d: ISM/HISM components considered=%d, "
+                "instances considered=%d, rows written=%d"),
+            FrameIndex,
+            InstancedComponentsConsidered,
+            InstancesConsidered,
+            InstancesWritten);
+    }
 }
 
 void UGTActorInfoGeneratorComponent::AppendFormattedRow(
@@ -486,195 +454,6 @@ bool UGTActorInfoGeneratorComponent::GetInstancedStaticMeshScreenBoundingBox(
     }
 
     return ProjectedPointCount > 0 && OutBox.bIsValid &&
-           !OutBox.GetSize().IsNearlyZero();
-}
-
-bool UGTActorInfoGeneratorComponent::GetLandscapeHeightAtXY(
-    const FVector& WorldPoint,
-    const UInstancedStaticMeshComponent* SourceComponent,
-    float& OutLandscapeZ) const
-{
-    UWorld* World = GetWorld();
-    if (!World)
-    {
-        return false;
-    }
-
-    const FVector TraceStart(
-        WorldPoint.X,
-        WorldPoint.Y,
-        WorldPoint.Z + LandscapeClipTraceHalfHeightCm);
-
-    const FVector TraceEnd(
-        WorldPoint.X,
-        WorldPoint.Y,
-        WorldPoint.Z - LandscapeClipTraceHalfHeightCm);
-
-    FCollisionQueryParams QueryParams(FName(TEXT("ActorInfoLandscapeClipTrace")), false);
-    QueryParams.bTraceComplex = false;
-
-    // Ignore the owner of the ISM/HISM rocks, otherwise the trace can hit the rock instances
-    // instead of the landscape/world surface below them.
-    if (SourceComponent && SourceComponent->GetOwner())
-    {
-        QueryParams.AddIgnoredActor(SourceComponent->GetOwner());
-    }
-
-    FHitResult Hit;
-    const bool bHit = World->LineTraceSingleByChannel(
-        Hit,
-        TraceStart,
-        TraceEnd,
-        ECC_WorldStatic,
-        QueryParams);
-
-    if (!bHit || !Hit.bBlockingHit)
-    {
-        return false;
-    }
-
-    OutLandscapeZ = Hit.ImpactPoint.Z;
-    return true;
-}
-
-bool UGTActorInfoGeneratorComponent::GetLandscapeClippedInstancedStaticMeshScreenBoundingBox(
-    const FBox& LocalBounds,
-    const FTransform& InstanceTransform,
-    const UInstancedStaticMeshComponent* InstancedComponent,
-    UGTImageGeneratorBase* ImageGeneratorComponent,
-    FBox2D& OutBox) const
-{
-    if (!LocalBounds.IsValid || !ImageGeneratorComponent || !InstancedComponent)
-    {
-        return false;
-    }
-
-    OutBox = FBox2D(EForceInit::ForceInit);
-
-    int32 KeptPointCount = 0;
-    int32 ProjectedPointCount = 0;
-    int32 LandscapeHitCount = 0;
-
-    auto TryAddLocalSamplePoint = [this,
-                                   &InstanceTransform,
-                                   InstancedComponent,
-                                   ImageGeneratorComponent,
-                                   &OutBox,
-                                   &KeptPointCount,
-                                   &ProjectedPointCount,
-                                   &LandscapeHitCount](const FVector& LocalSamplePoint)
-    {
-        const FVector WorldSamplePoint =
-            InstanceTransform.TransformPosition(LocalSamplePoint);
-
-        float LandscapeZ = 0.0f;
-        if (!GetLandscapeHeightAtXY(WorldSamplePoint, InstancedComponent, LandscapeZ))
-        {
-            return;
-        }
-
-        LandscapeHitCount++;
-
-        // Keep points that are above the landscape/world static surface. The tolerance lets
-        // a rock remain slightly buried visually without making the annotation too tiny.
-        if (WorldSamplePoint.Z < LandscapeZ - LandscapeClipToleranceCm)
-        {
-            return;
-        }
-
-        KeptPointCount++;
-
-        FVector2D ProjectedPoint;
-        if (ImageGeneratorComponent->GetSceneCaptureComponent()->ProjectToPixelLocation(
-                WorldSamplePoint,
-                ProjectedPoint))
-        {
-            OutBox += ProjectedPoint;
-            ProjectedPointCount++;
-        }
-    };
-
-    bool bUsedMeshVertices = false;
-
-    if (bUseMeshVerticesForLandscapeClip)
-    {
-        const UStaticMesh* StaticMesh = InstancedComponent->GetStaticMesh();
-        const FStaticMeshRenderData* RenderData = StaticMesh ? StaticMesh->GetRenderData() : nullptr;
-
-        if (RenderData && RenderData->LODResources.Num() > 0)
-        {
-            const FStaticMeshLODResources& LODResources = RenderData->LODResources[0];
-            const FPositionVertexBuffer& PositionVertexBuffer =
-                LODResources.VertexBuffers.PositionVertexBuffer;
-
-            const int32 VertexCount = static_cast<int32>(PositionVertexBuffer.GetNumVertices());
-            if (VertexCount > 0)
-            {
-                bUsedMeshVertices = true;
-
-                const int32 MaxVertexSamples =
-                    FMath::Clamp(MaxLandscapeClipVertexSamples, 8, 4096);
-                const int32 SamplesToUse = FMath::Min(VertexCount, MaxVertexSamples);
-
-                for (int32 SampleIndex = 0; SampleIndex < SamplesToUse; ++SampleIndex)
-                {
-                    int32 VertexIndex = 0;
-                    if (SamplesToUse > 1)
-                    {
-                        VertexIndex = FMath::Clamp(
-                            FMath::RoundToInt(
-                                static_cast<float>(SampleIndex) *
-                                static_cast<float>(VertexCount - 1) /
-                                static_cast<float>(SamplesToUse - 1)),
-                            0,
-                            VertexCount - 1);
-                    }
-
-                    const FVector3f LocalVertexPosition =
-                        PositionVertexBuffer.VertexPosition(VertexIndex);
-                    TryAddLocalSamplePoint(FVector(LocalVertexPosition));
-                }
-            }
-        }
-    }
-
-    // If mesh vertices are requested and available, their result is the result.
-    // If they are unavailable, fall back to the old grid sampling path so the option
-    // remains safe for meshes without CPU-visible render vertices.
-    if (!bUsedMeshVertices)
-    {
-        const int32 SamplesPerAxis = FMath::Clamp(LandscapeClipSamplesPerAxis, 2, 8);
-
-        for (int32 XIndex = 0; XIndex < SamplesPerAxis; ++XIndex)
-        {
-            const float XAlpha = static_cast<float>(XIndex) /
-                static_cast<float>(SamplesPerAxis - 1);
-
-            for (int32 YIndex = 0; YIndex < SamplesPerAxis; ++YIndex)
-            {
-                const float YAlpha = static_cast<float>(YIndex) /
-                    static_cast<float>(SamplesPerAxis - 1);
-
-                for (int32 ZIndex = 0; ZIndex < SamplesPerAxis; ++ZIndex)
-                {
-                    const float ZAlpha = static_cast<float>(ZIndex) /
-                        static_cast<float>(SamplesPerAxis - 1);
-
-                    const FVector LocalSamplePoint(
-                        FMath::Lerp(LocalBounds.Min.X, LocalBounds.Max.X, XAlpha),
-                        FMath::Lerp(LocalBounds.Min.Y, LocalBounds.Max.Y, YAlpha),
-                        FMath::Lerp(LocalBounds.Min.Z, LocalBounds.Max.Z, ZAlpha));
-
-                    TryAddLocalSamplePoint(LocalSamplePoint);
-                }
-            }
-        }
-    }
-
-    return LandscapeHitCount > 0 &&
-           KeptPointCount > 0 &&
-           ProjectedPointCount > 0 &&
-           OutBox.bIsValid &&
            !OutBox.GetSize().IsNearlyZero();
 }
 
@@ -789,21 +568,18 @@ void UGTActorInfoGeneratorComponent::DrawDebug(FViewport* Viewport, FCanvas* Can
     Canvas->DrawItem(TextItem);
 }
 
-#if WITH_EDITOR
 bool UGTActorInfoGeneratorComponent::CanEditChange(const FProperty* InProperty) const
 {
-    if (InProperty->GetFName() == GET_MEMBER_NAME_CHECKED(UGTActorInfoGeneratorComponent, bOnlyTrackOnScreenActors) ||
-        InProperty->GetFName() == GET_MEMBER_NAME_CHECKED(UGTActorInfoGeneratorComponent, bAccurateBoundingBoxes))
+    if (InProperty->GetFName() == GET_MEMBER_NAME_CHECKED(UGTActorInfoGeneratorComponent, bOnlyTrackOnScreenActors) || InProperty->GetFName() == GET_MEMBER_NAME_CHECKED(UGTActorInfoGeneratorComponent, bAccurateBoundingBoxes))
     {
         if (!LinkedImageGenerator.IsSet())
         {
             return false;
         }
     }
-
+    
     return Super::CanEditChange(InProperty);
 }
-#endif
 
 void UGTActorInfoGeneratorComponent::BeginPlay()
 {
@@ -826,24 +602,20 @@ void UGTActorInfoGeneratorComponent::BeginPlay()
             LogTemp,
             Warning,
             TEXT(
-                "UnrealGT ActorInfo: Accurate Bounding Boxes is not recommended "
-                "for ISM/HISM per-instance boxes. Use landscape clipping instead, "
-                "or turn Accurate Bounding Boxes off."));
+                "UnrealGT ActorInfo per-instance boxes use projected mesh bounds. "
+                "Accurate segmentation refinement is actor/component based and is not "
+                "applied per ISM/HISM instance."));
     }
 
-    if (bAccurateBoundingBoxes)
+    if (bAccurateBoundingBoxes && LinkedImageGenerator.GetComponent(GetOwner()))
     {
         UGTImageGeneratorBase* LinkedImageGeneratorComponent =
             Cast<UGTImageGeneratorBase>(LinkedImageGenerator.GetComponent(GetOwner()));
 
-        if (LinkedImageGeneratorComponent)
-        {
-            ApplyLinkedCameraCalibration(
-                SegmentationSceneCapture,
-                LinkedImageGeneratorComponent->GetSceneCaptureComponent());
-            SegmentationSceneCapture->SetupSegmentationPostProccess(
-                TrackActorsThatMatchFilter, bShouldApplyCloseMorph);
-        }
+        SegmentationSceneCapture->SetResolution(
+            LinkedImageGeneratorComponent->GetSceneCaptureComponent()->Resolution);
+        SegmentationSceneCapture->SetupSegmentationPostProccess(
+            TrackActorsThatMatchFilter, bShouldApplyCloseMorph);
     }
 }
 

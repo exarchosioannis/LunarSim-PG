@@ -55,56 +55,6 @@ public:
     float MaxDistanceToCamera;
 
     /**
-     * Optional annotation-only clipping for per-instance ISM/HISM bounding boxes.
-     * This does not move instances, does not modify meshes, and does not change visuals.
-     * It only ignores bounding-box sample points that are below the landscape/world static surface.
-     */
-    UPROPERTY(EditAnywhere, Category = "Tracked Actors|Instanced Meshes")
-    bool bClipInstancedBoundingBoxesAgainstLandscape = false;
-
-    UPROPERTY(
-        EditAnywhere,
-        Category = "Tracked Actors|Instanced Meshes",
-        meta = (EditCondition = "bClipInstancedBoundingBoxesAgainstLandscape", ClampMin = "2", ClampMax = "8"))
-    int32 LandscapeClipSamplesPerAxis = 4;
-
-    /**
-     * When enabled, the landscape-clipped bbox uses actual StaticMesh vertices instead of
-     * synthetic grid samples inside the mesh bounding box. This usually gives tighter boxes.
-     * If mesh render vertices are unavailable, the code falls back to the grid-sampling path.
-     */
-    UPROPERTY(
-        EditAnywhere,
-        Category = "Tracked Actors|Instanced Meshes",
-        meta = (EditCondition = "bClipInstancedBoundingBoxesAgainstLandscape"))
-    bool bUseMeshVerticesForLandscapeClip = false;
-
-    /** Maximum number of mesh vertices sampled per candidate instance. */
-    UPROPERTY(
-        EditAnywhere,
-        Category = "Tracked Actors|Instanced Meshes",
-        meta = (EditCondition = "bClipInstancedBoundingBoxesAgainstLandscape && bUseMeshVerticesForLandscapeClip", ClampMin = "8", ClampMax = "4096"))
-    int32 MaxLandscapeClipVertexSamples = 256;
-
-    UPROPERTY(
-        EditAnywhere,
-        Category = "Tracked Actors|Instanced Meshes",
-        meta = (EditCondition = "bClipInstancedBoundingBoxesAgainstLandscape", ClampMin = "0.0"))
-    float LandscapeClipToleranceCm = 10.0f;
-
-    UPROPERTY(
-        EditAnywhere,
-        Category = "Tracked Actors|Instanced Meshes",
-        meta = (EditCondition = "bClipInstancedBoundingBoxesAgainstLandscape", ClampMin = "1000.0"))
-    float LandscapeClipTraceHalfHeightCm = 100000.0f;
-
-    UPROPERTY(
-        EditAnywhere,
-        Category = "Tracked Actors|Instanced Meshes",
-        meta = (EditCondition = "bClipInstancedBoundingBoxesAgainstLandscape"))
-    bool bFallbackToProjectedBoxWhenLandscapeClipFails = true;
-
-    /**
      * Drastically Increase the accuracy of the bounding boxes, but requires an additional render
      * pass. The additional render pass creates a segmentation map for the tracked actors and uses
      * that map to refine the bounding boxes.
@@ -183,7 +133,7 @@ public:
     /** Warms the private accurate-bounding-box segmentation capture without generating CSV. */
     bool WarmUpCaptureNoOutput(FString& OutError);
 
-#if WITH_EDITOR
+#ifdef WITH_EDITOR
     virtual bool CanEditChange(const FProperty* InProperty) const override;
 #endif
 
@@ -222,18 +172,6 @@ private:
     bool GetInstancedStaticMeshScreenBoundingBox(
         const FBox& LocalBounds,
         const FTransform& InstanceTransform,
-        UGTImageGeneratorBase* ImageGeneratorComponent,
-        FBox2D& OutBox) const;
-
-    bool GetLandscapeHeightAtXY(
-        const FVector& WorldPoint,
-        const UInstancedStaticMeshComponent* SourceComponent,
-        float& OutLandscapeZ) const;
-
-    bool GetLandscapeClippedInstancedStaticMeshScreenBoundingBox(
-        const FBox& LocalBounds,
-        const FTransform& InstanceTransform,
-        const UInstancedStaticMeshComponent* InstancedComponent,
         UGTImageGeneratorBase* ImageGeneratorComponent,
         FBox2D& OutBox) const;
 
