@@ -30,6 +30,15 @@ Use this page to find the canonical guide for each task. The root
 
 - [Terrain generation](terrain-generation.md) — regional presets, seeds,
   crater and rock generation, output packages, and Unreal import.
+  - [Terrain generator workflow](terrain-generator-workflow.md) — step-by-step
+  use of the GUI, generated files, Landscape import, material setup, and rock
+  baking in Unreal Engine.
+  - [Terrain generation model](terrain-generation-model.md) — procedural
+  heightfield model, crater population and morphology equations, preset
+  assumptions, scientific sources, and limitations.
+  - [Rock distribution model](rock-distribution-model.md) — crater-relative rock
+  placement, boulder size and distance scaling, radial zones, background
+  populations, scientific sources, and procedural assumptions.
 
 ## Dataset generation
 
