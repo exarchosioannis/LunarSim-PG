@@ -5,6 +5,7 @@
 #include "Components/ChildActorComponent.h"
 #include "Components/LightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "CollisionQueryParams.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/StaticMesh.h"
@@ -655,30 +656,168 @@ bool CreateOrUpdateMoonEnvironment(UWorld* World, FString& OutStatus)
 	return bSuccess;
 }
 
+bool SnapRoverToGround(UWorld* World, AActor* Rover, const FVector2D& DesiredXY)
+{
+	if (!World || !Rover)
+		return false;
+
+	constexpr double TraceDistanceCm = 200000.0;
+	constexpr double GroundClearanceCm = 5.0;
+
+	// Set the final horizontal position and rotation before measuring bounds.
+	const FVector OriginalLocation = Rover->GetActorLocation();
+	Rover->SetActorRotation(FRotator::ZeroRotator);
+	Rover->SetActorLocation(
+	    FVector(DesiredXY.X, DesiredXY.Y, OriginalLocation.Z),
+	    false,
+	    nullptr,
+	    ETeleportType::TeleportPhysics);
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(RoverGroundTrace), true);
+	QueryParams.bReturnPhysicalMaterial = false;
+	QueryParams.AddIgnoredActor(Rover);
+
+	// A child-actor camera rig can be a separate actor, so ignore attached
+	// actors as well as the rover itself during the downward trace.
+	TArray<AActor*> AttachedActors;
+	Rover->GetAttachedActors(AttachedActors);
+	QueryParams.AddIgnoredActors(AttachedActors);
+
+	const FVector TraceStart(DesiredXY.X, DesiredXY.Y, TraceDistanceCm);
+	const FVector TraceEnd(DesiredXY.X, DesiredXY.Y, -TraceDistanceCm);
+
+	FHitResult Hit;
+	bool bHitGround = World->LineTraceSingleByChannel(
+	    Hit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParams);
+
+	// Some landscape collision profiles block Visibility rather than a trace
+	// performed on the WorldStatic channel, so use Visibility as a fallback.
+	if (!bHitGround) {
+		bHitGround = World->LineTraceSingleByChannel(
+		    Hit, TraceStart, TraceEnd, ECC_Visibility, QueryParams);
+	}
+
+	if (!bHitGround) {
+		UE_LOG(
+		    LogTemp,
+		    Warning,
+		    TEXT("MoonSim: No ground trace hit below rover at X=%.2f Y=%.2f; keeping its previous Z=%.2f."),
+		    DesiredXY.X,
+		    DesiredXY.Y,
+		    OriginalLocation.Z);
+		return false;
+	}
+
+	FVector BoundsOrigin = FVector::ZeroVector;
+	FVector BoundsExtent = FVector::ZeroVector;
+
+	// Only use components with collision. Using all components can include the
+	// camera rig, sensors, debug meshes, or other non-physical geometry and can
+	// calculate an offset that leaves the rover visibly floating.
+	Rover->GetActorBounds(true, BoundsOrigin, BoundsExtent);
+
+	// Fallback for Blueprints that have no colliding component bounds.
+	if (BoundsExtent.IsNearlyZero()) {
+		Rover->GetActorBounds(false, BoundsOrigin, BoundsExtent);
+		UE_LOG(
+		    LogTemp,
+		    Warning,
+		    TEXT("MoonSim: Rover has no colliding bounds; using all component bounds as a fallback."));
+	}
+
+	if (BoundsOrigin.ContainsNaN() || BoundsExtent.ContainsNaN() || BoundsExtent.IsNearlyZero()) {
+		UE_LOG(LogTemp, Warning, TEXT("MoonSim: Rover bounds are invalid; cannot snap rover to ground."));
+		return false;
+	}
+
+	const double BoundsBottomZ = BoundsOrigin.Z - BoundsExtent.Z;
+	const double ActorOriginToBottom = Rover->GetActorLocation().Z - BoundsBottomZ;
+	if (!FMath::IsFinite(ActorOriginToBottom) || ActorOriginToBottom < 0.0) {
+		UE_LOG(
+		    LogTemp,
+		    Warning,
+		    TEXT("MoonSim: Invalid rover origin-to-bottom offset: %.2f cm."),
+		    ActorOriginToBottom);
+		return false;
+	}
+
+	const FVector GroundedLocation(
+	    DesiredXY.X,
+	    DesiredXY.Y,
+	    Hit.ImpactPoint.Z + ActorOriginToBottom + GroundClearanceCm);
+
+	const bool bMoved = Rover->SetActorLocation(
+	    GroundedLocation,
+	    false,
+	    nullptr,
+	    ETeleportType::TeleportPhysics);
+
+	UE_LOG(
+	    LogTemp,
+	    Log,
+	    TEXT("MoonSim: Rover ground snap: hit actor='%s', ground Z=%.2f, bounds bottom Z=%.2f, offset=%.2f, final Z=%.2f."),
+	    Hit.GetActor() ? *Hit.GetActor()->GetActorLabel() : TEXT("None"),
+	    Hit.ImpactPoint.Z,
+	    BoundsBottomZ,
+	    ActorOriginToBottom,
+	    GroundedLocation.Z);
+
+	return bMoved;
+}
+
 AActor* CreateOrUpdateRoverActor(UWorld* World)
 {
 	if (!World)
 		return nullptr;
 
+	AActor* Rover = nullptr;
+
 	for (TActorIterator<AActor> It(World); It; ++It) {
 		AActor* Candidate = *It;
 		FResolvedRoverPipeline Pipeline;
 		if (ResolveCompleteRoverPipeline(Candidate, World, Pipeline)) {
-			Candidate->Modify();
-#if WITH_EDITOR
-			Candidate->SetActorLabel(TEXT("ESA_Rover"));
-#endif
-			Candidate->SetFolderPath(TEXT("MoonSim Rover"));
-			Candidate->SetActorLocation(FVector::ZeroVector);
-			Candidate->SetActorRotation(FRotator::ZeroRotator);
-			Candidate->MarkPackageDirty();
-			return Candidate;
+			Rover = Candidate;
+			break;
 		}
 	}
 
-	return CreateOrUpdateBlueprintActor(World, GetRoverBlueprintClassPaths(),
-	                                    {TEXT("ESA_Rover_C"), TEXT("BP_RoverVehicle_C")}, TEXT("ESA_Rover"),
-	                                    FVector::ZeroVector, FRotator::ZeroRotator, TEXT("MoonSim Rover"));
+	if (!Rover) {
+		Rover = CreateOrUpdateBlueprintActor(
+		    World,
+		    GetRoverBlueprintClassPaths(),
+		    {TEXT("ESA_Rover_C"), TEXT("BP_RoverVehicle_C")},
+		    TEXT("ESA_Rover"),
+		    FVector::ZeroVector,
+		    FRotator::ZeroRotator,
+		    TEXT("MoonSim Rover"));
+	}
+
+	if (!Rover)
+		return nullptr;
+
+	Rover->Modify();
+#if WITH_EDITOR
+	Rover->SetActorLabel(TEXT("ESA_Rover"));
+#endif
+	Rover->SetFolderPath(TEXT("MoonSim Rover"));
+
+	// Preserve the original requested X/Y spawn position, but derive Z from
+	// the landscape or other WorldStatic surface directly below it.
+	const FVector2D RoverXY(0.0, 0.0);
+	if (!SnapRoverToGround(World, Rover, RoverXY)) {
+		// Do not overwrite Z with zero when the trace fails. This preserves an
+		// existing manually placed rover and makes the Output Log warning useful.
+		const FVector CurrentLocation = Rover->GetActorLocation();
+		Rover->SetActorLocation(
+		    FVector(RoverXY.X, RoverXY.Y, CurrentLocation.Z),
+		    false,
+		    nullptr,
+		    ETeleportType::TeleportPhysics);
+		Rover->SetActorRotation(FRotator::ZeroRotator);
+	}
+
+	Rover->MarkPackageDirty();
+	return Rover;
 }
 
 bool CreateOrUpdateRoverAndGroundTruth(UWorld* World, FString& OutStatus)
