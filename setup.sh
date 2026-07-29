@@ -145,13 +145,13 @@ fi
 for file in \
     LunarSimPG.uproject \
     Source/simulatorEditor.Target.cs \
-    Plugins/TempoROS/Setup.sh \
+    Plugins/TempoROS/Scripts/SyncDeps.sh \
     Plugins/TempoROS/TempoROS.uplugin \
     Plugins/unrealgt/UnrealGT.uplugin; do
     require_file "$file"
 done
 
-UNREAL_ENGINE_PATH="$UE_ROOT" Plugins/TempoROS/Setup.sh
+UNREAL_ENGINE_PATH="$UE_ROOT" Plugins/TempoROS/Scripts/SyncDeps.sh
 
 for directory in \
     Plugins/TempoROS/Source/ThirdParty/rclcpp/Includes \
