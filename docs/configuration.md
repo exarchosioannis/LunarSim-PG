@@ -1,140 +1,130 @@
-# Configuration
+# Simulator configuration
 
-LunarSim-PG uses three user-facing configuration mechanisms:
+The **Simulator Config** window lets you choose the capture, ROS 2, timing,
+camera-pose, rover-pose, sensor, and rover-control settings for the next Play In
+Editor run. It also provides actions for preparing the current level.
 
-1. **Simulator Config** in Unreal Editor for runtime outputs, cameras, IMU, and
-   rover control.
-2. `Config/DefaultPlugins.ini` and `docker/docker-compose.yml` for ROS
-   networking.
-3. The MoonSim terrain GUI for profile, seed, heightmap, crater, and rock
-   settings.
+## Opening the window
 
-## Simulator Config
+1. Open the level you want to run.
+2. Go to **Window > Simulator > Simulator Config**.
+3. Choose the settings you need.
+4. Press **Apply Settings**.
+5. Start Play In Editor.
 
-Open **Window > Simulator > Simulator Config**. Apply settings while Play In
-Editor is stopped; the Apply button and world-setup actions are disabled during
-play.
+## Configuration blocks
+
+The defaults below are the implementation defaults. If the level already
+contains a configured rover, the window shows that rover's saved values
+instead. The first four blocks appear under **Data Generation and ROS 2** in
+the window.
 
 ### Outputs
 
-| Setting | Type | Default | Allowed values | Description |
-| --- | --- | --- | --- | --- |
-| Stereo ROS Images + CameraInfo | Boolean | Enabled | Enabled/disabled | Publishes both stereo RGB images and camera-info messages during active capture. |
-| Ground Truth Images | Boolean | Enabled | Enabled/disabled | Master switch for the four file-backed ground-truth modalities below. |
-| RGB | Boolean | Enabled | Enabled/disabled | Writes the ground-truth camera RGB PNG. |
-| Depth | Boolean | Enabled | Enabled/disabled | Writes UnrealGT RGB-packed depth PNG. |
-| Segmentation | Boolean | Enabled | Enabled/disabled | Writes color-coded segmentation PNG and legends. |
-| Bounding Boxes | Boolean | Enabled | Enabled/disabled | Writes per-frame bounding-box CSV. |
-| Trajectory CSV | Boolean | Enabled | Enabled/disabled | Writes rover and applicable camera pose CSV files. |
-| Ground Truth ROS Maps | Boolean | Enabled | Enabled/disabled | Generates run-level map files and publishes occupancy/elevation messages. |
-| Show Capture Status Overlay | Boolean | Enabled | Enabled/disabled | Shows capture state without changing the stop cooldown. |
+This block controls the main session outputs and the run-level ground-truth
+maps.
 
-Ground-truth subtype switches have no effect when the master switch is
-disabled. Map files are run-level products and do not schedule capture frames.
-
-### Camera and capture
-
-| Setting | Type | Default | Allowed values | Description |
-| --- | --- | --- | --- | --- |
-| Resolution | Enum | 1024x1024 | 640x360, 1024x576, 1280x720, 1920x1080, 640x640, 1024x1024 | Shared RGB, calibration, and ground-truth image size. |
-| Horizontal FOV deg | Float | 90 | 5–170 degrees | Horizontal pinhole field of view. |
-| Capture Hz | Float | 6 | 0.001–60 Hz in the editor | Schedules active-capture camera and file outputs. Effective rate cannot exceed Unreal performance. |
-| Stereo Baseline cm | Float | 20 | 1–200 cm | Separation used for the stereo rig, calibration, and right projection matrix. |
-
-Intrinsics are derived rather than entered:
-
-```text
-fx = fy = image_width / (2 * tan(horizontal_fov / 2))
-cx = image_width / 2
-cy = image_height / 2
-```
-
-The distortion model is `plumb_bob` with five zero coefficients.
-
-### Rover and IMU
-
-| Setting | Type | Default | Allowed values | Description |
-| --- | --- | --- | --- | --- |
-| IMU Hz | Float | 100 | 1–400 Hz | Requested IMU publication rate. The implementation explicitly caps effective publication to game-thread FPS. |
-| Control Mode | Enum | WASD | WASD, `cmd_vel`, Disabled | Selects keyboard, ROS 2 Twist, or no rover control. |
-
-The `cmd_vel` controller defaults are implemented in the rover component:
-
-| Setting | Default | Valid constraint |
+| Option | Default | What it does |
 | --- | --- | --- |
-| Topic | `/cmd_vel` | Canonical project endpoint |
-| Maximum linear speed | 1 m/s | At least 0.01 m/s |
-| Maximum angular speed | 1 rad/s | At least 0.01 rad/s |
-| Command timeout | 0.75 s | Non-negative |
-| Input dead zone | 0.02 | 0–1 |
-| Invert throttle/steering | Both false | Boolean |
-| Timeout stop | Rover stop / idle brake | Rover stop or full brake |
+| **Stereo ROS Images + CameraInfo** | Enabled | Publishes left and right RGB images with matching camera information during an active capture session. Enable this when ROS 2 needs the stereo camera stream; it does not write the stereo images to the dataset folder. |
+| **Trajectory CSV** | Enabled | Writes synchronized pose rows at **Capture Hz** while capture is active. Enable this when you need offline rover or camera poses; camera pose files depend on which camera outputs are enabled. |
+| **Ground Truth ROS Maps** | Enabled | Computes the ground-truth maps, writes the run-level map outputs, and publishes the ROS 2 map data. Enable this when you need occupancy and elevation products; the calculation starts during Play In Editor and does not wait for `C`. |
 
-These detailed controller fields are component properties, not controls in the
-Simulator Config window.
+**Ground Truth ROS Maps** can be changed only when the level contains the
+ground-truth map publisher. Map calculation can reduce runtime performance
+while it is running.
 
-## Applying changes
+### Ground Truth Outputs
 
-Click **Apply Settings**, save the affected level/assets if prompted, then
-start or restart Play In Editor. A C++ rebuild is not required for these
-setting changes.
+This block controls the single ground-truth camera view, which is aligned with
+the left camera. **Ground Truth Images** is the master switch; its four output
+choices are available only while the master switch is enabled.
 
-The first capture configuration registered during a Play In Editor session is
-frozen for that dataset run. Stop and restart Play In Editor before changing
-run-level capture settings.
+| Option | Default | What it does |
+| --- | --- | --- |
+| **Ground Truth Images** | Enabled | Enables file-backed ground-truth capture. Enable this when you want any of the four outputs below. |
+| **RGB** | Enabled | Writes the ground-truth RGB image for each active capture frame. Choose this when you need a color image aligned with the other ground-truth products. |
+| **Depth** | Enabled | Writes a depth image for each active capture frame. Use this option when your dataset needs per-pixel distance information. |
+| **Segmentation** | Enabled | Writes the color-coded segmentation image and its legends. Enable this when you need labeled scene regions. |
+| **Bounding Boxes** | Unchecked | Writes per-frame image-space bounding-box data. Enable this only when needed because it can significantly reduce capture performance in dense scenes. |
 
-## ROS networking
+Turning off **Ground Truth Images** leaves the four choices selected but makes
+them inactive. If the master switch is enabled with no output selected,
+**Apply Settings** reports that there are no selected ground-truth outputs.
 
-`Config/DefaultPlugins.ini` contains:
+### Capture
 
-```ini
-[/Script/TempoROS.TempoROSSettings]
-FixedFrameName=map
-ROSDomainID=9
-RMWImplementation=CycloneDDS
-```
+This block controls the shared camera calibration and the rate of active
+capture sessions. The resolution and field of view apply to both stereo ROS 2
+images and ground-truth images.
 
-The Docker environment matches these values with `ROS_DOMAIN_ID=9`,
-`ROS_LOCALHOST_ONLY=0`, and
-`RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`.
+| Option | Default and allowed values | What it does |
+| --- | --- | --- |
+| **Resolution** | Default: `1024x1024`<br>Choices: `640x360`, `1024x576`, `1280x720`, `1920x1080`, `640x640`, `1024x1024` | Sets the image size and the matching camera calibration. Choose a smaller size for lighter capture or a larger size when you need more image detail. |
+| **Horizontal FOV deg** | Default: `90`<br>Range: `5`–`170` degrees | Sets the horizontal camera field of view and updates the camera calibration. Change it when you need a wider or narrower view. |
+| **Capture Hz** | Default: `6`<br>Range: `0.001`–`60` Hz | Sets the target rate for active capture frames. Lower it to reduce capture load or raise it for denser sampling; the achieved rate can be lower if the simulation or rendering cannot keep up. |
+| **Stereo Baseline cm** | Default: `20`<br>Range: `1`–`200` cm | Sets the distance between the left and right cameras, including the right camera pose and stereo calibration. Change it when you want the simulated stereo rig to match a different physical baseline. |
 
-If changing the domain ID, keep the Unreal config and Docker environment
-identical, then restart both the editor and the container. Runtime ROS
-parameters, ROS services, and ROS actions are not implemented.
+### Rover / Sensors
 
-## Terrain configuration
+This block controls the IMU publication rate and which input can drive the
+rover.
 
-Run the graphical tool from the repository root:
+| Option | Default and allowed values | What it does |
+| --- | --- | --- |
+| **IMU Hz** | Default: `100`<br>Range: `1`–`400` Hz | Sets the requested ROS 2 IMU publication rate. Change it when your ROS 2 workflow needs a different sampling rate; it runs independently of capture and cannot exceed the simulation frame rate. |
+| **Control Mode** | Default: **WASD**<br>Choices: **WASD**, **cmd_vel** | Chooses the rover input source. Use **WASD** for keyboard driving, or choose **cmd_vel** before sending ROS 2 velocity commands. |
 
-```bash
-./Tools/Terrain_Generation/moonsim.sh
-```
+In **WASD** mode, use `W` to drive forward, `S` to brake or reverse, and `A`
+and `D` to steer. For ROS 2 control commands and limits, see the
+[ROS 2 interface](ros2-interface.md).
 
-The frequently used fields are profile, seed, heightmap size, map size, encoded
-height range, range mode, heightmap preset, rock profile, and the two crater
-abundance values. Rock settings are grouped under Limits, Background,
-Bart–Melosh scaling, Crater abundance, Zone fractions, Zone bounds, Distance
-and size, Clumping, Random big-rock clumps, Unreal placement, and Materials.
+### Apply Settings
 
-Changing terrain settings requires regenerating the affected heightmap and
-rockfield. The repository does not connect terrain settings to an existing
-Unreal Landscape automatically. See [Terrain generation](terrain-generation.md).
+Press **Apply Settings** after making changes. The button requires a complete
+rover setup in the open level and is unavailable while Play In Editor or
+simulation is running. If the level is missing that setup, use
+**Create / Update Rover + Ground Truth** in the next block.
 
-The generator records a fixed preview hillshade azimuth of 135 degrees and
-elevation of 25 degrees. These are metadata for the preview calculation; they
-are not user-facing illumination controls and do not configure Unreal lights.
-Configurable end-to-end illumination transfer is **Not yet verified**.
+The action updates the current level, so save the level if you want to keep the
+settings for later editor sessions. If the level contains more than one
+complete rover setup, the window applies the settings to the first one it
+finds and reports this below the button.
 
-## Output locations
+### World Setup
 
-Output directories are fixed by the implementation:
+This block prepares required actors in the current level. Both actions are
+disabled during Play In Editor.
 
-| Product | Location |
+| Option | What it does |
 | --- | --- |
-| Terrain run packages | `Tools/Terrain_Generation/generated/` |
-| Copies prepared for Unreal import | `Tools/Terrain_Generation/unreal_import/` |
-| Dataset runs | `Saved/Datasets/` |
-| Rosbags written in the container | Host `bags/` through container `/ws/bags` |
+| **Create / Update Sky, Earth and Sun** | Creates or updates the standard directional light, Earth, Sky, Sun, and Sun glow controller. Use this option to prepare a new level or restore the standard environment setup; it resets the Earth, Sky, and Sun to their preset transforms. |
+| **Create / Update Rover + Ground Truth** | Creates or updates the rover and ground-truth map publisher, then refreshes the window's configuration target. Use this option when the level does not yet have a complete rover setup; it places the rover and map publisher at the world origin. |
 
-The Unreal dataset root is not user-configurable in the current interface.
+These actions change the level immediately. Save the level when you want to
+keep the result.
 
+### Terrain Generation
+
+The **Terrain Generation** block contains the separate **Rock Field Baking**
+workflow. See [Terrain generator workflow](terrain-generator-workflow.md) for
+its inputs and actions.
+
+## Important behavior
+
+- **Capture Hz** controls session capture frames. It affects enabled
+  ground-truth images, stereo ROS 2 images, and **Trajectory CSV** sampling,
+  but it does not change **IMU Hz**, live rover ground-truth publication, or
+  map publication.
+- **Trajectory CSV** uses the same frame index and simulation timestamp as the
+  matching capture frame. It writes the rover pose, the left camera pose when
+  stereo or ground truth is enabled, and the right camera pose when stereo is
+  enabled. There are no separate frame, timestamp, or pose switches in this
+  window.
+- **Ground Truth ROS Maps** is a run-level option. When enabled, map generation
+  and publication begin after Play In Editor starts and do not require an
+  active capture session.
+- With the Play In Editor viewport focused, `C` starts or stops the enabled
+  session outputs: ground-truth images, stereo ROS 2 images, and trajectory
+  capture. It does not toggle the IMU, live rover ground truth, clock,
+  transforms, or run-level maps.

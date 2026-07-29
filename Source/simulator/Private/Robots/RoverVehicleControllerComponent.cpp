@@ -21,9 +21,6 @@ void URoverVehicleControllerComponent::BeginPlay()
 	Super::BeginPlay();
 
 	ResolveVehicleMovement();
-	if (ControlMode == ERoverControlMode::Disabled) {
-		EmergencyStopInternal();
-	}
 }
 
 void URoverVehicleControllerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -40,11 +37,6 @@ void URoverVehicleControllerComponent::TickComponent(
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (ControlMode == ERoverControlMode::Disabled) {
-		EmergencyStopInternal();
-		return;
-	}
-
 	ApplyDriveOutput();
 	ApplyIdleBrakeOutput();
 	ApplySteeringOutput(DeltaTime);
@@ -54,21 +46,12 @@ void URoverVehicleControllerComponent::TickComponent(
 void URoverVehicleControllerComponent::SetControlMode(ERoverControlMode NewControlMode)
 {
 	if (ControlMode == NewControlMode) {
-		if (ControlMode == ERoverControlMode::Disabled) {
-			EmergencyStopInternal();
-		}
 		RefreshTickEnabled();
 		return;
 	}
 
 	ControlMode = NewControlMode;
-	if (ControlMode == ERoverControlMode::Disabled) {
-		EmergencyStopInternal();
-	}
-	else {
-		StopDrive();
-	}
-
+	StopDrive();
 	RefreshTickEnabled();
 }
 
@@ -87,23 +70,8 @@ bool URoverVehicleControllerComponent::IsCmdVelInputEnabled() const
 	return CanAcceptCmdVelInput();
 }
 
-void URoverVehicleControllerComponent::SetManualInputEnabled(bool bEnabled)
-{
-	SetControlMode(bEnabled ? ERoverControlMode::Manual : ERoverControlMode::Disabled);
-}
-
-void URoverVehicleControllerComponent::SetCmdVelInputEnabled(bool bEnabled)
-{
-	SetControlMode(bEnabled ? ERoverControlMode::RosCmdVel : ERoverControlMode::Disabled);
-}
-
 void URoverVehicleControllerComponent::ApplyNormalizedDriveCommand(float ForwardReverseInput, float SteeringInput)
 {
-	if (ControlMode == ERoverControlMode::Disabled) {
-		EmergencyStopInternal();
-		return;
-	}
-
 	if (!CanAcceptCmdVelInput()) {
 		return;
 	}
@@ -135,11 +103,6 @@ void URoverVehicleControllerComponent::EmergencyStop()
 
 void URoverVehicleControllerComponent::ApplyForwardThrottle(float InputValue)
 {
-	if (ControlMode == ERoverControlMode::Disabled) {
-		EmergencyStopInternal();
-		return;
-	}
-
 	if (!CanAcceptManualInput()) {
 		return;
 	}
@@ -149,11 +112,6 @@ void URoverVehicleControllerComponent::ApplyForwardThrottle(float InputValue)
 
 void URoverVehicleControllerComponent::ApplyReverseThrottle(float InputValue)
 {
-	if (ControlMode == ERoverControlMode::Disabled) {
-		EmergencyStopInternal();
-		return;
-	}
-
 	if (!CanAcceptManualInput()) {
 		return;
 	}
@@ -163,11 +121,6 @@ void URoverVehicleControllerComponent::ApplyReverseThrottle(float InputValue)
 
 void URoverVehicleControllerComponent::ApplySteering(float InputValue)
 {
-	if (ControlMode == ERoverControlMode::Disabled) {
-		EmergencyStopInternal();
-		return;
-	}
-
 	if (!CanAcceptManualInput()) {
 		return;
 	}
@@ -195,11 +148,6 @@ void URoverVehicleControllerComponent::StopSteering()
 
 void URoverVehicleControllerComponent::ApplyBrake(float BrakeValue)
 {
-	if (ControlMode == ERoverControlMode::Disabled) {
-		EmergencyStopInternal();
-		return;
-	}
-
 	if (!CanAcceptManualInput()) {
 		return;
 	}
@@ -536,14 +484,13 @@ void URoverVehicleControllerComponent::ApplySteeringOutput(float DeltaTime)
 
 void URoverVehicleControllerComponent::RefreshTickEnabled()
 {
-	const bool bNeedsDisabledTick = ControlMode == ERoverControlMode::Disabled;
 	const bool bNeedsDriveTick = ActiveThrottleDirection != 0 && CurrentThrottleInput > KINDA_SMALL_NUMBER;
 	const bool bNeedsSteeringTick = bUseSteeringSmoothing
 		? !FMath::IsNearlyZero(TargetSteeringInput) || !FMath::IsNearlyZero(SmoothedSteeringInput)
 		: !FMath::IsNearlyZero(TargetSteeringInput);
 	const bool bNeedsIdleBrakeTick = bIdleBrakeActive && bUseIdleBrake;
 
-	SetComponentTickEnabled(bNeedsDisabledTick || bNeedsDriveTick || bNeedsSteeringTick || bSpeedLimitBrakeActive || bNeedsIdleBrakeTick);
+	SetComponentTickEnabled(bNeedsDriveTick || bNeedsSteeringTick || bSpeedLimitBrakeActive || bNeedsIdleBrakeTick);
 }
 
 bool URoverVehicleControllerComponent::ShouldApplyIdleBrake() const

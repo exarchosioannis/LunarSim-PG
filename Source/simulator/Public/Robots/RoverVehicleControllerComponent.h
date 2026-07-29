@@ -10,9 +10,8 @@ class UChaosVehicleMovementComponent;
 UENUM(BlueprintType)
 enum class ERoverControlMode : uint8
 {
-	Manual UMETA(DisplayName = "Manual"),
-	RosCmdVel UMETA(DisplayName = "ROS cmd_vel"),
-	Disabled UMETA(DisplayName = "Disabled")
+	Manual UMETA(DisplayName = "WASD"),
+	RosCmdVel UMETA(DisplayName = "cmd_vel")
 };
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -38,12 +37,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Rover Vehicle Controller|Control")
 	bool IsCmdVelInputEnabled() const;
-
-	UFUNCTION(BlueprintCallable, Category = "Rover Vehicle Controller|Control")
-	void SetManualInputEnabled(bool bEnabled);
-
-	UFUNCTION(BlueprintCallable, Category = "Rover Vehicle Controller|Control")
-	void SetCmdVelInputEnabled(bool bEnabled);
 
 	UFUNCTION(BlueprintCallable, Category = "Rover Vehicle Controller|Control")
 	void ApplyNormalizedDriveCommand(float ForwardReverseInput, float SteeringInput);

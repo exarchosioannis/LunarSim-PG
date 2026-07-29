@@ -46,18 +46,6 @@ const FName FsimulatorEditorModule::SimulatorConfigTabName(TEXT("SimulatorConfig
 
 namespace
 {
-ERoverControlMode NormalizeEditorRoverControlMode(ERoverControlMode InMode)
-{
-	switch (InMode) {
-	case ERoverControlMode::Manual:
-	case ERoverControlMode::RosCmdVel:
-	case ERoverControlMode::Disabled:
-		return InMode;
-	default:
-		return ERoverControlMode::Manual;
-	}
-}
-
 ELunarSimResolutionPreset NormalizeEditorResolutionPreset(ELunarSimResolutionPreset InPreset, int32 Width, int32 Height)
 {
 	switch (InPreset) {
@@ -1405,7 +1393,6 @@ void FsimulatorEditorModule::InitRoverControlOptions()
 
 	RoverControlModeOptions.Add(MakeShared<ERoverControlMode>(ERoverControlMode::Manual));
 	RoverControlModeOptions.Add(MakeShared<ERoverControlMode>(ERoverControlMode::RosCmdVel));
-	RoverControlModeOptions.Add(MakeShared<ERoverControlMode>(ERoverControlMode::Disabled));
 }
 
 TSharedPtr<ERoverControlMode> FsimulatorEditorModule::FindRoverControlModeOption(ERoverControlMode InMode) const
@@ -1425,8 +1412,6 @@ FString FsimulatorEditorModule::RoverControlModeToString(ERoverControlMode InMod
 		return TEXT("WASD");
 	case ERoverControlMode::RosCmdVel:
 		return TEXT("cmd_vel");
-	case ERoverControlMode::Disabled:
-		return TEXT("Disabled");
 	default:
 		return TEXT("WASD");
 	}
@@ -1434,7 +1419,7 @@ FString FsimulatorEditorModule::RoverControlModeToString(ERoverControlMode InMod
 
 FText FsimulatorEditorModule::GetRoverControlModeText() const
 {
-	return FText::FromString(RoverControlModeToString(NormalizeEditorRoverControlMode(RoverControlMode)));
+	return FText::FromString(RoverControlModeToString(RoverControlMode));
 }
 
 TSharedRef<SWidget>
@@ -1451,7 +1436,7 @@ void FsimulatorEditorModule::OnRoverControlModeSelectionChanged(TSharedPtr<ERove
 		return;
 
 	SelectedRoverControlModeOption = NewSelection;
-	RoverControlMode = NormalizeEditorRoverControlMode(*NewSelection);
+	RoverControlMode = *NewSelection;
 }
 
 void FsimulatorEditorModule::OnCustomCaptureHzChanged(float NewValue)
@@ -1871,7 +1856,7 @@ void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
 void FsimulatorEditorModule::LoadConfigFromRoverControl()
 {
 	if (URoverVehicleControllerComponent* RoverController = TargetRoverController.Get()) {
-		RoverControlMode = NormalizeEditorRoverControlMode(RoverController->GetControlMode());
+		RoverControlMode = RoverController->GetControlMode();
 	} else {
 		RoverControlMode = ERoverControlMode::Manual;
 	}

@@ -167,11 +167,6 @@ void URoverCmdVelVehicleControllerComponent::UpdateRoverCommand()
 	}
 
 	const ERoverControlMode ControlMode = RoverController->GetControlMode();
-	if (ControlMode == ERoverControlMode::Disabled) {
-		RoverController->EmergencyStop();
-		return;
-	}
-
 	if (ControlMode != ERoverControlMode::RosCmdVel) {
 		return;
 	}

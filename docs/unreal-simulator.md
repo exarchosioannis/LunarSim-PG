@@ -120,7 +120,6 @@ Select a control mode before starting play:
 | --- | --- |
 | WASD | `W` forward, `S` brake/reverse, `A`/`D` steering |
 | `cmd_vel` | ROS 2 `/cmd_vel`, using `linear.x` and `angular.z` |
-| Disabled | No control commands applied |
 
 The ROS teleop launch file and command limits are documented in
 [ROS 2 interface](ros2-interface.md).
