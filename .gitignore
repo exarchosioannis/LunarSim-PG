@@ -25,6 +25,9 @@ Saved/
 # Unreal local developer content
 Content/Developers/
 
+# Project-local Unreal Engine path
+.ue_root
+
 # Plugin generated files
 Plugins/*/Binaries/
 Plugins/*/Intermediate/

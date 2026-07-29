@@ -31,14 +31,16 @@ Engine/Build/BatchFiles/Linux/Build.sh
 Engine/Binaries/Linux/UnrealEditor
 ```
 
-Set `UE_ROOT` in every terminal used for setup, build, or launch:
+Pass that root to setup once:
 
 ```bash
-export UE_ROOT=/path/to/UnrealEngine-5.7.x
+./setup.sh --ue-root /path/to/UnrealEngine-5.7.x
 ```
 
 The path is necessarily machine-specific. Replace it with the real engine root;
-do not point it at the `Engine/` subdirectory.
+do not point it at the `Engine/` subdirectory. Setup validates the engine
+version and required Linux executables, resolves the canonical path, and writes
+it to the project-local `.ue_root` file. That file is ignored by Git.
 
 ## Clone and retrieve large files
 
@@ -61,18 +63,30 @@ submodules if one is added later.
 Working directory: repository root.
 
 ```bash
-export UE_ROOT=/path/to/UnrealEngine-5.7.x
-./setup.sh
+./setup.sh --ue-root /path/to/UnrealEngine-5.7.x
 ```
 
 The script verifies Git, Git LFS, `curl`, `jq`, the engine version, project and
 plugin descriptors, and then runs `Plugins/TempoROS/Setup.sh`. TempoROS prepares
-its bundled ROS 2 Humble headers and Linux libraries.
+its bundled ROS 2 Humble headers and Linux libraries. Later `./build.sh` and
+`./open_project.sh` invocations read `.ue_root`, including in new terminal
+sessions.
+
+The existing environment-variable form is also supported:
+
+```bash
+UE_ROOT=/path/to/UnrealEngine-5.7.x ./setup.sh
+```
+
+`UE_ROOT` overrides `.ue_root` for any command. When used with setup, its
+validated path is saved; when used with `build.sh` or `open_project.sh`, it is a
+one-command override.
 
 Successful script completion prints:
 
 ```text
 Setup complete.
+Unreal Engine path saved to /path/to/LunarSim-PG/.ue_root
 Next: ./build.sh
 ```
 
@@ -104,9 +118,9 @@ Working directory: repository root.
 ./open_project.sh
 ```
 
-The script opens `LunarSimPG.uproject` with the editor below `UE_ROOT`. Extra
-Unreal Editor arguments can be appended to the command. The configured editor
-startup map is `/Game/Levels/fresh_crater`.
+The script opens `LunarSimPG.uproject` with the editor below the resolved Unreal
+Engine root. Extra Unreal Editor arguments can be appended to the command. The
+configured editor startup map is `/Game/Levels/fresh_crater`.
 
 ## Build the ROS 2 environment
 
@@ -162,4 +176,3 @@ docker compose -f docker/docker-compose.yml down
 ```
 
 Continue with the [quickstart](quickstart.md).
-

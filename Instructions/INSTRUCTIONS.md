@@ -23,17 +23,14 @@ git clone https://github.com/exarchosgiannis/LunarSim-PG.git
 cd LunarSim-PG
 ```
 
-### Unreal Engine
-
-```bash
-export UE_ROOT=/absolute/path/to/UnrealEngine-5.7.x
-```
-
 ### Setup
 
 ```bash
-./setup.sh
+./setup.sh --ue-root /absolute/path/to/UnrealEngine-5.7.x
 ```
+
+The validated path is saved in `.ue_root`, so it does not need to be exported
+again for build or launch.
 
 ### Build
 

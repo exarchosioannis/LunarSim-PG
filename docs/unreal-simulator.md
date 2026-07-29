@@ -32,7 +32,8 @@ profile in the Python GUI does not select or update an Unreal level.
 
 ## Build and open
 
-Working directory: repository root, with `UE_ROOT` already set.
+Working directory: repository root, after setup has saved `.ue_root` (or with a
+`UE_ROOT` override).
 
 ```bash
 ./build.sh
@@ -162,4 +163,3 @@ Saved/Logs/
 
 Capture errors use structured messages containing subsystem, resource, stage,
 cause, and effect. Dataset output is separate under `Saved/Datasets/`.
-

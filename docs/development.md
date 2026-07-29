@@ -22,10 +22,12 @@ DesktopPlatform, and the runtime module.
 Build from the repository root:
 
 ```bash
-export UE_ROOT=/path/to/UnrealEngine-5.7.x
-./setup.sh
+./setup.sh --ue-root /path/to/UnrealEngine-5.7.x
 ./build.sh
 ```
+
+After setup, `.ue_root` supplies the engine path. `UE_ROOT` remains available
+as a per-command override.
 
 The supported target clean is:
 

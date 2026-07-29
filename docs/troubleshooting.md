@@ -24,24 +24,25 @@ git lfs ls-files
 The final command should list the base-color and normal material assets below
 `Content/Materials/LunarRegolithShader/`.
 
-## `setup.sh` reports that `UE_ROOT` is not set or has the wrong version
+## A script reports that the Unreal Engine path is missing or has the wrong version
 
 **Likely cause**
 
-`UE_ROOT` is absent, points at the `Engine/` subdirectory, or does not describe
-Unreal Engine 5.7.x.
+Setup has not created `.ue_root`, the saved path is stale, or a `UE_ROOT`
+override points at the `Engine/` subdirectory or a version other than Unreal
+Engine 5.7.x.
 
 **Fix**
 
-Point it at the engine root and rerun setup:
+Point setup at the engine root again:
 
 ```bash
-export UE_ROOT=/path/to/UnrealEngine-5.7.x
-test -f "$UE_ROOT/Engine/Build/Build.version"
-./setup.sh
+test -f /path/to/UnrealEngine-5.7.x/Engine/Build/Build.version
+./setup.sh --ue-root /path/to/UnrealEngine-5.7.x
 ```
 
-The setup script reads the major and minor values and requires `5.7`.
+The setup script reads the major and minor values, requires `5.7`, and replaces
+the saved path only after validation.
 
 ## `setup.sh` reports a missing command
 
@@ -59,8 +60,9 @@ rerun `./setup.sh`. Exact distribution installation commands are
 
 **Likely cause**
 
-The repository is incomplete, `UE_ROOT` is invalid, or TempoROS setup did not
-create its Humble third-party includes, libraries, and binaries.
+The repository is incomplete, the configured Unreal Engine path is invalid, or
+TempoROS setup did not create its Humble third-party includes, libraries, and
+binaries.
 
 **Fix**
 
@@ -97,8 +99,7 @@ GenerateProjectFiles command.
 From the repository root:
 
 ```bash
-export UE_ROOT=/path/to/UnrealEngine-5.7.x
-./setup.sh
+./setup.sh --ue-root /path/to/UnrealEngine-5.7.x
 ./build.sh --clean
 ./open_project.sh
 ```

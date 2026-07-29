@@ -57,24 +57,24 @@ git lfs pull
 LunarSim-PG stores its large Unreal Engine assets with Git LFS. These commands
 download the actual assets instead of leaving Git LFS pointer files.
 
-### 2. Set the Unreal Engine path
+### 2. Prepare the project and save the Unreal Engine path
 
 ```bash
-export UE_ROOT=/path/to/UnrealEngine-5.7.x
+./setup.sh --ue-root /path/to/UnrealEngine-5.7.x
 ```
 
 Replace `/path/to/UnrealEngine-5.7.x` with the engine root containing
 `Engine/Build/Build.version`.
 
-### 3. Prepare, build, and open the project
+### 3. Build and open the project
 
 ```bash
-./setup.sh
 ./build.sh
 ./open_project.sh
 ```
 
-- `setup.sh` prepares dependencies and validates the Unreal Engine path.
+- `setup.sh` prepares dependencies, validates the Unreal Engine path, and saves
+  it for later terminal sessions.
 - `build.sh` compiles the Unreal Editor project.
 - `open_project.sh` opens `LunarSimPG.uproject` in Unreal Editor.
 

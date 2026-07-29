@@ -17,8 +17,12 @@ fi
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 PROJECT_FILE="$PROJECT_ROOT/LunarSimPG.uproject"
 
+if [[ -z "${UE_ROOT:-}" && -f "$PROJECT_ROOT/.ue_root" ]]; then
+    UE_ROOT="$(< "$PROJECT_ROOT/.ue_root")"
+fi
+
 [[ -n "${UE_ROOT:-}" ]] || {
-    printf 'Error: UE_ROOT is not set. Run ./setup.sh first.\n' >&2
+    printf 'Error: Unreal Engine path is not configured. Run ./setup.sh --ue-root PATH first.\n' >&2
     exit 1
 }
 
