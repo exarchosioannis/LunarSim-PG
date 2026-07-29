@@ -1,12 +1,22 @@
 #include "Robots/RoverVehicleControllerComponent.h"
 #include "simulator.h"
 
-#include "ChaosVehicleMovementComponent.h"
+#include "ChaosVehicleWheel.h"
+#include "ChaosWheeledVehicleMovementComponent.h"
 #include "GameFramework/Actor.h"
+#include "HAL/IConsoleManager.h"
 
 namespace
 {
 constexpr float CmPerSecondToKmh = 0.036f;
+constexpr float NewtonMetresToChaosTorqueScale = 100.0f;
+
+TAutoConsoleVariable<int32> CVarRoverWheelContactDiagnostics(
+	TEXT("lunarsim.Rover.WheelContactDiagnostics"),
+	0,
+	TEXT("Logs rover wheel contact transitions. 0: disabled, 1: enabled."),
+	ECVF_Default
+);
 }
 
 URoverVehicleControllerComponent::URoverVehicleControllerComponent()
@@ -21,6 +31,7 @@ void URoverVehicleControllerComponent::BeginPlay()
 	Super::BeginPlay();
 
 	ResolveVehicleMovement();
+	RefreshTickEnabled();
 }
 
 void URoverVehicleControllerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -37,6 +48,7 @@ void URoverVehicleControllerComponent::TickComponent(
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	UpdateWheelEngineInfluence();
 	ApplyDriveOutput();
 	ApplyIdleBrakeOutput();
 	ApplySteeringOutput(DeltaTime);
@@ -345,13 +357,13 @@ void URoverVehicleControllerComponent::ResolveVehicleMovement()
 		return;
 	}
 
-	VehicleMovement = Owner->FindComponentByClass<UChaosVehicleMovementComponent>();
+	VehicleMovement = Owner->FindComponentByClass<UChaosWheeledVehicleMovementComponent>();
 
 	if (!VehicleMovement && !bLoggedMissingMovement) {
 		UE_LOG(
 			LogLunarSimROS,
 			Warning,
-			TEXT("RoverVehicleControllerComponent: No ChaosVehicleMovementComponent found on %s. Add this component to the rover vehicle Pawn that owns the Chaos movement component."),
+			TEXT("RoverVehicleControllerComponent: No ChaosWheeledVehicleMovementComponent found on %s. Add this component to the rover vehicle Pawn that owns the Chaos wheeled movement component."),
 			*Owner->GetName()
 		);
 		bLoggedMissingMovement = true;
@@ -482,15 +494,92 @@ void URoverVehicleControllerComponent::ApplySteeringOutput(float DeltaTime)
 	VehicleMovement->SetSteeringInput(AppliedSteering);
 }
 
+void URoverVehicleControllerComponent::UpdateWheelEngineInfluence()
+{
+	if (!HasVehicleMovement()) {
+		return;
+	}
+
+	const int32 WheelCount = VehicleMovement->GetNumWheels();
+	if (WheelContactStates.Num() != WheelCount) {
+		WheelContactStates.Init(EWheelContactState::Unknown, WheelCount);
+	}
+
+	const bool bLogDiagnostics = CVarRoverWheelContactDiagnostics.GetValueOnGameThread() != 0;
+
+	for (int32 WheelIndex = 0; WheelIndex < WheelCount; ++WheelIndex) {
+		const FWheelStatus& WheelState = VehicleMovement->GetWheelState(WheelIndex);
+		if (!WheelState.bIsValid) {
+			continue;
+		}
+
+		const EWheelContactState NewContactState = WheelState.bInContact
+			? EWheelContactState::Grounded
+			: EWheelContactState::Airborne;
+		const EWheelContactState PreviousContactState = WheelContactStates[WheelIndex];
+		const bool bContactStateChanged = PreviousContactState != NewContactState;
+		UChaosVehicleWheel* Wheel = VehicleMovement->Wheels.IsValidIndex(WheelIndex)
+			? VehicleMovement->Wheels[WheelIndex].Get()
+			: nullptr;
+
+		if (bContactStateChanged) {
+			VehicleMovement->SetAffectedByEngine(WheelIndex, WheelState.bInContact);
+
+			// UE 5.7.4 assigns motor torque from the wheel setup, so the runtime
+			// engine flag alone does not authoritatively suppress airborne drive.
+			VehicleMovement->SetTorqueCombineMethod(
+				WheelState.bInContact
+					? (Wheel ? Wheel->ExternalTorqueCombineMethod : ETorqueCombineMethod::None)
+					: ETorqueCombineMethod::Override,
+				WheelIndex
+			);
+			WheelContactStates[WheelIndex] = NewContactState;
+		}
+
+		float AirborneDampingTorqueNm = 0.0f;
+		if (!WheelState.bInContact) {
+			if (AirborneWheelSpinDecayTimeSeconds > KINDA_SMALL_NUMBER && Wheel) {
+				const float WheelAngularVelocity = Wheel->GetWheelAngularVelocity();
+				const float WheelInertia = 0.5f * Wheel->WheelMass * FMath::Square(Wheel->WheelRadius);
+				AirborneDampingTorqueNm = -WheelAngularVelocity * WheelInertia
+					/ (AirborneWheelSpinDecayTimeSeconds * NewtonMetresToChaosTorqueScale);
+			}
+
+			VehicleMovement->SetDriveTorque(AirborneDampingTorqueNm, WheelIndex);
+		}
+
+		if (bLogDiagnostics && bContactStateChanged) {
+			UE_LOG(
+				LogLunarSimROS,
+				Log,
+				TEXT("Rover wheel contact: wheel=%d, state=%s, engine=%s, drive_torque=%.3f Nm, angular_velocity=%.3f rad/s, airborne_damping_torque=%.3f Nm."),
+				WheelIndex,
+				WheelState.bInContact ? TEXT("grounded") : TEXT("airborne"),
+				WheelState.bInContact ? TEXT("enabled") : TEXT("disabled"),
+				WheelState.DriveTorque,
+				Wheel ? Wheel->GetWheelAngularVelocity() : 0.0f,
+				AirborneDampingTorqueNm
+			);
+		}
+	}
+}
+
 void URoverVehicleControllerComponent::RefreshTickEnabled()
 {
+	const bool bNeedsWheelContactTick = VehicleMovement != nullptr;
 	const bool bNeedsDriveTick = ActiveThrottleDirection != 0 && CurrentThrottleInput > KINDA_SMALL_NUMBER;
 	const bool bNeedsSteeringTick = bUseSteeringSmoothing
 		? !FMath::IsNearlyZero(TargetSteeringInput) || !FMath::IsNearlyZero(SmoothedSteeringInput)
 		: !FMath::IsNearlyZero(TargetSteeringInput);
 	const bool bNeedsIdleBrakeTick = bIdleBrakeActive && bUseIdleBrake;
 
-	SetComponentTickEnabled(bNeedsDriveTick || bNeedsSteeringTick || bSpeedLimitBrakeActive || bNeedsIdleBrakeTick);
+	SetComponentTickEnabled(
+		bNeedsWheelContactTick
+		|| bNeedsDriveTick
+		|| bNeedsSteeringTick
+		|| bSpeedLimitBrakeActive
+		|| bNeedsIdleBrakeTick
+	);
 }
 
 bool URoverVehicleControllerComponent::ShouldApplyIdleBrake() const

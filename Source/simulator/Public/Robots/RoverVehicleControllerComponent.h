@@ -5,7 +5,7 @@
 
 #include "RoverVehicleControllerComponent.generated.h"
 
-class UChaosVehicleMovementComponent;
+class UChaosWheeledVehicleMovementComponent;
 
 UENUM(BlueprintType)
 enum class ERoverControlMode : uint8
@@ -131,9 +131,24 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rover Vehicle Controller|Control")
 	ERoverControlMode ControlMode = ERoverControlMode::Manual;
 
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadWrite,
+		Category = "Rover Vehicle Controller|Wheels",
+		meta = (ClampMin = "0.0", UIMin = "0.0", Units = "s")
+	)
+	float AirborneWheelSpinDecayTimeSeconds = 0.0f;
+
 private:
+	enum class EWheelContactState : uint8
+	{
+		Unknown,
+		Airborne,
+		Grounded
+	};
+
 	UPROPERTY(Transient)
-	UChaosVehicleMovementComponent* VehicleMovement = nullptr;
+	UChaosWheeledVehicleMovementComponent* VehicleMovement = nullptr;
 
 	bool bLoggedMissingMovement = false;
 	bool bSpeedLimitBrakeActive = false;
@@ -144,6 +159,7 @@ private:
 	int32 LastRequestedGear = 0;
 	int32 ActiveThrottleDirection = 0;
 	float CoastBrakeSpeedLimitKmh = 0.0f;
+	TArray<EWheelContactState> WheelContactStates;
 
 	bool CanAcceptManualInput() const;
 	bool CanAcceptCmdVelInput() const;
@@ -160,6 +176,7 @@ private:
 	void ApplyDriveOutput();
 	void ApplyIdleBrakeOutput();
 	void ApplySteeringOutput(float DeltaTime);
+	void UpdateWheelEngineInfluence();
 	void RefreshTickEnabled();
 	bool ShouldApplyIdleBrake() const;
 	float CalculateSpeedLimitedThrottle(float DesiredThrottle, float SpeedKmh, float SpeedLimitKmh, float& OutBrakeInput);
