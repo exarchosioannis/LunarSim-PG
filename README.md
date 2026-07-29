@@ -89,11 +89,11 @@ Once the project opens, choose one of the included levels from
 
 | Level | Description |
 | --- | --- |
-| `apollo17` | _[Add a short description of the terrain and its main characteristics.]_ |
-| `highland` | _[Add a short description of the terrain and its main characteristics.]_ |
-| `mare` | _[Add a short description of the terrain and its main characteristics.]_ |
-| `fresh_crater` | _[Add a short description of the terrain and its main characteristics.]_ |
-| `custom` | _[Add a short description, for example a configurable terrain with a dense rock field.]_ |
+| `apollo17` | Apollo 17-inspired valley and highland terrain combining sloped landforms, impact craters, and scattered boulders. Intended for representative rover visual-navigation experiments. |
+| `highland` | Rugged, heavily cratered highland terrain with older, bigger, more degraded craters, pronounced relief, and increased surface roughness. Suitable for challenging perception and navigation tests.|
+| `mare` | Relatively smooth, low-relief basaltic mare terrain with fewer craters and sparse rocks. Provides a simpler baseline environment with broad, weakly textured surfaces. |
+| `fresh_crater` | Terrain dominated by a comparatively fresh impact crater with a sharp rim, visible ejecta structure, and concentrated blocky rocks. Intended for obstacle detection and traversability experiments. |
+| `custom` | A more densely populated terrain with increased crater and rock abundance, creating a visually richer and more obstacle-heavy environment for general testing and demonstrations. |
 
 You can also create your own lunar terrain by following the
 [terrain-generation guide](docs/terrain-generation.md).
