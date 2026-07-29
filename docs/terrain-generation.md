@@ -150,12 +150,13 @@ Tools/Terrain_Generation/
 | `source_heightmap.json` | Linkage to the source heightmap package |
 
 The heightmap coordinate description is top-left based, while crater and
-rockfield X/Y coordinates are centered about the map origin. See
-[Coordinate frames](coordinate-frames.md).
+rockfield X/Y coordinates are centered about the map origin.
 
 The analysis dialogs can create elevation and slope visualization PNGs from a heightmap, plus crater/ejecta-zone and rock-density visualization PNGs from a rockfield. They also write metrics, summaries, and CSV files under analysis_results/.
 
-These are offline analysis products, not the simulator dataset modalities generated from the Unreal scene during Play In Editor and defined in [Output format](output-format.md)
+These are offline analysis products, not the simulator data generated from the
+Unreal scene during Play In Editor and described in
+[Data outputs and ROS 2](data-and-ros2.md).
 
 ## Import into Unreal
 

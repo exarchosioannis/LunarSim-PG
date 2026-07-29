@@ -129,11 +129,60 @@ Depending on your settings, LunarSim-PG can save ground-truth data and publish
 stereo images through ROS 2. Each capture is stored in its own
 `Session_NNN` directory.
 
-For more details, see:
+## Data generation and ROS 2
 
-- [Dataset generation](docs/dataset-generation.md)
-- [Output formats](docs/output-format.md)
-- [ROS 2 interface](docs/ros2-interface.md)
+LunarSim-PG supports two complementary ways to work with simulation data. Save
+reference data directly to disk for offline use, work with live ROS 2 streams,
+or use both during the same run.
+
+| Workflow | What you get |
+| --- | --- |
+| Dataset generation | Ground-truth images, trajectories, metadata, manifests, and terrain maps saved under `Saved/Datasets/` |
+| ROS 2 operation | Stereo cameras, IMU, rover ground truth, TF, clock, maps, capture control, and `cmd_vel`, with optional rosbag recording |
+
+### Save data directly to disk
+
+A capture session can contain:
+
+- ground-truth RGB aligned with the left/reference camera, packed depth,
+  segmentation images with JSON legends, and per-frame bounding boxes;
+- rover, left-camera, and right-camera trajectories, when their pose sources
+  are enabled and available;
+- a manifest that connects output files to their offline frame index and
+  simulation timestamp;
+- session metadata describing the level, enabled outputs, camera calibration,
+  frame names, capture rate, and map paths;
+- run-level occupancy maps for free, occupied, and unknown cells, elevation
+  maps for terrain height, and slope maps for local terrain slope.
+
+The frame index and timestamp make the trajectories useful as reference data
+for visual odometry, SLAM, localization, and trajectory evaluation. Use the
+ground-truth maps as references for mapping, elevation reconstruction,
+obstacle-map, or traversability evaluation; LunarSim-PG does not automatically
+score an estimated result against them.
+
+### Work live through ROS 2
+
+The live interface groups stereo images and calibration, IMU data, rover
+ground-truth pose, odometry and path, occupancy and elevation maps, TF, and
+simulation time. It also accepts rover commands through `/cmd_vel` and capture
+commands through `/capture/control`.
+
+Live ROS streams are not all duplicated in the offline session folder. Record
+a rosbag when you need the stereo pair, IMU, TF, clock, or other selected
+topics after the simulation ends.
+
+### Built with
+
+- [UnrealGT](https://github.com/unrealgt/unrealgt) provides ground-truth RGB,
+  depth, segmentation, and bounding-box generation. LunarSim-PG adapts it for
+  session-organized output, metadata, shared frame and timestamp association,
+  enabled-output selection, camera warm-up, and protection against late writes
+  from an ended capture.
+- [TempoROS](https://github.com/tempo-sim/TempoROS) provides the bridge between
+  Unreal Engine and ROS 2.
+
+[Explore the available data and ROS 2 interface](docs/data-and-ros2.md).
 
 ## Documentation
 
@@ -141,9 +190,7 @@ For more details, see:
 - [Installation](docs/installation.md)
 - [Simulator configuration](docs/configuration.md)
 - [Terrain generation](docs/terrain-generation.md)
-- [ROS 2 interface](docs/ros2-interface.md)
-- [Dataset generation](docs/dataset-generation.md)
-- [Output formats](docs/output-format.md)
+- [Data outputs and ROS 2](docs/data-and-ros2.md)
 - [Coordinate frames](docs/coordinate-frames.md)
 
 ## Current scope

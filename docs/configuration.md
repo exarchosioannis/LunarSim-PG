@@ -77,7 +77,7 @@ rover.
 
 In **WASD** mode, use `W` to drive forward, `S` to brake or reverse, and `A`
 and `D` to steer. For ROS 2 control commands and limits, see the
-[ROS 2 interface](ros2-interface.md).
+[Data outputs and ROS 2](data-and-ros2.md) guide.
 
 ### Apply Settings
 
