@@ -27,6 +27,8 @@ research.
   timestamp for perception, navigation, mapping, and dataset-generation
   workflows.
 
+  ![Ground-truth dataset generation preview](docs/images/dataset-generation/dataset_preview.gif)
+
 - **Procedural lunar terrain generation** — Generate reproducible terrain from
   regional profiles and random seeds, with configurable crater populations,
   degradation states, rock abundance, and crater-coupled rock placement.
