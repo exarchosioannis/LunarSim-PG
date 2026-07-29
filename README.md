@@ -103,10 +103,10 @@ for your experiment.
 
 For example, you can select:
 
-- which ground-truth outputs to generate;
-- whether to publish stereo images through ROS 2;
-- pose, trajectory, and timing outputs;
-- rover control through WASD or ROS 2 `cmd_vel`.
+- which ground-truth outputs to generate
+- whether to publish stereo images through ROS 2
+- pose, trajectory, and timing outputs
+- rover control through WASD or ROS 2 `cmd_vel`
 
 When you are ready, press **Apply Settings**.
 
