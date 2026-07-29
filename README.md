@@ -145,21 +145,20 @@ or use both during the same run.
 A capture session can contain:
 
 - ground-truth RGB aligned with the left/reference camera, packed depth,
-  segmentation images with JSON legends, and per-frame bounding boxes;
+  segmentation images with JSON legends, and per-frame bounding boxes.
 - rover, left-camera, and right-camera trajectories, when their pose sources
-  are enabled and available;
+  are enabled and available.
 - a manifest that connects output files to their offline frame index and
-  simulation timestamp;
+  simulation timestamp.
 - session metadata describing the level, enabled outputs, camera calibration,
   frame names, capture rate, and map paths;
 - run-level occupancy maps for free, occupied, and unknown cells, elevation
   maps for terrain height, and slope maps for local terrain slope.
 
-The frame index and timestamp make the trajectories useful as reference data
+The **frame index** and **timestamp** make the trajectories useful as reference data
 for visual odometry, SLAM, localization, and trajectory evaluation. Use the
 ground-truth maps as references for mapping, elevation reconstruction,
-obstacle-map, or traversability evaluation; LunarSim-PG does not automatically
-score an estimated result against them.
+obstacle-map, or traversability evaluation.
 
 ### Work live through ROS 2
 
@@ -175,10 +174,9 @@ topics after the simulation ends.
 ### Built with
 
 - [UnrealGT](https://github.com/unrealgt/unrealgt) provides ground-truth RGB,
-  depth, segmentation, and bounding-box generation. LunarSim-PG adapts it for
-  session-organized output, metadata, shared frame and timestamp association,
-  enabled-output selection, camera warm-up, and protection against late writes
-  from an ended capture.
+  depth, segmentation, and bounding-box generation. LunarSim-PG uses a modified
+  version with asynchronous GPU readback, camera warm-up, and frame/timestamp
+  association for synchronized capture.
 - [TempoROS](https://github.com/tempo-sim/TempoROS) provides the bridge between
   Unreal Engine and ROS 2.
 
