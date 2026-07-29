@@ -31,6 +31,8 @@ research.
   regional profiles and random seeds, with configurable crater populations,
   degradation states, rock abundance, and crater-coupled rock placement.
 
+  ![Watch the terrain-generation demonstration](docs/images/terrain-generation/four_terrain_pipeline.gif)
+
 ## Requirements
 
 | Component | Requirement |

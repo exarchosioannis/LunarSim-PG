@@ -386,7 +386,7 @@ PRESET_DEFAULTS = {
             1.3, 1.9, 2.2, 3.0,
             1.7, 0.25, 1.10, 0.75, 0.25,
             0.40, 5.0, 2.0, "rim_proximal",
-            False, 2, 3.0, 5.0, 1.0, 3.5, 60.0, 1.0,
+            False, 15, 10.0, 6.0, 1.5, 8.0, 60.0, 1.0,
             "MareBasalt", "RegolithCovered", "MixedBreccia", "FreshEjecta"
         ),
     },
@@ -409,7 +409,7 @@ PRESET_DEFAULTS = {
             1.2, 1.5, 2.1, 3.2,
             1.8, 0.35, 1.25, 0.75, 0.20,
             0.70, 8.0, 1.8, "rim_proximal",
-            False, 6, 4.0, 4.0, 1.5, 8.6, 60.0, 1.0,
+            False, 16, 10.0, 6.0, 2.0, 12.0, 60.0, 1.0,
             "MixedBreccia", "RegolithCovered", "MixedBreccia", "FreshEjecta"
         ),
     },
@@ -432,7 +432,7 @@ PRESET_DEFAULTS = {
             1.1, 1.6, 2.0, 2.5,
             1.4, 0.45, 1.25, 0.90, 0.35,
             0.65, 8.0, 5, "rim_proximal",
-            False, 8, 5.0, 5.0, 1.5, 12.0, 60.0, 1.0,
+            False, 24, 12.0, 8.0, 2.5, 22.0, 60.0, 1.0,
             "HighlandAnorthosite", "RegolithCovered", "MixedBreccia", "FreshEjecta"
         ),
     },
@@ -455,7 +455,7 @@ PRESET_DEFAULTS = {
             1.2, 1.4, 1.8, 2.4,
             1.4, 0.30, 1.35, 0.95, 0.35,
             0.75, 10.0, 2.5, "all_ejecta",
-            False, 14, 6.0, 6.0, 1.5, 14.2, 60.0, 1.0,
+            False, 30, 14.0, 8.0, 2.5, 22.0, 60.0, 1.0,
             "FreshEjecta", "FreshEjecta", "MixedBreccia", "FreshEjecta"
         ),
     },
@@ -481,7 +481,7 @@ PRESET_DEFAULTS = {
             1.1, 1.6, 2.0, 2.5,
             1.4, 0.45, 1.25, 0.90, 0.35,
             0.70, 10.0, 5.0, "rim_proximal",
-            True, 40, 12.0, 6.0, 1.5, 20.0, 60.0, 1.0,
+            True, 50, 18.0, 10.0, 3.0, 30.0, 60.0, 1.0,
             "HighlandAnorthosite", "RegolithCovered", "MixedBreccia", "FreshEjecta"
         ),
     },

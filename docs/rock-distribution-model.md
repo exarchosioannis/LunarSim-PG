@@ -136,7 +136,7 @@ The radial boundaries and fractions are procedural controls informed by the
 observed concentration of large rocks near crater rims and the decline in rock
 size and abundance with distance.
 
-![Crater-relative rock-placement zones](images/rock-placement-zones.png)
+![Crater-relative rock-placement zones](images/terrain-generation/rock-placement-zones.png)
 
 ### GUI zone defaults
 
@@ -176,7 +176,7 @@ N(>=d) proportional to d^-beta
 where `beta` is `power_law_exponent`. Larger exponents produce a population more
 strongly dominated by small rocks.
 
-![Distance- and freshness-dependent rock-size limit](images/rock-size-distance-trend.png)
+![Distance- and freshness-dependent rock-size limit](images/terrain-generation/rock-size-distance-trend.png)
 
 ## Crater-owned clumps
 
@@ -213,7 +213,7 @@ rocks. Converting those abundance parameters into `background_density_per_m2`
 is procedural, so this field should be treated as a generator count-density
 control rather than a direct copy of the published abundance parameter `k`.
 
-![Components of a generated rockfield](images/rock-population-components.png)
+![Components of a generated rockfield](images/terrain-generation/rock-population-components.png)
 
 ## Optional independent big-rock clumps
 

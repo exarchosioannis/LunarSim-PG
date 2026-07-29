@@ -30,7 +30,7 @@ The generated elevation field is built in the following order:
 The seed controls every stochastic stage. Reusing the same code, complete
 settings, and seed produces the same output.
 
-[Watch the terrain-generation demonstration](images/four_terrain_pipeline.mp4)
+![Watch the terrain-generation demonstration](images/terrain-generation/four_terrain_pipeline.gif)
 
 ## Base floor
 
@@ -55,7 +55,7 @@ These features provide regional relief such as subdued rises, basins, and
 highland-like forms. They are explicitly an art-direction layer; they do not
 model a named geological unit or an impact basin formation process.
 
-![Multiscale base relief and broad landforms](images/terrain-base-relief.png)
+![Multiscale base relief and broad landforms](images/terrain-generation/terrain-base-relief.png)
 
 ## Crater size-frequency distribution
 
@@ -80,7 +80,7 @@ law. Crater centers are uniform over the map.
 `K` controls abundance and `b` controls the relative proportion of small and
 large craters. A larger `b` produces proportionally more small craters.
 
-![Expected crater counts from the GUI size-frequency segments](images/terrain-crater-size-frequency.png)
+![Expected crater counts from the GUI size-frequency segments](images/terrain-generation/terrain-crater-size-frequency.png)
 
 ### GUI crater segments
 
@@ -120,7 +120,7 @@ This part is constrained by the small-crater morphology work of Mahanti et al.
 The exact blending weights, large-crater taper, and final bounds are
 implementation choices.
 
-![Effect of crater degradation](images/terrain-degradation-effect.png)
+![Effect of crater degradation](images/terrain-generation/terrain-generation/terrain-degradation-effect.png)
 
 ## Crater integration
 
@@ -148,10 +148,10 @@ The bowl construction, rim Gaussian, ejecta decay, blend masks, and rim
 irregularity harmonics are procedural geometry constrained by observed lunar
 crater behavior. They are not a hydrocode impact solution.
 
-![Rim irregularity](images/terrain-rim-irregularity-outlines.png)
-![Rim width](images/terrain-rim-width-effect.png)
-![Ejecta decay](images/terrain-ejecta-decay-effect.png)
-![Crater parameter profile comparison](images/terrain-parameter-centerline-overlays.png)
+![Rim irregularity](images/terrain-generation/terrain-rim-irregularity-outlines.png)
+![Rim width](images/terrain-generation/terrain-rim-width-effect.png)
+![Ejecta decay](images/terrain-generation/terrain-ejecta-decay-effect.png)
+![Crater parameter profile comparison](images/terrain-generation/terrain-parameter-centerline-overlays.png)
 
 
 ## Slope-dependent crater retention
