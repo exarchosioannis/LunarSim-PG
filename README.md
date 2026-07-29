@@ -49,7 +49,7 @@ troubleshooting.
 
 ```bash
 git lfs install
-git clone https://github.com/exarchosgiannis/LunarSim-PG.git
+git clone https://github.com/exarchosioannis/LunarSim-PG.git
 cd LunarSim-PG
 git lfs pull
 ```
@@ -78,6 +78,62 @@ Replace `/path/to/UnrealEngine-5.7.x` with the engine root containing
 - `build.sh` compiles the Unreal Editor project.
 - `open_project.sh` opens `LunarSimPG.uproject` in Unreal Editor.
 
+## How to use LunarSim-PG
+
+### 1. Choose a lunar environment
+
+Once the project opens, choose one of the included levels from
+`Content/Levels/`:
+
+| Level | Description |
+| --- | --- |
+| `apollo17` | _[Add a short description of the terrain and its main characteristics.]_ |
+| `highland` | _[Add a short description of the terrain and its main characteristics.]_ |
+| `mare` | _[Add a short description of the terrain and its main characteristics.]_ |
+| `fresh_crater` | _[Add a short description of the terrain and its main characteristics.]_ |
+| `custom` | _[Add a short description, for example a configurable terrain with a dense rock field.]_ |
+
+You can also create your own lunar terrain by following the
+[terrain-generation guide](docs/terrain-generation.md).
+
+### 2. Configure your simulation
+
+Open **Window > Simulator > Simulator Config** and choose the settings you need
+for your experiment.
+
+For example, you can select:
+
+- which ground-truth outputs to generate;
+- whether to publish stereo images through ROS 2;
+- pose, trajectory, and timing outputs;
+- rover control through WASD or ROS 2 `cmd_vel`.
+
+When you are ready, press **Apply Settings**.
+
+For a full explanation of every option, see the
+[configuration guide](docs/configuration.md).
+
+### 3. Start the simulation
+
+Start **Play In Editor** to begin the simulation.
+
+LunarSim-PG creates a new run directory under `Saved/Datasets/`, where your
+selected configuration and generated outputs are organized.
+
+### 4. Start and stop capture
+
+With the Play In Editor viewport active, press `C` whenever you want to start
+capturing data. Press `C` again to stop.
+
+Depending on your settings, LunarSim-PG can save ground-truth data and publish
+stereo images through ROS 2. Each capture is stored in its own
+`Session_NNN` directory.
+
+For more details, see:
+
+- [Dataset generation](docs/dataset-generation.md)
+- [Output formats](docs/output-format.md)
+- [ROS 2 interface](docs/ros2-interface.md)
 
 ## Documentation
 
