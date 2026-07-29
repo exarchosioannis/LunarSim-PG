@@ -1,76 +1,28 @@
 #!/usr/bin/env python3
 """
-MoonSim rockfield analysis.
+LunarSim-PG rockfield analysis.
 
-This script analyzes one generated MoonSim rockfield. It is intended for the
-asset-generator GUI and for direct command-line use.
-
-Required inputs
----------------
-1. Matching heightmap metadata JSON, used for physical map dimensions.
-2. Matching generated crater catalog ending in *_rockfield_craters.json.
-3. At least one rockfield input:
-   - a folder containing rock_candidates.json, rock_positions.json,
-     rock_instances.json and/or rock_metadata.csv; or
-   - an explicit generic/offline/Unreal rock JSON; or
-   - explicit paths to the individual files.
-
-Optional inputs
----------------
-- Matching heightmap PNG/R16/RAW. When supplied, hillshade is used behind the
-  ejecta-zone, density, and large-rock maps.
-- Matching rock-settings JSON. When supplied, the exact crater-interior, rim,
-  proximal-ejecta, and distal-ejecta bounds are used. Otherwise, preset-based
-  defaults are inferred from the metadata and filenames.
-
-Main outputs
-------------
-01_rockfield_overview.png
-    Rock size distribution, crater-owned rocks by zone, nearest-neighbor
-    distribution, and rock size versus normalized source-crater radius.
-
-02_crater_ejecta_zones.png
-    Source craters and dominant crater/ejecta placement zones.
-
-03_rocks_grouped_by_source_crater.png
-    Rocks grouped by stored dominant_crater_index for source craters with
-    diameter D >= 5 m by default.
-
-04_rock_density_field.png
-    Smoothed rock-density field in rocks per square metre.
-
-05_large_rock_map.png
-    Large rocks drawn as true-diameter circles over the map.
-
-rockfield_analysis.json
-rockfield_metrics.csv
-merged_rocks.csv
-rockfield_analysis_summary.txt
-
-Typical call
-------------
-python3 analyze_rockfield.py \
-  --rockfield-dir "/path/to/generated/rockfield_folder" \
-  --metadata "/path/to/heightmap_metadata.json" \
-  --crater-json "/path/to/map_rockfield_craters.json" \
-  --heightmap "/path/to/heightmap.png" \
-  --rock-settings "/path/to/run_rock_settings.json" \
-  --out-dir "/path/to/analysis_results"
-
-Dependencies
-------------
-Python 3, numpy, Pillow, matplotlib, scipy
+The GUI-facing script analyzes generated rockfield data, crater ownership, ejecta
+zones, rock sizes, and spatial distributions, and writes portable timestamped
+analysis products.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
+import logging
 import math
+import os
+import platform
 import re
+import subprocess
 import sys
 from collections import Counter
+from datetime import datetime, timezone
+from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -91,6 +43,108 @@ except ImportError as exc:
         "This script requires scipy. Install dependencies with:\n"
         "  python3 -m pip install numpy pillow matplotlib scipy"
     ) from exc
+
+
+
+PROJECT_NAME = "LunarSim-PG"
+SCRIPT_NAME = "rockfield_analysis"
+SCRIPT_VERSION = "2.0.0"
+LOGGER = logging.getLogger(SCRIPT_NAME)
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def utc_file_timestamp(value: datetime) -> str:
+    return value.strftime("%Y%m%d_%H%M%S")
+
+
+def package_version(name: str) -> str | None:
+    try:
+        return importlib_metadata.version(name)
+    except importlib_metadata.PackageNotFoundError:
+        return None
+
+
+def git_commit() -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "HEAD"],
+            check=True, capture_output=True, text=True, timeout=3,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return None
+    value = completed.stdout.strip()
+    return value or None
+
+
+def build_provenance(generated_at: datetime) -> Dict[str, object]:
+    return {
+        "project": PROJECT_NAME,
+        "analysis": SCRIPT_NAME,
+        "analysis_version": SCRIPT_VERSION,
+        "generated_utc": generated_at.isoformat().replace("+00:00", "Z"),
+        "git_commit": git_commit(),
+        "runtime": {
+            "python": platform.python_version(),
+            "numpy": np.__version__,
+            "Pillow": package_version("Pillow"),
+            "matplotlib": matplotlib.__version__,
+            "scipy": package_version("scipy"),
+        },
+    }
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def portable_path(path: str | Path | None, base_dir: Path) -> str | None:
+    if path is None:
+        return None
+    relative = os.path.relpath(
+        Path(path).expanduser().resolve(),
+        start=base_dir.expanduser().resolve(),
+    )
+    return Path(relative).as_posix()
+
+
+def temporary_path(path: Path) -> Path:
+    return path.with_name(f".{path.stem}.tmp{path.suffix}")
+
+
+def atomic_write_json(path: Path, payload: object) -> None:
+    temp = temporary_path(path)
+    try:
+        with temp.open("w", encoding="utf-8") as file:
+            json.dump(payload, file, indent=2, allow_nan=False)
+            file.write("\n")
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    temp = temporary_path(path)
+    try:
+        temp.write_text(text, encoding="utf-8")
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def atomic_savefig(fig: plt.Figure, path: Path, **kwargs: Any) -> None:
+    temp = temporary_path(path)
+    try:
+        fig.savefig(temp, format=path.suffix.lstrip("."), **kwargs)
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 # -----------------------------------------------------------------------------
@@ -541,10 +595,21 @@ def read_craters(path: Path) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
             continue
         craters.append({
             "list_index": list_index,
+            "crater_id": safe_int(
+                crater.get(
+                    "crater_id",
+                    crater.get(
+                        "crater_index", crater.get("index", list_index)
+                    ),
+                ),
+                list_index,
+            ),
             "crater_index": safe_int(
                 crater.get(
-                    "crater_index",
-                    crater.get("index", list_index),
+                    "crater_id",
+                    crater.get(
+                        "crater_index", crater.get("index", list_index)
+                    ),
                 ),
                 list_index,
             ),
@@ -628,7 +693,9 @@ def crater_index_lookup(
     lookup: Dict[int, int] = {}
     for list_index, crater in enumerate(craters):
         lookup[list_index] = list_index
-        explicit = safe_int(crater.get("crater_index"), list_index)
+        explicit = safe_int(
+            crater.get("crater_id", crater.get("crater_index")), list_index
+        )
         lookup[explicit] = list_index
     return lookup
 
@@ -691,10 +758,22 @@ def canonical_rock_record(
             )
             or ""
         ),
+        "dominant_crater_id": safe_int(
+            rock.get(
+                "dominant_crater_id",
+                rock.get(
+                    "dominant_crater_index",
+                    rock.get("source_crater_index"),
+                ),
+            )
+        ),
         "dominant_crater_index": safe_int(
             rock.get(
-                "dominant_crater_index",
-                rock.get("source_crater_index"),
+                "dominant_crater_id",
+                rock.get(
+                    "dominant_crater_index",
+                    rock.get("source_crater_index"),
+                ),
             )
         ),
         "distance_to_dominant_crater_center_m": safe_float(
@@ -779,7 +858,7 @@ def value_is_missing(key: str, value: Any) -> bool:
             and stripped.lower() in {"none", "nan", "unknown"}
         ):
             return True
-    if key in {"dominant_crater_index", "clump_id"}:
+    if key in {"dominant_crater_id", "dominant_crater_index", "clump_id"}:
         try:
             return int(value) < 0
         except (TypeError, ValueError):
@@ -796,17 +875,30 @@ def value_is_missing(key: str, value: Any) -> bool:
     return False
 
 
+def values_equivalent(first: Any, second: Any) -> bool:
+    if first == second:
+        return True
+    try:
+        first_number = float(first)
+        second_number = float(second)
+    except (TypeError, ValueError):
+        return str(first) == str(second)
+    if not np.isfinite(first_number) or not np.isfinite(second_number):
+        return False
+    return math.isclose(
+        first_number, second_number, rel_tol=1.0e-9, abs_tol=1.0e-9
+    )
+
+
 def merge_rock_rows(
     *groups: Sequence[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     merged: Dict[int, Dict[str, Any]] = {}
+    conflicts: List[Dict[str, Any]] = []
 
     for group in groups:
         for row in group:
-            instance_id = safe_int(
-                row.get("instance_id"),
-                len(merged),
-            )
+            instance_id = safe_int(row.get("instance_id"), len(merged))
             if instance_id not in merged:
                 merged[instance_id] = {
                     "instance_id": instance_id,
@@ -815,10 +907,8 @@ def merge_rock_rows(
 
             destination = merged[instance_id]
             source_file = row.get("source_file")
-            if (
-                source_file
-                and source_file
-                not in destination.setdefault("source_files", [])
+            if source_file and source_file not in destination.setdefault(
+                "source_files", []
             ):
                 destination["source_files"].append(source_file)
 
@@ -830,16 +920,25 @@ def merge_rock_rows(
                     continue
 
                 old_value = destination.get(key)
-                if (
-                    value_is_missing(key, value)
-                    and not value_is_missing(key, old_value)
+                if value_is_missing(key, value):
+                    if not value_is_missing(key, old_value):
+                        continue
+                elif (
+                    not value_is_missing(key, old_value)
+                    and not values_equivalent(old_value, value)
                 ):
-                    continue
+                    conflicts.append({
+                        "instance_id": instance_id,
+                        "field": key,
+                        "previous_value": json_safe(old_value),
+                        "incoming_value": json_safe(value),
+                        "incoming_source": source_file,
+                    })
                 destination[key] = value
 
             destination["instance_id"] = instance_id
 
-    return [merged[key] for key in sorted(merged)]
+    return [merged[key] for key in sorted(merged)], conflicts
 
 
 def discover_rock_files(
@@ -882,7 +981,9 @@ def discover_rock_files(
     return discovered
 
 
-def load_rocks(args: argparse.Namespace) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+def load_rocks(
+    args: argparse.Namespace,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any], List[Dict[str, Any]]]:
     rockfield_dir = (
         Path(args.rockfield_dir).expanduser().resolve()
         if args.rockfield_dir
@@ -926,7 +1027,15 @@ def load_rocks(args: argparse.Namespace) -> Tuple[List[Dict[str, Any]], Dict[str
         read_rocks_json(explicit_or_discovered["generic_json"]),
     ]
 
-    rocks = merge_rock_rows(*groups)
+    rocks, conflicts = merge_rock_rows(*groups)
+    if conflicts and args.merge_conflict_policy == "error":
+        first = conflicts[0]
+        raise ValueError(
+            "Conflicting rock records were found; first conflict: "
+            f"instance {first['instance_id']} field {first['field']}"
+        )
+    if conflicts and args.merge_conflict_policy == "warn":
+        LOGGER.warning("Detected %d conflicting rock fields; later inputs won", len(conflicts))
     input_files = {
         key: str(path) if path is not None else None
         for key, path in explicit_or_discovered.items()
@@ -941,7 +1050,7 @@ def load_rocks(args: argparse.Namespace) -> Tuple[List[Dict[str, Any]], Dict[str
             "explicit rock JSON/CSV input."
         )
 
-    return rocks, input_files
+    return rocks, input_files, conflicts
 
 
 def rock_arrays_all(
@@ -1510,8 +1619,8 @@ def build_metrics(
     )
 
     return {
-        "format": "MoonSimRockfieldAnalysis",
-        "version": 1,
+        "format": "LunarSimRockfieldAnalysis",
+        "format_version": 2,
         "terrain": terrain_name,
         "inputs": input_files,
         "map": {
@@ -1596,10 +1705,15 @@ def write_metrics_csv(
         for key, value in flatten_dict(metrics)
         if key.split(".", 1)[0] not in excluded_roots
     ]
-    with path.open("w", encoding="utf-8", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow(["metric", "value"])
-        writer.writerows(rows)
+    temp = temporary_path(path)
+    try:
+        with temp.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["metric", "value"])
+            writer.writerows(rows)
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 def write_merged_rocks_csv(
@@ -1609,35 +1723,25 @@ def write_merged_rocks_csv(
     zone_labels: np.ndarray,
 ) -> None:
     preferred = [
-        "instance_id",
-        "x_m",
-        "y_m",
-        "diameter_m",
-        "size_class",
-        "material_type",
-        "source_type",
-        "crater_zone",
-        "analysis_crater_zone",
-        "dominant_crater_index",
+        "instance_id", "x_m", "y_m", "diameter_m",
+        "size_class", "material_type", "source_type",
+        "crater_zone", "analysis_crater_zone",
+        "dominant_crater_id", "dominant_crater_index",
         "normalized_crater_radius",
         "analysis_normalized_crater_radius",
         "distance_to_dominant_crater_center_m",
-        "local_slope_deg",
-        "local_density_per_m2",
-        "acceptance_probability",
-        "clump_id",
-        "mesh_name",
-        "source_file",
-        "source_files",
+        "local_slope_deg", "local_density_per_m2",
+        "acceptance_probability", "clump_id", "mesh_name",
+        "source_file", "source_files",
     ]
 
     rows: List[Dict[str, Any]] = []
     for index, rock in enumerate(rocks):
         row = dict(rock)
         row["analysis_crater_zone"] = str(zone_labels[index])
-        row["analysis_normalized_crater_radius"] = float(
-            rnorm[index]
-        ) if np.isfinite(rnorm[index]) else ""
+        row["analysis_normalized_crater_radius"] = (
+            float(rnorm[index]) if np.isfinite(rnorm[index]) else ""
+        )
         if isinstance(row.get("source_files"), list):
             row["source_files"] = ";".join(row["source_files"])
         rows.append(row)
@@ -1648,14 +1752,17 @@ def write_merged_rocks_csv(
             if key not in keys:
                 keys.append(key)
 
-    with path.open("w", encoding="utf-8", newline="") as file:
-        writer = csv.DictWriter(
-            file,
-            fieldnames=keys,
-            extrasaction="ignore",
-        )
-        writer.writeheader()
-        writer.writerows(rows)
+    temp = temporary_path(path)
+    try:
+        with temp.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.DictWriter(
+                file, fieldnames=keys, extrasaction="ignore"
+            )
+            writer.writeheader()
+            writer.writerows(rows)
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 def write_summary(
@@ -1670,7 +1777,7 @@ def write_summary(
     zone_counts = rocks["counts_by_crater_zone"]
 
     lines = [
-        "MoonSim rockfield analysis",
+        "LunarSim-PG rockfield analysis",
         "==========================",
         f"Terrain: {metrics['terrain']}",
         (
@@ -1741,11 +1848,11 @@ def write_summary(
         f"  source: {metrics['crater_zone_settings']['source']}",
         "",
         "Output files",
-        *[f"  {output_file}" for output_file in output_files],
+        *[f"  {output_file.name}" for output_file in output_files],
         "",
     ])
 
-    path.write_text("\n".join(lines), encoding="utf-8")
+    atomic_write_text(path, "\n".join(lines))
 
 
 # -----------------------------------------------------------------------------
@@ -2095,7 +2202,7 @@ def make_overview_figure(
         fontsize=14,
         fontweight="bold",
     )
-    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    atomic_savefig(fig, path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -2197,7 +2304,7 @@ def make_ejecta_zone_figure(
         fontsize=12,
         fontweight="bold",
     )
-    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    atomic_savefig(fig, path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -2403,7 +2510,7 @@ def make_source_crater_figure(
         fontsize=12,
         fontweight="bold",
     )
-    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    atomic_savefig(fig, path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
     return {
@@ -2488,7 +2595,7 @@ def make_density_figure(
         fontsize=12,
         fontweight="bold",
     )
-    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    atomic_savefig(fig, path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -2561,10 +2668,44 @@ def make_large_rock_figure(
         fontsize=12,
         fontweight="bold",
     )
-    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    atomic_savefig(fig, path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
     return int(np.count_nonzero(large_mask))
+
+
+def seed_from_sources(
+    metadata: Dict[str, Any],
+    rock_settings_path: Optional[Path],
+    rock_input_files: Dict[str, Any],
+) -> int:
+    candidates: List[Any] = []
+    for key in ("seed",):
+        candidates.append(metadata.get(key))
+    if isinstance(metadata.get("settings"), dict):
+        candidates.append(metadata["settings"].get("seed"))
+    paths: List[Path] = []
+    if rock_settings_path is not None:
+        paths.append(rock_settings_path)
+    for value in rock_input_files.values():
+        if value and str(value).lower().endswith(".json"):
+            paths.append(Path(value))
+    for path in paths:
+        if not path.is_file():
+            continue
+        try:
+            root = read_json(path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        candidates.insert(0, root.get("seed"))
+        if isinstance(root.get("settings"), dict):
+            candidates.insert(0, root["settings"].get("seed"))
+    for value in candidates:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            continue
+    return 0
 
 
 # -----------------------------------------------------------------------------
@@ -2610,13 +2751,14 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
 
     ensure_dir(output_dir)
     metadata = read_json(metadata_path)
+    generated_at = utc_now()
     map_size_m = (
         float(args.map_size_m)
         if args.map_size_m is not None
         else map_size_from_metadata(metadata)
     )
 
-    rocks, rock_input_files = load_rocks(args)
+    rocks, rock_input_files, merge_conflicts = load_rocks(args)
     if args.exclude_random_big_rock_clumps:
         rocks = [
             rock
@@ -2633,11 +2775,17 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
 
     terrain_name = (
         args.name
+        or str(metadata.get("preset") or "").strip()
         or clean_name(
             heightmap_path
             if heightmap_path is not None
             else crater_json_path
         )
+    )
+    seed = seed_from_sources(metadata, rock_settings_path, rock_input_files)
+    prefix = (
+        f"{utc_file_timestamp(generated_at)}_"
+        f"{clean_name(terrain_name)}_seed{seed}"
     )
 
     settings, settings_source = load_zone_settings(
@@ -2696,19 +2844,14 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
     )
 
     input_files: Dict[str, Any] = {
-        **rock_input_files,
-        "metadata": str(metadata_path),
-        "crater_json": str(crater_json_path),
-        "heightmap": (
-            str(heightmap_path)
-            if heightmap_path is not None
-            else None
-        ),
-        "rock_settings": (
-            str(rock_settings_path)
-            if rock_settings_path is not None
-            else None
-        ),
+        **{
+            key: portable_path(path, output_dir)
+            for key, path in rock_input_files.items()
+        },
+        "metadata": portable_path(metadata_path, output_dir),
+        "crater_json": portable_path(crater_json_path, output_dir),
+        "heightmap": portable_path(heightmap_path, output_dir),
+        "rock_settings": portable_path(rock_settings_path, output_dir),
     }
 
     metrics = build_metrics(
@@ -2724,11 +2867,54 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
         settings_source,
         input_files,
     )
+    metrics["provenance"] = build_provenance(generated_at)
+    metrics["seed"] = seed
+    metrics["path_base"] = "this_json_directory"
+    source_paths: Dict[str, Path] = {
+        "metadata": metadata_path,
+        "crater_json": crater_json_path,
+    }
+    if heightmap_path is not None:
+        source_paths["heightmap"] = heightmap_path
+    if rock_settings_path is not None:
+        source_paths["rock_settings"] = rock_settings_path
+    for key, value in rock_input_files.items():
+        if value and key != "rockfield_dir":
+            candidate = Path(value)
+            if candidate.is_file():
+                source_paths[key] = candidate
+    metrics["source_checksums_sha256"] = {
+        key: sha256_file(path) for key, path in source_paths.items()
+    }
+    metrics["input_validation"] = {
+        "merge_conflict_count": len(merge_conflicts),
+        "merge_conflict_policy": args.merge_conflict_policy,
+        "merge_conflicts": merge_conflicts[:100],
+        "merge_conflicts_truncated": len(merge_conflicts) > 100,
+    }
+
+    planned_output_paths = [
+        output_dir / f"{prefix}_01_rockfield_overview.png",
+        output_dir / f"{prefix}_02_crater_ejecta_zones.png",
+        output_dir / f"{prefix}_03_rocks_grouped_by_source_crater.png",
+        output_dir / f"{prefix}_04_rock_density_field.png",
+        output_dir / f"{prefix}_05_large_rock_map.png",
+        output_dir / f"{prefix}_merged_rocks.csv",
+        output_dir / f"{prefix}_rockfield_metrics.csv",
+        output_dir / f"{prefix}_rockfield_analysis.json",
+        output_dir / f"{prefix}_rockfield_analysis_summary.txt",
+    ]
+    existing = [path for path in planned_output_paths if path.exists()]
+    if existing and not args.overwrite:
+        raise FileExistsError(
+            "Refusing to overwrite existing analysis outputs: "
+            + ", ".join(str(path) for path in existing)
+        )
 
     configure_plot_style()
     output_files: List[Path] = []
 
-    overview_path = output_dir / "01_rockfield_overview.png"
+    overview_path = output_dir / f"{prefix}_01_rockfield_overview.png"
     make_overview_figure(
         overview_path,
         terrain_name,
@@ -2742,7 +2928,7 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
     )
     output_files.append(overview_path)
 
-    zones_path = output_dir / "02_crater_ejecta_zones.png"
+    zones_path = output_dir / f"{prefix}_02_crater_ejecta_zones.png"
     make_ejecta_zone_figure(
         zones_path,
         terrain_name,
@@ -2758,7 +2944,7 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
     output_files.append(zones_path)
 
     source_path = (
-        output_dir / "03_rocks_grouped_by_source_crater.png"
+        output_dir / f"{prefix}_03_rocks_grouped_by_source_crater.png"
     )
     source_metrics = make_source_crater_figure(
         source_path,
@@ -2774,7 +2960,7 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
     metrics["source_crater_figure"] = source_metrics
     output_files.append(source_path)
 
-    density_path = output_dir / "04_rock_density_field.png"
+    density_path = output_dir / f"{prefix}_04_rock_density_field.png"
     make_density_figure(
         density_path,
         terrain_name,
@@ -2788,7 +2974,7 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
     )
     output_files.append(density_path)
 
-    large_rock_path = output_dir / "05_large_rock_map.png"
+    large_rock_path = output_dir / f"{prefix}_05_large_rock_map.png"
     large_rock_count = make_large_rock_figure(
         large_rock_path,
         terrain_name,
@@ -2807,7 +2993,7 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
     metrics["rocks"]["large_rock_count"] = large_rock_count
     output_files.append(large_rock_path)
 
-    merged_csv_path = output_dir / "merged_rocks.csv"
+    merged_csv_path = output_dir / f"{prefix}_merged_rocks.csv"
     write_merged_rocks_csv(
         merged_csv_path,
         rocks,
@@ -2816,29 +3002,24 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
     )
     output_files.append(merged_csv_path)
 
-    metrics_csv_path = output_dir / "rockfield_metrics.csv"
-    write_metrics_csv(metrics_csv_path, metrics)
+    metrics_csv_path = output_dir / f"{prefix}_rockfield_metrics.csv"
     output_files.append(metrics_csv_path)
 
-    metrics["source_crater_catalog"] = crater_root
-    metrics["output_files"] = [
-        str(output_file)
-        for output_file in output_files
-    ]
-
-    json_path = output_dir / "rockfield_analysis.json"
-    with json_path.open("w", encoding="utf-8") as file:
-        json.dump(
-            json_safe(metrics),
-            file,
-            indent=2,
-            allow_nan=False,
-        )
-    output_files.append(json_path)
-
-    summary_path = output_dir / "rockfield_analysis_summary.txt"
-    write_summary(summary_path, metrics, output_files)
-    output_files.append(summary_path)
+    metrics["source_crater_catalog"] = {
+        "format": crater_root.get("format"),
+        "format_version": crater_root.get(
+            "format_version", crater_root.get("version")
+        ),
+        "declared_count": len(crater_root.get("craters", [])),
+    }
+    json_path = output_dir / f"{prefix}_rockfield_analysis.json"
+    summary_path = output_dir / f"{prefix}_rockfield_analysis_summary.txt"
+    final_output_files = output_files + [json_path, summary_path]
+    metrics["output_files"] = [path.name for path in final_output_files]
+    write_metrics_csv(metrics_csv_path, metrics)
+    atomic_write_json(json_path, json_safe(metrics))
+    write_summary(summary_path, metrics, final_output_files)
+    output_files = final_output_files
 
     return {
         "terrain": terrain_name,
@@ -2855,7 +3036,7 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Analyze one MoonSim rockfield and its crater ownership, "
+            "Analyze one LunarSim-PG rockfield and its crater ownership, "
             "ejecta zones, rock sizes, and spatial distribution."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -2869,7 +3050,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--crater-json",
         required=True,
-        help="Matching *_rockfield_craters.json catalog.",
+        help="Matching generated crater catalogue JSON.",
     )
     parser.add_argument(
         "--out-dir",
@@ -2913,6 +3094,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--rock-metadata-csv",
         default=None,
         help="Explicit path to rock_metadata.csv.",
+    )
+
+    parser.add_argument(
+        "--merge-conflict-policy",
+        choices=["error", "warn", "prefer_last"],
+        default="warn",
+        help="How to handle conflicting fields when several rock inputs overlap.",
     )
 
     parser.add_argument(
@@ -3032,6 +3220,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=220,
         help="PNG output resolution.",
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Allow replacement of an identical timestamped output name.",
+    )
 
     return parser
 
@@ -3093,6 +3286,7 @@ def validate_args(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     parser = build_arg_parser()
     args = parser.parse_args()
 

@@ -1,55 +1,26 @@
 #!/usr/bin/env python3
 """
-MoonSim heightmap and generated-crater analysis.
+LunarSim-PG heightmap and generated-crater analysis.
 
-This script analyzes the terrain products created by the heightmap generator.
-It does not require a generated rockfield and it does not analyze rock positions.
-
-Required inputs
----------------
-1. The generated 16-bit PNG, R16, or RAW heightmap.
-2. Its matching heightmap metadata JSON.
-3. Its matching generated crater catalog ending in *_rockfield_craters.json.
-
-Typical call
-------------
-python3 analyze_heightmap.py \
-  --heightmap "heightmap_pngs/20260703_170908_apollo_17_moon_apollo17_scientific_1009_500m_seed14725.png" \
-  --metadata "generation_files/20260703_170911_apollo_17/moon_apollo17_scientific_1009_500m_seed14725.json" \
-  --crater-json "crater_jsons/20260703_170908_apollo_17_moon_apollo17_scientific_1009_500m_seed14725_rockfield_craters.json" \
-  --out-dir "analysis_results/20260703_170908_apollo_17_heightmap"
-
-Outputs
--------
-- 01_elevation_map.png
-- 02_hillshade.png
-- 03_slope_map.png
-- 04_roughness_map.png
-- 05_heightmap_overview.png
-- 06_heightmap_statistics.png
-- heightmap_analysis.json
-- heightmap_metrics.csv
-- heightmap_analysis_summary.txt
-
-The main statistics figure contains:
-- elevation distribution;
-- slope distribution;
-- crater diameter distribution and cumulative size-frequency distribution;
-- crater degradation versus diameter.
-
-Dependencies
-------------
-Python 3, numpy, Pillow, matplotlib, scipy
+The GUI-facing script reads a generated heightmap package, computes terrain and
+crater metrics, and writes portable, timestamped analysis products.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
+import logging
 import math
+import os
+import platform
 import re
+import subprocess
 import sys
+from datetime import datetime, timezone
+from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
@@ -67,6 +38,120 @@ except ImportError as exc:  # pragma: no cover - dependency error is user-facing
         "This script requires scipy. Install dependencies with:\n"
         "  python3 -m pip install numpy pillow matplotlib scipy"
     ) from exc
+
+
+
+PROJECT_NAME = "LunarSim-PG"
+SCRIPT_NAME = "heightmap_analysis"
+SCRIPT_VERSION = "2.0.0"
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def utc_file_timestamp(value: datetime) -> str:
+    return value.strftime("%Y%m%d_%H%M%S")
+
+
+def safe_name(value: str) -> str:
+    cleaned = re.sub(r"[^0-9A-Za-z_.-]+", "_", str(value)).strip("_")
+    return cleaned or "terrain"
+
+
+def package_version(name: str) -> str | None:
+    try:
+        return importlib_metadata.version(name)
+    except importlib_metadata.PackageNotFoundError:
+        return None
+
+
+def git_commit() -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "HEAD"],
+            check=True, capture_output=True, text=True, timeout=3,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return None
+    value = completed.stdout.strip()
+    return value or None
+
+
+def build_provenance(generated_at: datetime) -> Dict[str, object]:
+    return {
+        "project": PROJECT_NAME,
+        "analysis": SCRIPT_NAME,
+        "analysis_version": SCRIPT_VERSION,
+        "generated_utc": generated_at.isoformat().replace("+00:00", "Z"),
+        "git_commit": git_commit(),
+        "runtime": {
+            "python": platform.python_version(),
+            "numpy": np.__version__,
+            "Pillow": package_version("Pillow"),
+            "matplotlib": matplotlib.__version__,
+            "scipy": package_version("scipy"),
+        },
+    }
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def portable_path(path: Path | str, base_dir: Path) -> str:
+    relative = os.path.relpath(
+        Path(path).expanduser().resolve(),
+        start=base_dir.expanduser().resolve(),
+    )
+    return Path(relative).as_posix()
+
+
+def temporary_path(path: Path) -> Path:
+    return path.with_name(f".{path.stem}.tmp{path.suffix}")
+
+
+def atomic_write_json(path: Path, payload: object) -> None:
+    temp = temporary_path(path)
+    try:
+        with temp.open("w", encoding="utf-8") as file:
+            json.dump(payload, file, indent=2, allow_nan=False)
+            file.write("\n")
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    temp = temporary_path(path)
+    try:
+        temp.write_text(text, encoding="utf-8")
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def atomic_savefig(fig: plt.Figure, path: Path, **kwargs: Any) -> None:
+    temp = temporary_path(path)
+    try:
+        fig.savefig(temp, format=path.suffix.lstrip("."), **kwargs)
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def seed_from_metadata(metadata: Dict[str, Any]) -> int:
+    value: Any = metadata.get("seed")
+    if value is None and isinstance(metadata.get("settings"), dict):
+        value = metadata["settings"].get("seed")
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 # -----------------------------------------------------------------------------
@@ -195,10 +280,16 @@ def read_crater_catalog(path: Path) -> Tuple[List[Dict[str, Any]], Dict[str, Any
     for index, crater in enumerate(crater_items):
         if not isinstance(crater, dict):
             continue
+        crater_id = int(safe_float_value(
+            crater.get(
+                "crater_id",
+                crater.get("crater_index", crater.get("index", index)),
+            ),
+            index,
+        ))
         craters.append({
-            "crater_index": int(safe_float_value(
-                crater.get("crater_index", crater.get("index", index)), index
-            )),
+            "crater_id": crater_id,
+            "crater_index": crater_id,
             "x_m": safe_float_value(crater.get("x_m", crater.get("X_Meters"))),
             "y_m": safe_float_value(crater.get("y_m", crater.get("Y_Meters"))),
             "diameter_m": safe_float_value(
@@ -236,7 +327,7 @@ def crater_arrays(
 
     finite_xy = np.isfinite(xs) & np.isfinite(ys)
     if np.any(finite_xy):
-        # MoonSim crater catalogs may use centered coordinates (-L/2 ... +L/2)
+        # LunarSim-PG crater catalogs may use centered coordinates (-L/2 ... +L/2)
         # or top-left coordinates (0 ... L). Convert centered coordinates for maps.
         if np.nanmin(xs[finite_xy]) < 0.0 or np.nanmin(ys[finite_xy]) < 0.0:
             xs = xs + 0.5 * map_size_m
@@ -495,9 +586,6 @@ def build_crater_metrics(
 
 def build_metrics(
     terrain_name: str,
-    heightmap_path: Path,
-    metadata_path: Path,
-    metadata: Dict[str, Any],
     raw_u16: np.ndarray,
     height_m: np.ndarray,
     slope_deg: np.ndarray,
@@ -528,13 +616,10 @@ def build_metrics(
     raw_max = int(np.max(raw_u16))
 
     return {
-        "format": "MoonSimHeightmapAnalysis",
-        "version": 1,
+        "format": "LunarSimHeightmapAnalysis",
+        "format_version": 2,
         "terrain": terrain_name,
-        "inputs": {
-            "heightmap": str(heightmap_path.resolve()),
-            "metadata": str(metadata_path.resolve()),
-        },
+        "inputs": {},
         "raster": {
             "width_px": int(height_m.shape[1]),
             "height_px": int(height_m.shape[0]),
@@ -576,7 +661,6 @@ def build_metrics(
             "sun_elevation_deg": float(sun_elevation_deg),
             "note": "visualization setting only; not an ephemeris calculation",
         },
-        "source_metadata": metadata,
     }
 
 
@@ -590,16 +674,21 @@ def flatten_dict(data: Dict[str, Any], prefix: str = "") -> Iterable[Tuple[str, 
 
 
 def write_metrics_csv(path: Path, metrics: Dict[str, Any]) -> None:
-    excluded_roots = {"source_metadata", "source_crater_json", "inputs"}
+    excluded_roots = {"inputs"}
     rows = [
         (key, value)
         for key, value in flatten_dict(metrics)
         if key.split(".", 1)[0] not in excluded_roots
     ]
-    with path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["metric", "value"])
-        writer.writerows(rows)
+    temp = temporary_path(path)
+    try:
+        with temp.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["metric", "value"])
+            writer.writerows(rows)
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 def format_percent(value: float) -> str:
@@ -635,7 +724,7 @@ def write_summary(path: Path, metrics: Dict[str, Any], output_files: Sequence[Pa
     clipping_status = "none detected" if low_count == 0 and high_count == 0 else "review endpoint saturation"
 
     text = "\n".join([
-        "MoonSim heightmap and generated-crater analysis",
+        "LunarSim-PG heightmap and generated-crater analysis",
         "===============================================",
         f"Terrain: {metrics['terrain']}",
         f"Raster: {raster['width_px']} x {raster['height_px']} px",
@@ -684,10 +773,10 @@ def write_summary(path: Path, metrics: Dict[str, Any], output_files: Sequence[Pa
         f"  potential elevation clipping: {clipping_status}",
         "",
         "Output files",
-        *[f"  {p}" for p in output_files],
+        *[f"  {p.name}" for p in output_files],
         "",
     ])
-    path.write_text(text, encoding="utf-8")
+    atomic_write_text(path, text)
 
 
 # -----------------------------------------------------------------------------
@@ -743,7 +832,7 @@ def save_single_map(
     ax.set_title(title)
     cbar = fig.colorbar(image, ax=ax, fraction=0.046, pad=0.03)
     cbar.set_label(colorbar_label)
-    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    atomic_savefig(fig, path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -842,7 +931,7 @@ def make_overview_figure(
     ax[5].set_title("Summary")
 
     fig.suptitle(f"Heightmap analysis — {terrain_name}", fontsize=14, fontweight="bold")
-    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    atomic_savefig(fig, path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -1234,10 +1323,11 @@ def make_statistics_figure(
             alpha=0.3,
         )
 
-        degradation_ax.legend(
-            frameon=False,
-            loc="best",
-        )
+        handles, labels = degradation_ax.get_legend_handles_labels()
+        if handles:
+            degradation_ax.legend(
+                handles, labels, frameon=False, loc="best"
+            )
 
     else:
         degradation_ax.text(
@@ -1262,10 +1352,8 @@ def make_statistics_figure(
         fontweight="bold",
     )
 
-    fig.savefig(
-        path,
-        dpi=dpi,
-        bbox_inches="tight",
+    atomic_savefig(
+        fig, path, dpi=dpi, bbox_inches="tight"
     )
 
     plt.close(fig)
@@ -1290,6 +1378,7 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
         raise FileNotFoundError(f"Crater JSON does not exist: {crater_json_path}")
     ensure_dir(out_dir)
     metadata = read_json(metadata_path)
+    generated_at = utc_now()
     raw_u16, height_m, encoded_min_m, encoded_max_m = load_heightmap(heightmap_path, metadata)
 
     expected_size = expected_heightmap_size(metadata)
@@ -1312,16 +1401,38 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
         roughness_window_px += 1
     roughness_m = compute_local_roughness(height_m, roughness_window_px)
 
-    terrain_name = args.name or clean_name(heightmap_path)
+    terrain_name = (
+        args.name or str(metadata.get("preset") or "").strip()
+        or clean_name(heightmap_path)
+    )
+    seed = seed_from_metadata(metadata)
+    prefix = (
+        f"{utc_file_timestamp(generated_at)}_"
+        f"{safe_name(terrain_name)}_seed{seed}"
+    )
+    planned_output_paths = [
+        out_dir / f"{prefix}_01_elevation_map.png",
+        out_dir / f"{prefix}_02_hillshade.png",
+        out_dir / f"{prefix}_03_slope_map.png",
+        out_dir / f"{prefix}_04_roughness_map.png",
+        out_dir / f"{prefix}_05_heightmap_overview.png",
+        out_dir / f"{prefix}_06_heightmap_statistics.png",
+        out_dir / f"{prefix}_heightmap_analysis.json",
+        out_dir / f"{prefix}_heightmap_metrics.csv",
+        out_dir / f"{prefix}_heightmap_analysis_summary.txt",
+    ]
+    existing = [path for path in planned_output_paths if path.exists()]
+    if existing and not args.overwrite:
+        raise FileExistsError(
+            "Refusing to overwrite existing analysis outputs: "
+            + ", ".join(str(path) for path in existing)
+        )
     craters, crater_json_root = read_crater_catalog(crater_json_path)
     crater_metrics = build_crater_metrics(
         craters, map_size_m, args.crater_diameter_thresholds
     )
     metrics = build_metrics(
         terrain_name=terrain_name,
-        heightmap_path=heightmap_path,
-        metadata_path=metadata_path,
-        metadata=metadata,
         raw_u16=raw_u16,
         height_m=height_m,
         slope_deg=slope_deg,
@@ -1337,21 +1448,39 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
         sun_elevation_deg=args.sun_elevation_deg,
     )
 
-    metrics["inputs"]["crater_json"] = str(crater_json_path)
+    metrics["provenance"] = build_provenance(generated_at)
+    metrics["seed"] = seed
+    metrics["path_base"] = "this_json_directory"
+    metrics["inputs"] = {
+        "heightmap": portable_path(heightmap_path, out_dir),
+        "metadata": portable_path(metadata_path, out_dir),
+        "crater_json": portable_path(crater_json_path, out_dir),
+    }
+    metrics["source_checksums_sha256"] = {
+        "heightmap": sha256_file(heightmap_path),
+        "metadata": sha256_file(metadata_path),
+        "crater_json": sha256_file(crater_json_path),
+    }
     metrics["craters"] = crater_metrics
-    metrics["source_crater_json"] = crater_json_root
+    metrics["source_crater_catalog"] = {
+        "format": crater_json_root.get("format"),
+        "format_version": crater_json_root.get(
+            "format_version", crater_json_root.get("version")
+        ),
+        "declared_count": len(crater_json_root.get("craters", [])),
+    }
 
     configure_plot_style()
     output_files: List[Path] = []
 
-    elevation_path = out_dir / "01_elevation_map.png"
+    elevation_path = out_dir / f"{prefix}_01_elevation_map.png"
     save_single_map(
         height_m, elevation_path, f"Elevation — {terrain_name}", "elevation (m)",
         map_size_m, "cividis", args.dpi, args.max_plot_size,
     )
     output_files.append(elevation_path)
 
-    hillshade_path = out_dir / "02_hillshade.png"
+    hillshade_path = out_dir / f"{prefix}_02_hillshade.png"
     save_single_map(
         hillshade, hillshade_path,
         f"Hillshade — {terrain_name} (azimuth {args.sun_azimuth_deg:g}°, elevation {args.sun_elevation_deg:g}°)",
@@ -1359,7 +1488,7 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
     )
     output_files.append(hillshade_path)
 
-    slope_path = out_dir / "03_slope_map.png"
+    slope_path = out_dir / f"{prefix}_03_slope_map.png"
     save_single_map(
         slope_deg, slope_path, f"Slope — {terrain_name}", "slope (deg)",
         map_size_m, "magma", args.dpi, args.max_plot_size,
@@ -1367,7 +1496,7 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
     )
     output_files.append(slope_path)
 
-    roughness_path = out_dir / "04_roughness_map.png"
+    roughness_path = out_dir / f"{prefix}_04_roughness_map.png"
     save_single_map(
         roughness_m, roughness_path,
         f"Local elevation roughness — {terrain_name} ({roughness_window_px} px window)",
@@ -1376,33 +1505,29 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
     )
     output_files.append(roughness_path)
 
-    overview_path = out_dir / "05_heightmap_overview.png"
+    overview_path = out_dir / f"{prefix}_05_heightmap_overview.png"
     make_overview_figure(
         overview_path, terrain_name, height_m, hillshade, slope_deg, roughness_m,
         metrics, map_size_m, args.dpi, args.max_plot_size,
     )
     output_files.append(overview_path)
 
-    statistics_path = out_dir / "06_heightmap_statistics.png"
+    statistics_path = out_dir / f"{prefix}_06_heightmap_statistics.png"
     make_statistics_figure(
         statistics_path, terrain_name, height_m, slope_deg, craters,
         map_size_m, args.slope_thresholds, args.dpi,
     )
     output_files.append(statistics_path)
 
-    json_path = out_dir / "heightmap_analysis.json"
-    metrics["output_files"] = [str(path) for path in output_files]
-    with json_path.open("w", encoding="utf-8") as f:
-        json.dump(metrics, f, indent=2, allow_nan=False)
-    output_files.append(json_path)
-
-    csv_path = out_dir / "heightmap_metrics.csv"
+    json_path = out_dir / f"{prefix}_heightmap_analysis.json"
+    csv_path = out_dir / f"{prefix}_heightmap_metrics.csv"
+    summary_path = out_dir / f"{prefix}_heightmap_analysis_summary.txt"
+    final_output_files = output_files + [json_path, csv_path, summary_path]
+    metrics["output_files"] = [path.name for path in final_output_files]
+    atomic_write_json(json_path, metrics)
     write_metrics_csv(csv_path, metrics)
-    output_files.append(csv_path)
-
-    summary_path = out_dir / "heightmap_analysis_summary.txt"
-    write_summary(summary_path, metrics, output_files)
-    output_files.append(summary_path)
+    write_summary(summary_path, metrics, final_output_files)
+    output_files = final_output_files
 
     return {
         "terrain": terrain_name,
@@ -1414,14 +1539,14 @@ def analyze(args: argparse.Namespace) -> Dict[str, Any]:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Analyze one MoonSim heightmap and its generated crater catalog; no rockfield is required.",
+        description="Analyze one LunarSim-PG heightmap and its generated crater catalog; no rockfield is required.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--heightmap", required=True, help="16-bit PNG, R16, or RAW heightmap.")
     parser.add_argument("--metadata", required=True, help="Matching heightmap metadata JSON.")
     parser.add_argument(
         "--crater-json", required=True,
-        help="Matching generated crater catalog ending in *_rockfield_craters.json.",
+        help="Matching generated crater catalogue JSON.",
     )
     parser.add_argument("--out-dir", required=True, help="Directory where analysis products are written.")
     parser.add_argument("--name", default=None, help="Optional terrain name shown in figures and reports.")
@@ -1454,6 +1579,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--max-plot-size", type=int, default=1600, help="Maximum raster dimension used in figures.")
     parser.add_argument("--dpi", type=int, default=220, help="PNG output resolution.")
+    parser.add_argument("--overwrite", action="store_true", help="Allow replacement of an identical timestamped output name.")
     return parser
 
 
@@ -1475,6 +1601,7 @@ def validate_args(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     parser = build_arg_parser()
     args = parser.parse_args()
     try:

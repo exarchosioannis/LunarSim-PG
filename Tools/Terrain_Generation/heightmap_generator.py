@@ -1,42 +1,131 @@
 #!/usr/bin/env python3
 """
-Moon heightmap generator for Unreal Engine.
+LunarSim-PG terrain-aware lunar heightmap generator.
 
-Design goals
-------------
-1. Work in real meters until the final export.
-2. Generate a smooth lunar floor first.
-3. Generate a crater population from crater size-frequency distribution segments.
-4. Integrate craters into the floor using a local reference surface instead of
-   simply adding crater stamps on top of the terrain.
-5. Export a compact package containing a 16-bit PNG, metadata JSON, and crater JSON.
-
-Example
--------
-python heightmap.py --out ./out --preset mare_smooth --seed 12345 --size 4033 --map-size-m 500 --height-range-m 30
-
-For Unreal landscape resolutions, use sizes such as 1009, 2017, 4033, or 8129.
+The GUI-facing script works in metres, generates a lunar floor and crater
+population, integrates craters against local reference surfaces, and exports a
+portable 16-bit heightmap package for Unreal Engine and downstream analysis.
 
 Scientific sources used for preset comments and crater laws:
-- Mahanti et al. (2018), Small lunar craters at Apollo 16 and 17: d/D morphology classes.
-- Minton et al. (2019), Equilibrium SFD of small lunar craters: mare equilibrium crater densities.
-- Bugiolacchi & Wöhler (2020), Apollo 17 small crater population: Apollo 17 unit α/β values.
-- Plescia & Robinson (2019), Giordano Bruno self-secondaries: fresh ejecta/melt N(10) ranges.
-- Williams et al. (2022), Giordano Bruno terrain properties: rock abundance affects crater density.
-- Oetting et al. (2023), Copernican crater CSFD slopes: fresh crater small-diameter slopes/N(0.01).
+- Mahanti et al. (2018), small lunar crater d/D morphology classes.
+- Minton et al. (2019), equilibrium size-frequency distributions.
+- Bugiolacchi & Wöhler (2020), Apollo 17 small-crater populations.
+- Plescia & Robinson (2019), Giordano Bruno self-secondaries.
+- Williams et al. (2022), Giordano Bruno terrain properties.
+- Oetting et al. (2023), Copernican crater size-frequency distributions.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import logging
 import math
+import platform
+import re
+import subprocess
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from importlib import metadata as importlib_metadata
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 from PIL import Image, ImageFilter
+
+
+PROJECT_NAME = "LunarSim-PG"
+SCRIPT_NAME = "heightmap_generator"
+SCRIPT_VERSION = "2.0.0"
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def utc_file_timestamp(value: datetime) -> str:
+    return value.strftime("%Y%m%d_%H%M%S")
+
+
+def safe_name(value: str) -> str:
+    cleaned = re.sub(r"[^0-9A-Za-z_.-]+", "_", str(value)).strip("_")
+    return cleaned or "terrain"
+
+
+def package_version(name: str) -> str | None:
+    try:
+        return importlib_metadata.version(name)
+    except importlib_metadata.PackageNotFoundError:
+        return None
+
+
+def git_commit() -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "HEAD"],
+            check=True, capture_output=True, text=True, timeout=3,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return None
+    value = completed.stdout.strip()
+    return value or None
+
+
+def build_provenance(generated_at: datetime) -> Dict[str, object]:
+    return {
+        "project": PROJECT_NAME,
+        "generator": SCRIPT_NAME,
+        "generator_version": SCRIPT_VERSION,
+        "generated_utc": generated_at.isoformat().replace("+00:00", "Z"),
+        "git_commit": git_commit(),
+        "runtime": {
+            "python": platform.python_version(),
+            "numpy": np.__version__,
+            "Pillow": package_version("Pillow"),
+        },
+    }
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def temporary_path(path: Path) -> Path:
+    return path.with_name(f".{path.stem}.tmp{path.suffix}")
+
+
+def atomic_write_json(path: Path, payload: object) -> None:
+    temp = temporary_path(path)
+    try:
+        with temp.open("w", encoding="utf-8") as file:
+            json.dump(payload, file, indent=2, allow_nan=False)
+            file.write("\n")
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    temp = temporary_path(path)
+    try:
+        temp.write_text(text, encoding="utf-8")
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def atomic_save_png16(path: Path, array: np.ndarray) -> None:
+    temp = temporary_path(path)
+    try:
+        Image.fromarray(array).save(temp, format="PNG")
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 # -----------------------------
@@ -444,7 +533,7 @@ def gaussian_blur_float32(data: np.ndarray, sigma_px: float) -> np.ndarray:
     try:
         from scipy.ndimage import gaussian_filter
         return gaussian_filter(arr, sigma=sigma_px, mode="nearest").astype(np.float32)
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
         img = Image.fromarray(arr, mode="F")
         img = img.filter(ImageFilter.GaussianBlur(radius=sigma_px))
         return np.asarray(img, dtype=np.float32)
@@ -1277,10 +1366,11 @@ def export_map_crater_json(
     meters_per_pixel: float,
     ue_xy_scale_cm: float,
     ue_z_scale: float,
+    generated_at: datetime,
     coordinate_mode: str = "top_left",
 ) -> None:
     """
-    Export crater metadata in the old map/crater JSON style.
+    Export the versioned crater catalogue used by analysis and rock generation.
 
     coordinate_mode:
         "top_left" keeps x_m/y_m in the heightmap coordinate system:
@@ -1295,7 +1385,11 @@ def export_map_crater_json(
     half = settings.map_size_m * 0.5
 
     payload = {
+        "format": "LunarSimCraterCatalog",
+        "format_version": 2,
+        "provenance": build_provenance(generated_at),
         "preset_name": settings.preset,
+        "seed": settings.seed,
         "map_size_meters": settings.map_size_m,
         "heightmap_size": settings.size,
         "meters_per_pixel": meters_per_pixel,
@@ -1338,7 +1432,7 @@ def export_map_crater_json(
         "craters": [],
     }
 
-    for crater in craters:
+    for crater_id, crater in enumerate(craters):
         if coordinate_mode == "centered":
             x_m = crater.x_m - half
             y_m = crater.y_m - half
@@ -1348,14 +1442,16 @@ def export_map_crater_json(
 
         payload["craters"].append(
             {
-                # Old map JSON field names.
+                "crater_id": crater_id,
                 "x_m": float(x_m),
                 "y_m": float(y_m),
                 "diameter_m": float(crater.diameter_m),
+                "degradation": float(crater.degradation),
+                "morphology": "NORMAL",
+
+                # Compatibility aliases retained for existing Unreal readers.
                 "degrade": float(crater.degradation),
                 "morph": "NORMAL",
-
-                # Extra aliases for newer readers; safe for readers that ignore unknown fields.
                 "center_meters": {
                     "x": float(x_m),
                     "y": float(y_m),
@@ -1366,8 +1462,7 @@ def export_map_crater_json(
             }
         )
 
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
+    atomic_write_json(path, payload)
 
 
 def save_outputs(
@@ -1376,17 +1471,21 @@ def save_outputs(
     height_m: np.ndarray,
     craters: List[Crater],
     range_mode: str,
+    overwrite: bool = False,
 ) -> tuple[Dict[str, str], str]:
     """
-    Save the compact heightmap package used by MoonSim.
+    Save the compact heightmap package used by LunarSim-PG.
 
-    Exactly four files are written:
-      - heightmap.png: 16-bit terrain height data
-      - metadata.json: physical decoding and Unreal import information
-      - craters.json: centered crater catalogue used by analysis and rock generation
-      - generation_summary.txt: human-readable generation and Unreal scale summary
+    Four timestamped, seed-qualified files are written: heightmap, metadata,
+    crater catalogue, and a human-readable generation summary.
     """
+    validate_settings(settings)
     out_dir.mkdir(parents=True, exist_ok=True)
+    generated_at = utc_now()
+    prefix = (
+        f"{utc_file_timestamp(generated_at)}_"
+        f"{safe_name(settings.preset)}_seed{settings.seed}"
+    )
 
     min_m, max_m = compute_export_range(height_m, settings, range_mode)
     encoded = encode_height_to_uint16(
@@ -1397,12 +1496,19 @@ def save_outputs(
         settings.seed,
     )
 
-    heightmap_path = out_dir / "heightmap.png"
-    metadata_path = out_dir / "metadata.json"
-    craters_path = out_dir / "craters.json"
-    summary_path = out_dir / "generation_summary.txt"
+    heightmap_path = out_dir / f"{prefix}_heightmap.png"
+    metadata_path = out_dir / f"{prefix}_metadata.json"
+    craters_path = out_dir / f"{prefix}_craters.json"
+    summary_path = out_dir / f"{prefix}_generation_summary.txt"
+    output_paths = (heightmap_path, metadata_path, craters_path, summary_path)
+    existing = [path for path in output_paths if path.exists()]
+    if existing and not overwrite:
+        raise FileExistsError(
+            "Refusing to overwrite existing output files: "
+            + ", ".join(str(path) for path in existing)
+        )
 
-    Image.fromarray(encoded, mode="I;16").save(heightmap_path)
+    atomic_save_png16(heightmap_path, encoded)
 
     meters_per_pixel = settings.map_size_m / float(settings.size - 1)
     ue_xy_scale_cm = meters_per_pixel * 100.0
@@ -1419,14 +1525,16 @@ def save_outputs(
         meters_per_pixel,
         ue_xy_scale_cm,
         ue_z_scale,
+        generated_at,
         coordinate_mode="centered",
     )
 
     metadata = {
-        "generator": "heightmap_generator.py",
-        "format": "MoonSimHeightmapPackage",
-        "format_version": 1,
+        "format": "LunarSimHeightmapPackage",
+        "format_version": 2,
+        "provenance": build_provenance(generated_at),
         "units": "meters until 16-bit export",
+        "path_base": "this_json_directory",
         "preset": settings.preset,
         "seed": settings.seed,
         "heightmap_size_px": settings.size,
@@ -1461,15 +1569,18 @@ def save_outputs(
         },
         "settings": settings_to_jsonable(settings),
         "output_files": {
-            "heightmap": "heightmap.png",
-            "metadata": "metadata.json",
-            "craters": "craters.json",
-            "generation_summary": "generation_summary.txt",
+            "heightmap": heightmap_path.name,
+            "metadata": metadata_path.name,
+            "craters": craters_path.name,
+            "generation_summary": summary_path.name,
+        },
+        "checksums_sha256": {
+            heightmap_path.name: sha256_file(heightmap_path),
+            craters_path.name: sha256_file(craters_path),
         },
     }
 
-    with metadata_path.open("w", encoding="utf-8") as file:
-        json.dump(metadata, file, indent=2)
+    atomic_write_json(metadata_path, metadata)
 
     summary_text = (
         "Generated terrain-aware lunar heightmap\n"
@@ -1486,7 +1597,7 @@ def save_outputs(
         f"  actual height min/max: {actual_min_m:.3f} m / {actual_max_m:.3f} m\n"
     )
 
-    summary_path.write_text(summary_text, encoding="utf-8")
+    atomic_write_text(summary_path, summary_text)
 
     return {
         "heightmap": str(heightmap_path),
@@ -1494,6 +1605,54 @@ def save_outputs(
         "craters": str(craters_path),
         "generation_summary": str(summary_path),
     }, summary_text
+
+
+def validate_settings(settings: GeneratorSettings) -> None:
+    errors: List[str] = []
+    if settings.size < 2:
+        errors.append("size must be at least 2")
+    if settings.map_size_m <= 0:
+        errors.append("map_size_m must be positive")
+    if settings.height_range_m <= 0:
+        errors.append("height_range_m must be positive")
+    if settings.base_relief_m < 0:
+        errors.append("base_relief_m cannot be negative")
+    if settings.floor_final_blur_px < 0:
+        errors.append("floor_final_blur_px cannot be negative")
+    if settings.landform_count < 0:
+        errors.append("landform_count cannot be negative")
+    if settings.landform_radius_min_m <= 0:
+        errors.append("landform_radius_min_m must be positive")
+    if settings.landform_radius_max_m < settings.landform_radius_min_m:
+        errors.append("landform_radius_max_m must be >= landform_radius_min_m")
+    if not 0.0 <= settings.degradation_min <= settings.degradation_max <= 1.0:
+        errors.append("degradation range must satisfy 0 <= min <= max <= 1")
+    if settings.rim_width_radius_ratio <= 0:
+        errors.append("rim_width_radius_ratio must be positive")
+    if settings.ejecta_decay_exponent <= 0:
+        errors.append("ejecta_decay_exponent must be positive")
+    if settings.crater_outer_radius_ratio <= 0:
+        errors.append("crater_outer_radius_ratio must be positive")
+    for name in (
+        "min_local_reference_blur_px", "max_local_reference_blur_px",
+        "max_degraded_crater_blur_px", "post_regolith_blur_px",
+        "final_global_blur_px", "crater_floor_roughness_blur_px",
+    ):
+        if float(getattr(settings, name)) < 0:
+            errors.append(f"{name} cannot be negative")
+    if settings.max_local_reference_blur_px < settings.min_local_reference_blur_px:
+        errors.append("max_local_reference_blur_px must be >= min_local_reference_blur_px")
+    for index, segment in enumerate(settings.crater_segments or []):
+        if segment.min_diameter_m <= 0:
+            errors.append(f"crater segment {index} minimum diameter must be positive")
+        if segment.max_diameter_m <= segment.min_diameter_m:
+            errors.append(f"crater segment {index} maximum diameter must exceed minimum")
+        if segment.K < 0:
+            errors.append(f"crater segment {index} K cannot be negative")
+        if segment.b <= 0:
+            errors.append(f"crater segment {index} b must be positive")
+    if errors:
+        raise ValueError("Invalid heightmap settings: " + "; ".join(errors))
 
 
 def settings_to_jsonable(settings: GeneratorSettings) -> Dict:
@@ -1525,6 +1684,7 @@ def parse_segments_json(path: Optional[str]) -> Optional[List[CraterSegment]]:
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     parser = argparse.ArgumentParser(description="Generate terrain-aware lunar heightmaps for Unreal Engine.")
     parser.add_argument("--out", required=True, help="Output directory")
     parser.add_argument("--preset", choices=list(PRESETS.keys()), default="mare_smooth")
@@ -1539,6 +1699,7 @@ def main() -> None:
     parser.add_argument("--crater-floor-roughness-m", type=float, default=None, help="Add mild roughness only inside larger crater floors")
     parser.add_argument("--crater-floor-roughness-blur-px", type=float, default=None, help="Blur radius for crater-floor roughness")
     parser.add_argument("--crater-floor-roughness-min-diameter-m", type=float, default=None, help="Only add crater-floor roughness above this crater diameter")
+    parser.add_argument("--overwrite", action="store_true", help="Allow replacement of an identical timestamped output name")
     args = parser.parse_args()
 
     settings = apply_preset(GeneratorSettings(), args.preset)
@@ -1562,6 +1723,7 @@ def main() -> None:
     if custom_segments is not None:
         settings.crater_segments = custom_segments
 
+    validate_settings(settings)
     height_m, craters = build_heightfield(settings)
     paths, summary_text = save_outputs(
         Path(args.out),
@@ -1569,6 +1731,7 @@ def main() -> None:
         height_m,
         craters,
         args.range_mode,
+        overwrite=args.overwrite,
     )
 
     print(summary_text, end="" if summary_text.endswith("\n") else "\n")
@@ -1576,15 +1739,6 @@ def main() -> None:
     for label, output_path in paths.items():
         print(f"  {label}: {output_path}")
 
-    print()
-    print("Analysis command:")
-    print(
-        "python heightmap_analysis.py "
-        f"--heightmap \"{paths['heightmap']}\" "
-        f"--metadata \"{paths['metadata']}\" "
-        f"--crater-json \"{paths['craters']}\" "
-        f"--out-dir \"{Path(args.out) / 'analysis'}\""
-    )
 
 
 if __name__ == "__main__":

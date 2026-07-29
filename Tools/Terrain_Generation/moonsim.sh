@@ -813,7 +813,7 @@ ttk.Label(
     basic_box,
     text=(
         "Generate a heightmap first, or select a folder under generated/heightmaps. "
-        "The GUI resolves heightmap.png, metadata.json, and craters.json automatically."
+        "The GUI resolves the timestamped heightmap, metadata, and crater files automatically."
     ),
     foreground=MUTED,
     wraplength=760,
@@ -1073,9 +1073,13 @@ def analysis_heightmap_candidates():
     candidates = []
 
     if HEIGHTMAP_GENERATIONS_DIR.exists():
-        candidates.extend(
-            HEIGHTMAP_GENERATIONS_DIR.glob("*/heightmap.png")
-        )
+        for run_dir in HEIGHTMAP_GENERATIONS_DIR.iterdir():
+            if not run_dir.is_dir():
+                continue
+            try:
+                candidates.append(resolve_heightmap_run_folder(run_dir)["heightmap"])
+            except Exception:
+                continue
 
     if HEIGHTMAP_PNG_DIR.exists():
         candidates.extend(HEIGHTMAP_PNG_DIR.glob("*.png"))
@@ -1101,8 +1105,11 @@ def analysis_heightmap_candidates():
 
 def matching_crater_json_for_heightmap(heightmap_path):
     run_dir = heightmap_run_for_asset(heightmap_path)
-    if run_dir is not None and (run_dir / "craters.json").is_file():
-        return run_dir / "craters.json"
+    if run_dir is not None:
+        try:
+            return resolve_heightmap_run_folder(run_dir)["crater_json"]
+        except Exception:
+            pass
 
     try:
         info = resolve_heightmap_run_folder(Path(heightmap_path).parent)
@@ -1133,8 +1140,11 @@ def matching_crater_json_for_heightmap(heightmap_path):
 
 def matching_metadata_for_heightmap(heightmap_path, crater_json=None):
     run_dir = heightmap_run_for_asset(heightmap_path)
-    if run_dir is not None and (run_dir / "metadata.json").is_file():
-        return run_dir / "metadata.json"
+    if run_dir is not None:
+        try:
+            return resolve_heightmap_run_folder(run_dir)["metadata"]
+        except Exception:
+            pass
 
     try:
         info = resolve_heightmap_run_folder(Path(heightmap_path).parent)
@@ -1351,7 +1361,7 @@ def open_heightmap_analysis_dialog():
         container,
         text=(
             "Choose one generated heightmap folder. The GUI automatically uses "
-            "heightmap.png, metadata.json, and craters.json from that folder."
+            "the timestamped heightmap, metadata, and crater files from that folder."
         ),
         foreground=MUTED,
         wraplength=820,
@@ -1386,7 +1396,7 @@ def open_heightmap_analysis_dialog():
         output_dir_var.set(str(output_dir))
         if update_status:
             dialog_status_var.set(
-                "Package found: heightmap.png, metadata.json, and craters.json."
+                "Complete timestamped heightmap package found."
             )
         return info, output_dir
 
@@ -1446,14 +1456,15 @@ def open_heightmap_analysis_dialog():
     options.columnconfigure(0, weight=1)
 
     def use_newest_generated():
-        candidates = [
-            run_dir
-            for run_dir in HEIGHTMAP_GENERATIONS_DIR.glob("*")
-            if run_dir.is_dir()
-            and (run_dir / "heightmap.png").is_file()
-            and (run_dir / "metadata.json").is_file()
-            and (run_dir / "craters.json").is_file()
-        ]
+        candidates = []
+        for run_dir in HEIGHTMAP_GENERATIONS_DIR.glob("*"):
+            if not run_dir.is_dir():
+                continue
+            try:
+                resolve_heightmap_run_folder(run_dir)
+                candidates.append(run_dir)
+            except Exception:
+                continue
         if not candidates:
             dialog_status_var.set("No complete generated heightmap package was found.")
             return
@@ -1544,6 +1555,22 @@ def open_heightmap_analysis_dialog():
 # Rockfield-analysis dialog
 # -----------------------------------------------------------------------------
 
+def packaged_rockfield_json(run_dir):
+    run_dir = Path(run_dir)
+    candidates = []
+
+    legacy = run_dir / "unreal_rockfield.json"
+    if legacy.is_file():
+        candidates.append(legacy)
+
+    candidates.extend(
+        path
+        for path in run_dir.glob("*_rockfield.json")
+        if path.is_file()
+    )
+    return newest_path(candidates)
+
+
 def rockfield_analysis_run_candidates():
     candidates = []
     if ROCKFIELD_GENERATIONS_DIR.exists():
@@ -1551,7 +1578,7 @@ def rockfield_analysis_run_candidates():
             if not run_dir.is_dir():
                 continue
             if (
-                (run_dir / "unreal_rockfield.json").is_file()
+                packaged_rockfield_json(run_dir) is not None
                 and (run_dir / "rock_settings.json").is_file()
                 and (run_dir / "source_heightmap.json").is_file()
             ):
@@ -1565,8 +1592,9 @@ def newest_rockfield_analysis_run():
         return None
 
     def modified_time(run_dir):
+        rockfield = packaged_rockfield_json(run_dir)
         try:
-            return (run_dir / "unreal_rockfield.json").stat().st_mtime
+            return rockfield.stat().st_mtime if rockfield is not None else 0.0
         except OSError:
             return 0.0
 
@@ -1580,15 +1608,18 @@ def resolve_rockfield_run_folder(run_folder):
             f"Rockfield run folder does not exist: {run_dir}"
         )
 
-    rockfield = run_dir / "unreal_rockfield.json"
+    rockfield = packaged_rockfield_json(run_dir)
     rock_settings = run_dir / "rock_settings.json"
     source_manifest_path = run_dir / "source_heightmap.json"
 
-    missing_package_files = [
+    missing_package_files = []
+    if rockfield is None:
+        missing_package_files.append("*_rockfield.json")
+    missing_package_files.extend(
         path.name
-        for path in (rockfield, rock_settings, source_manifest_path)
+        for path in (rock_settings, source_manifest_path)
         if not path.is_file()
-    ]
+    )
     if missing_package_files:
         raise FileNotFoundError(
             "The selected folder is not a complete compact rockfield run. "
@@ -1816,7 +1847,7 @@ def open_rockfield_analysis_dialog():
     ttk.Label(
         inputs_box,
         text=(
-            "Expected files: unreal_rockfield.json, rock_settings.json, "
+            "Expected files: *_rockfield.json, rock_settings.json, "
             "and source_heightmap.json"
         ),
         foreground=MUTED,
@@ -2101,6 +2132,7 @@ def find_unreal_rockfield_json(run_dir, base_name, newer_than=None):
 
     exact_names = [
         f"{base_name}_unreal_rockfield.json",
+        f"{base_name}_rockfield.json",
     ]
 
     candidates = []
@@ -2111,9 +2143,10 @@ def find_unreal_rockfield_json(run_dir, base_name, newer_than=None):
             if exact.exists() and exact.is_file():
                 candidates.append(exact)
 
-        for match in folder.glob("*_unreal_rockfield.json"):
-            if match.exists() and match.is_file():
-                candidates.append(match)
+        for pattern in ("*_unreal_rockfield.json", "*_rockfield.json"):
+            for match in folder.glob(pattern):
+                if match.exists() and match.is_file():
+                    candidates.append(match)
 
     if newer_than is not None:
         filtered = []
@@ -2293,14 +2326,48 @@ def finalize_heightmap_run(
     run_dir,
     generator_out_dir,
 ):
-    """Move the compact four-file generator output into the final run folder."""
+    """Move a timestamped compact heightmap package into its final run folder."""
     run_dir = Path(run_dir)
     generator_out_dir = Path(generator_out_dir)
 
-    heightmap_source = generator_out_dir / "heightmap.png"
-    metadata_source = generator_out_dir / "metadata.json"
-    crater_source = generator_out_dir / "craters.json"
-    summary_source = generator_out_dir / "generation_summary.txt"
+    metadata_candidates = sorted(
+        generator_out_dir.glob("*_metadata.json"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    if not metadata_candidates:
+        # Compatibility with the original fixed-name generator.
+        legacy_metadata = generator_out_dir / "metadata.json"
+        if legacy_metadata.is_file():
+            metadata_candidates = [legacy_metadata]
+
+    if not metadata_candidates:
+        raise FileNotFoundError(
+            "Heightmap generation did not produce a metadata JSON file."
+        )
+
+    metadata_source = metadata_candidates[0]
+    package_metadata = read_json(metadata_source)
+    output_files = package_metadata.get("output_files", {})
+    if not isinstance(output_files, dict):
+        raise ValueError(
+            f"Invalid output_files section in generated metadata: {metadata_source}"
+        )
+
+    def package_file(key, legacy_name):
+        value = output_files.get(key)
+        if value:
+            path = resolve_manifest_path(value, metadata_source.parent)
+            if path is not None:
+                return path
+        return generator_out_dir / legacy_name
+
+    heightmap_source = package_file("heightmap", "heightmap.png")
+    crater_source = package_file("craters", "craters.json")
+    summary_source = package_file(
+        "generation_summary",
+        "generation_summary.txt",
+    )
 
     required = [
         heightmap_source,
@@ -2311,25 +2378,26 @@ def finalize_heightmap_run(
     missing = [path.name for path in required if not path.is_file()]
     if missing:
         raise FileNotFoundError(
-            "Heightmap generation did not produce the compact package files: "
+            "Heightmap generation produced an incomplete package. Missing: "
             + ", ".join(missing)
         )
 
+    # Keep the generator's timestamp/preset/seed filenames intact.
     canonical_heightmap = move_primary_file(
         heightmap_source,
-        run_dir / "heightmap.png",
-    )
-    canonical_metadata = move_primary_file(
-        metadata_source,
-        run_dir / "metadata.json",
+        run_dir / heightmap_source.name,
     )
     canonical_craters = move_primary_file(
         crater_source,
-        run_dir / "craters.json",
+        run_dir / crater_source.name,
     )
     canonical_summary = move_primary_file(
         summary_source,
-        run_dir / "generation_summary.txt",
+        run_dir / summary_source.name,
+    )
+    canonical_metadata = move_primary_file(
+        metadata_source,
+        run_dir / metadata_source.name,
     )
 
     HEIGHTMAP_PNG_DIR.mkdir(parents=True, exist_ok=True)
@@ -2349,7 +2417,7 @@ def finalize_heightmap_run(
         "crater_json": canonical_craters,
         "generation_summary": canonical_summary,
         "unreal_heightmap": unreal_heightmap,
-        "base_name": run_name,
+        "base_name": base_name_from_crater_json(canonical_craters),
         "run_name": run_name,
     }
 
@@ -2363,15 +2431,37 @@ def finalize_rockfield_run(
 ):
     run_dir = Path(run_dir)
     generator_out_dir = Path(generator_out_dir)
+    unreal_source = Path(unreal_source)
 
-    canonical_unreal = move_primary_file(
+    # Keep the generator's timestamp/terrain/seed filename intact.
+    canonical_rockfield = move_primary_file(
         unreal_source,
-        run_dir / "unreal_rockfield.json",
+        run_dir / unreal_source.name,
     )
+
+    # The generator originally wrote relative source paths from its temporary
+    # directory. Rebase them to the final compact run folder after moving it.
+    try:
+        rockfield_payload = read_json(canonical_rockfield)
+        rockfield_payload["path_base"] = "this_json_directory"
+        rockfield_payload["source_crater_json"] = relative_or_absolute(
+            source_info.get("crater_json"),
+            run_dir,
+        )
+        rockfield_payload["source_metadata_json"] = relative_or_absolute(
+            source_info.get("metadata"),
+            run_dir,
+        )
+        with canonical_rockfield.open("w", encoding="utf-8") as file:
+            json.dump(rockfield_payload, file, indent=2, allow_nan=False)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Could not rebase source paths in {canonical_rockfield.name}: {exc}"
+        ) from exc
 
     UNREAL_ROCKFIELD_DIR.mkdir(parents=True, exist_ok=True)
     unreal_import = UNREAL_ROCKFIELD_DIR / f"{run_name}.json"
-    shutil.copy2(canonical_unreal, unreal_import)
+    shutil.copy2(canonical_rockfield, unreal_import)
 
     source_manifest = {
         "format": "MoonSimRockfieldSourceHeightmap",
@@ -2400,13 +2490,11 @@ def finalize_rockfield_run(
     ) as file:
         json.dump(source_manifest, file, indent=2)
 
-    # The generator uses a temporary output directory. Remove it after the
-    # canonical JSON has been packaged so the final run stays compact.
-    if generator_out_dir.exists():
+    if generator_out_dir.exists() and generator_out_dir != run_dir:
         shutil.rmtree(generator_out_dir, ignore_errors=True)
 
     allowed_files = {
-        "unreal_rockfield.json",
+        canonical_rockfield.name,
         "rock_settings.json",
         "source_heightmap.json",
     }
@@ -2423,9 +2511,10 @@ def finalize_rockfield_run(
 
     return {
         "run_dir": run_dir,
-        "unreal_rockfield": canonical_unreal,
+        "unreal_rockfield": canonical_rockfield,
         "unreal_import": unreal_import,
     }
+
 
 current_run = {
     "run_dir": None,
@@ -2467,7 +2556,7 @@ def make_run_folder(state):
     )
     run_name, run_dir = unique_generation_run_dir(
         HEIGHTMAP_GENERATIONS_DIR,
-        f"{run_timestamp}_{terrain_slug}",
+        f"{run_timestamp}_{terrain_slug}_seed{int(state['seed'])}",
     )
     generator_out_dir = run_dir / "intermediate"
     generator_out_dir.mkdir(parents=True, exist_ok=True)
@@ -2480,7 +2569,7 @@ def make_rock_run_folder(state):
     )
     run_name, run_dir = unique_generation_run_dir(
         ROCKFIELD_GENERATIONS_DIR,
-        f"{run_timestamp}_{terrain_slug}",
+        f"{run_timestamp}_{terrain_slug}_seed{int(state['seed'])}",
     )
     run_dir.mkdir(parents=True, exist_ok=False)
     generator_out_dir = Path(
@@ -2557,24 +2646,70 @@ def resolve_heightmap_run_folder(run_folder):
     if not run_dir.is_dir():
         raise FileNotFoundError(f"Heightmap run folder does not exist: {run_dir}")
 
+    # New timestamped package: discover metadata, then trust its output_files map.
+    metadata_candidates = sorted(
+        run_dir.glob("*_metadata.json"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+
+    # Compatibility with older compact packages.
+    legacy_metadata = run_dir / "metadata.json"
+    if legacy_metadata.is_file():
+        metadata_candidates.append(legacy_metadata)
+
+    for metadata_path in metadata_candidates:
+        try:
+            package_metadata = read_json(metadata_path)
+            output_files = package_metadata.get("output_files", {})
+            if not isinstance(output_files, dict):
+                continue
+
+            heightmap = resolve_manifest_path(
+                output_files.get("heightmap"),
+                metadata_path.parent,
+            )
+            crater_json = resolve_manifest_path(
+                output_files.get("craters"),
+                metadata_path.parent,
+            )
+
+            # Old compact metadata may not contain output_files.
+            if heightmap is None:
+                old_heightmap = run_dir / "heightmap.png"
+                heightmap = old_heightmap if old_heightmap.is_file() else None
+            if crater_json is None:
+                old_craters = run_dir / "craters.json"
+                crater_json = old_craters if old_craters.is_file() else None
+
+            if (
+                heightmap is not None
+                and heightmap.is_file()
+                and crater_json is not None
+                and crater_json.is_file()
+            ):
+                return {
+                    "run_dir": run_dir,
+                    "heightmap": heightmap,
+                    "metadata": metadata_path,
+                    "crater_json": crater_json,
+                    "base_name": base_name_from_crater_json(crater_json),
+                    "run_name": run_dir.name,
+                }
+        except Exception:
+            continue
+
+    # Original fixed-name compact package without a modern output_files map.
     clean_heightmap = run_dir / "heightmap.png"
     clean_metadata = run_dir / "metadata.json"
     clean_craters = run_dir / "craters.json"
     if clean_heightmap.is_file() and clean_metadata.is_file() and clean_craters.is_file():
-        base_name = run_dir.name
-        manifest_path = run_dir / "run_manifest.json"
-        if manifest_path.is_file():
-            try:
-                manifest = read_json(manifest_path)
-                base_name = str(manifest.get("generator_base_name") or base_name)
-            except Exception:
-                pass
         return {
             "run_dir": run_dir,
             "heightmap": clean_heightmap,
             "metadata": clean_metadata,
             "crater_json": clean_craters,
-            "base_name": base_name,
+            "base_name": run_dir.name,
             "run_name": run_dir.name,
         }
 
@@ -2630,6 +2765,11 @@ def find_metadata_for_crater_json(crater_json, base_name):
     crater_json = Path(crater_json)
     if crater_json.name == "craters.json":
         sibling = crater_json.parent / "metadata.json"
+        if sibling.is_file():
+            return sibling
+    elif crater_json.name.endswith("_craters.json"):
+        prefix = crater_json.name[:-len("_craters.json")]
+        sibling = crater_json.parent / f"{prefix}_metadata.json"
         if sibling.is_file():
             return sibling
     candidates = []
@@ -2737,17 +2877,22 @@ def base_name_from_crater_json(crater_json):
     name = path.name
     if name.endswith("_rockfield_craters.json"):
         return name.replace("_rockfield_craters.json", "")
+    if name.endswith("_craters.json"):
+        return name[:-len("_craters.json")]
     return path.stem
 
 def find_latest_heightmap_run():
-    clean_runs = [
-        run_dir
-        for run_dir in HEIGHTMAP_GENERATIONS_DIR.glob("*")
-        if run_dir.is_dir()
-        and (run_dir / "heightmap.png").is_file()
-        and (run_dir / "metadata.json").is_file()
-        and (run_dir / "craters.json").is_file()
-    ]
+    clean_runs = []
+    if HEIGHTMAP_GENERATIONS_DIR.exists():
+        for run_dir in HEIGHTMAP_GENERATIONS_DIR.glob("*"):
+            if not run_dir.is_dir():
+                continue
+            try:
+                resolve_heightmap_run_folder(run_dir)
+                clean_runs.append(run_dir)
+            except Exception:
+                continue
+
     if clean_runs:
         latest = max(clean_runs, key=lambda path: path.stat().st_mtime)
         return resolve_heightmap_run_folder(latest)
@@ -2765,6 +2910,7 @@ def find_latest_heightmap_run():
         return resolve_heightmap_run_folder(crater_json.parents[2])
     except Exception:
         return None
+
 
 def make_crater_segments_json(state):
     """Create a temporary CLI override without adding files to the run package."""
@@ -2916,8 +3062,7 @@ def get_heightmap_source_for_rocks(state):
 
     raise FileNotFoundError(
         "Rock generation needs a complete heightmap run. Generate a heightmap first, "
-        "or choose a folder under generated/heightmaps containing heightmap.png, "
-        "metadata.json, and craters.json."
+        "or choose a complete folder under generated/heightmaps."
     )
 
 def rock_generation_thread(state):
@@ -2970,31 +3115,27 @@ def rock_generation_thread(state):
             output_filter=filter_rockfield_summary,
         )
 
-        expected = generator_out_dir / f"{base_name}_unreal_rockfield.json"
-        found_unreal_json = find_unreal_rockfield_json(
+        converted = find_unreal_rockfield_json(
             generator_out_dir,
             base_name,
             newer_than=rock_start_time - 2.0,
         )
 
-        if found_unreal_json and found_unreal_json.exists() and not expected.exists():
-            expected.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(found_unreal_json, expected)
-            try:
-                if found_unreal_json.resolve() != expected.resolve():
-                    found_unreal_json.unlink()
-            except OSError:
-                pass
-
-        converted = convert_minimal_unreal_json_if_needed(
-            expected,
-            base_name,
-            crater_json,
-        )
+        # Compatibility fallback for older generators that wrote only the
+        # position/CSV files and required conversion to a compact JSON.
+        if converted is None:
+            legacy_expected = (
+                generator_out_dir / f"{base_name}_unreal_rockfield.json"
+            )
+            converted = convert_minimal_unreal_json_if_needed(
+                legacy_expected,
+                base_name,
+                crater_json,
+            )
 
         if not converted or not converted.exists():
             raise FileNotFoundError(
-                "Rock generation completed, but no Unreal rockfield JSON was found or converted."
+                "Rock generation completed, but no rockfield JSON was found or converted."
             )
 
         packaged = finalize_rockfield_run(

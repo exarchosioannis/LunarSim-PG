@@ -1,49 +1,104 @@
 #!/usr/bin/env python3
 """
-Offline MoonSim rock-field generator.
+LunarSim-PG offline rockfield generator.
 
-This is a Python port of the crater-first logic in RockFieldGenerator.cpp,
-including the scientific rock-placement presets used by the Unreal baker.
-It reads one or more terrain crater JSON files, usually:
-
-    Heightmaps/out/rockfield_json/<terrain>_rockfield_craters.json
-
-and writes one complete rock-field JSON for each terrain:
-
-    <out-root>/<terrain>/<terrain>_unreal_rockfield.json
-
-It intentionally does NOT reproduce Unreal-only placement data such as mesh name,
-world Z, ground-normal alignment, burial, or HISM instance transforms. Those need
-an Unreal World, mesh bounds, and line traces. This script generates the offline
-candidate rock positions and metadata that the analysis/paper scripts can use.
-
-This balanced paper version keeps the Unreal crater-first generation structure:
-crater-owned rocks are generated first and store dominant_crater_index, crater_zone,
-normalized_crater_radius, and source_type. It also keeps the scientific preset
-size, distance, zone, freshness, and material laws.
-
-The default background cap is intentionally set to "maxrocks" rather than the
-strict Unreal cap, because the strict Unreal cap can suppress almost all background
-rocks when a scientifically old/degraded profile generates few crater-owned rocks.
-Use --background-cap-mode unreal when you want to reproduce the exact Unreal cap.
-Use the default/maxrocks mode when you want paper-ready offline fields with both
-regional background abundance and crater-owned metadata.
+The GUI-facing script ports the crater-first placement logic used by the Unreal
+baker. It generates deterministic candidate positions and procedural placement
+metadata. Unreal-specific mesh selection, terrain traces, final world Z, ground
+normal alignment, and final transforms remain the responsibility of Unreal.
 """
 
 from __future__ import annotations
 
 import argparse
-import csv
+import hashlib
 import json
+import logging
 import math
+import os
+import platform
+import re
+import subprocess
 import sys
-from collections import Counter
 from dataclasses import asdict, dataclass, fields
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 PI = math.pi
 KINDA_SMALL_NUMBER = 1.0e-4
+PROJECT_NAME = "LunarSim-PG"
+SCRIPT_NAME = "rockfield_generator"
+SCRIPT_VERSION = "2.0.0"
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def utc_file_timestamp(value: datetime) -> str:
+    return value.strftime("%Y%m%d_%H%M%S")
+
+
+def safe_name(value: str) -> str:
+    cleaned = re.sub(r"[^0-9A-Za-z_.-]+", "_", str(value)).strip("_")
+    return cleaned or "terrain"
+
+
+def git_commit() -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parent), "rev-parse", "HEAD"],
+            check=True, capture_output=True, text=True, timeout=3,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return None
+    value = completed.stdout.strip()
+    return value or None
+
+
+def build_provenance(generated_at: datetime) -> Dict[str, object]:
+    return {
+        "project": PROJECT_NAME,
+        "generator": SCRIPT_NAME,
+        "generator_version": SCRIPT_VERSION,
+        "generated_utc": generated_at.isoformat().replace("+00:00", "Z"),
+        "git_commit": git_commit(),
+        "runtime": {
+            "python": platform.python_version(),
+        },
+    }
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def portable_path(path: Path | str, base_dir: Path) -> str:
+    relative = os.path.relpath(
+        Path(path).expanduser().resolve(),
+        start=base_dir.expanduser().resolve(),
+    )
+    return Path(relative).as_posix()
+
+
+def temporary_path(path: Path) -> Path:
+    return path.with_name(f".{path.stem}.tmp{path.suffix}")
+
+
+def atomic_write_json(path: Path, payload: object) -> None:
+    temp = temporary_path(path)
+    try:
+        with temp.open("w", encoding="utf-8") as file:
+            json.dump(payload, file, indent=2, allow_nan=False)
+            file.write("\n")
+        temp.replace(path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 # -----------------------------------------------------------------------------
@@ -134,6 +189,7 @@ def distance(a: Tuple[float, float], b: Tuple[float, float]) -> float:
 
 @dataclass
 class CraterInfo:
+    crater_id: int
     x_m: float
     y_m: float
     diameter_m: float
@@ -1055,8 +1111,13 @@ def terrain_name_from_crater_json(path: Path) -> str:
     if path.name == "craters.json":
         return path.parent.name
     stem = path.stem
-    suffix = "_rockfield_craters"
-    return stem[:-len(suffix)] if stem.endswith(suffix) else stem
+    for suffix in ("_rockfield_craters", "_craters"):
+        if stem.endswith(suffix):
+            stem = stem[:-len(suffix)]
+            break
+    stem = re.sub(r"^\d{8}_\d{6}_", "", stem)
+    stem = re.sub(r"_seed-?\d+$", "", stem)
+    return stem or path.parent.name
 
 
 def read_json(path: Path) -> Dict[str, Any]:
@@ -1065,42 +1126,30 @@ def read_json(path: Path) -> Dict[str, Any]:
 
 
 def load_metadata(path: Optional[Path]) -> Dict[str, Any]:
-    if path is None or not path.exists():
+    if path is None:
         return {}
-    try:
-        return read_json(path)
-    except Exception as exc:
-        print(f"Warning: could not read metadata {path}: {exc}", file=sys.stderr)
-        return {}
+    if not path.is_file():
+        raise FileNotFoundError(f"Metadata JSON does not exist: {path}")
+    return read_json(path)
 
 
 def apply_metadata_to_settings(settings: RockGenSettings, metadata: Dict[str, Any]) -> None:
     if not metadata:
         return
-    if "seed" in metadata:
-        try:
+    try:
+        if "seed" in metadata:
             settings.seed = int(metadata["seed"])
-        except Exception:
-            pass
-    # Most of your generator metadata uses map_size_m for square maps.
-    if "map_size_m" in metadata:
-        try:
+        if "map_size_m" in metadata:
             size = float(metadata["map_size_m"])
             settings.map_size_meters_x = size
             settings.map_size_meters_y = size
-        except Exception:
-            pass
-    if "map_size_x_m" in metadata:
-        try:
+        if "map_size_x_m" in metadata:
             settings.map_size_meters_x = float(metadata["map_size_x_m"])
-        except Exception:
-            pass
-    if "map_size_y_m" in metadata:
-        try:
+        if "map_size_y_m" in metadata:
             settings.map_size_meters_y = float(metadata["map_size_y_m"])
-        except Exception:
-            pass
-    if "preset" in metadata and metadata["preset"]:
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid numeric value in heightmap metadata: {exc}") from exc
+    if metadata.get("preset"):
         settings.rock_profile = str(metadata["preset"])
 
 
@@ -1144,8 +1193,10 @@ def apply_settings_json(settings: RockGenSettings, path: Optional[Path]) -> None
             try:
                 settings.map_size_meters_x = float(value)
                 settings.map_size_meters_y = float(value)
-            except Exception:
-                pass
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"Invalid settings value {raw_key}={value!r}"
+                ) from exc
             continue
         if target in valid:
             current = getattr(settings, target)
@@ -1162,50 +1213,68 @@ def apply_settings_json(settings: RockGenSettings, path: Optional[Path]) -> None
                 else:
                     value = str(value)
                 setattr(settings, target, value)
-            except Exception:
-                print(f"Warning: ignored invalid settings value {raw_key}={value!r}", file=sys.stderr)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"Invalid settings value {raw_key}={value!r}"
+                ) from exc
 
 
-def load_craters_from_json(path: Path, map_size_x: float, map_size_y: float, coordinates_are_centered: bool) -> List[CraterInfo]:
+def load_craters_from_json(
+    path: Path,
+    map_size_x: float,
+    map_size_y: float,
+    coordinates_are_centered: bool,
+) -> List[CraterInfo]:
     root = read_json(path)
     raw_craters = root.get("craters")
     if not isinstance(raw_craters, list):
         raise ValueError(f"Crater JSON missing 'craters' array: {path}")
 
     craters: List[CraterInfo] = []
-    for obj in raw_craters:
+    for index, obj in enumerate(raw_craters):
         if not isinstance(obj, dict):
-            continue
+            raise ValueError(f"Crater record {index} is not a JSON object")
         try:
             x = float(obj["x_m"])
             y = float(obj["y_m"])
-            d = float(obj["diameter_m"])
-        except Exception:
-            continue
+            diameter = float(obj["diameter_m"])
+            crater_id = int(obj.get("crater_id", index))
+            degradation = clamp(
+                float(obj.get("degradation", obj.get("degrade", 0.0))),
+                0.0,
+                1.0,
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"Invalid crater record {index}: {exc}") from exc
+        if diameter <= 0:
+            raise ValueError(f"Crater record {index} has non-positive diameter")
         if not coordinates_are_centered:
             x -= 0.5 * map_size_x
             y -= 0.5 * map_size_y
-        degrade = obj.get("degrade", obj.get("degradation", 0.0))
-        try:
-            degrade = clamp(float(degrade), 0.0, 1.0)
-        except Exception:
-            degrade = 0.0
-        morph = str(obj.get("morph", "NORMAL") or "NORMAL")
-        craters.append(CraterInfo(x_m=x, y_m=y, diameter_m=d, degrade=degrade, morph=morph))
+        morphology = str(
+            obj.get("morphology", obj.get("morph", "NORMAL")) or "NORMAL"
+        )
+        craters.append(
+            CraterInfo(
+                crater_id=crater_id,
+                x_m=x,
+                y_m=y,
+                diameter_m=diameter,
+                degrade=degradation,
+                morph=morphology,
+            )
+        )
+    crater_ids = [crater.crater_id for crater in craters]
+    if len(crater_ids) != len(set(crater_ids)):
+        raise ValueError("Crater catalogue contains duplicate crater_id values")
     return craters
 
 
-#def rock_to_position_json(rock: RockInstance) -> Dict[str, Any]:
-#    return {
-#        "instance_id": rock.instance_id,
-#        "x_m": rock.x_m,
-#        "y_m": rock.y_m,
-#        "diameter_m": rock.diameter_m,
-#        "dominant_crater_index": rock.dominant_crater_index,
-#    }
 
-
-def rock_to_full_json(rock: RockInstance) -> Dict[str, Any]:
+def rock_to_full_json(
+    rock: RockInstance,
+    crater_ids_by_index: Dict[int, int],
+) -> Dict[str, Any]:
     return {
         "instance_id": rock.instance_id,
         "x_m": rock.x_m,
@@ -1214,6 +1283,9 @@ def rock_to_full_json(rock: RockInstance) -> Dict[str, Any]:
         "size_class": rock.size_class,
         "material_type": rock.material_type,
         "crater_zone": rock.crater_zone,
+        "dominant_crater_id": crater_ids_by_index.get(
+            rock.dominant_crater_index, rock.dominant_crater_index
+        ),
         "dominant_crater_index": rock.dominant_crater_index,
         "distance_to_dominant_crater_center_m": rock.distance_to_dominant_crater_center_m,
         "normalized_crater_radius": rock.normalized_crater_radius,
@@ -1225,6 +1297,7 @@ def rock_to_full_json(rock: RockInstance) -> Dict[str, Any]:
         "yaw_degrees": rock.yaw_degrees,
         "tilt_degrees": rock.tilt_degrees,
         "tilt_axis_degrees": rock.tilt_axis_degrees,
+        "procedural_burial_fraction": rock.burial_fraction,
         "burial_fraction": rock.burial_fraction,
     }
 
@@ -1238,38 +1311,62 @@ def write_outputs(
     craters: List[CraterInfo],
     rocks: List[RockInstance],
     warnings: Iterable[str],
-    write_offline_instances: bool = False,
-) -> None:
-    del craters
-    del warnings
-    del write_offline_instances
-
+    overwrite: bool = False,
+) -> Path:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    rockfield_path = out_dir / f"{terrain_name}_unreal_rockfield.json"
+    generated_at = utc_now()
+    prefix = (
+        f"{utc_file_timestamp(generated_at)}_"
+        f"{safe_name(terrain_name)}_seed{settings.seed}"
+    )
+    rockfield_path = out_dir / f"{prefix}_rockfield.json"
+    if rockfield_path.exists() and not overwrite:
+        raise FileExistsError(f"Refusing to overwrite existing output: {rockfield_path}")
 
-    with rockfield_path.open("w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "format": "MoonSimOfflineRockField",
-                "version": 1,
-                "units": "meters",
-                "coordinate_frame": "centered_map_meters",
-                "terrain_name": terrain_name,
-                "source_crater_json": str(crater_json),
-                "source_metadata_json": (
-                    str(metadata_path) if metadata_path else None
-                ),
-                "map_size_x_m": settings.map_size_meters_x,
-                "map_size_y_m": settings.map_size_meters_y,
-                "rock_count": len(rocks),
-                "rocks": [rock_to_full_json(r) for r in rocks],
-            },
-            f,
-            indent=2,
-        )
+    crater_ids_by_index = {index: crater.crater_id for index, crater in enumerate(craters)}
+    warning_list = list(warnings)
+    source_checksums = {
+        "craters": sha256_file(crater_json),
+    }
+    if metadata_path is not None:
+        source_checksums["metadata"] = sha256_file(metadata_path)
 
-    print(f"Wrote Unreal rockfield: {rockfield_path}")
+    payload = {
+        "format": "LunarSimRockfieldPackage",
+        "format_version": 2,
+        "provenance": build_provenance(generated_at),
+        "units": "meters",
+        "coordinate_frame": "centered_map_meters",
+        "terrain_name": terrain_name,
+        "seed": settings.seed,
+        "path_base": "this_json_directory",
+        "source_crater_json": portable_path(crater_json, out_dir),
+        "source_metadata_json": (
+            portable_path(metadata_path, out_dir) if metadata_path else None
+        ),
+        "source_checksums_sha256": source_checksums,
+        "settings_resolution_order": [
+            "dataclass_defaults",
+            "settings_json",
+            "heightmap_metadata",
+            "scientific_profile",
+            "gui_overrides",
+        ],
+        "settings": asdict(settings),
+        "map_size_x_m": settings.map_size_meters_x,
+        "map_size_y_m": settings.map_size_meters_y,
+        "source_crater_count": len(craters),
+        "rock_count": len(rocks),
+        "generation_warnings": warning_list,
+        "rocks": [
+            rock_to_full_json(rock, crater_ids_by_index) for rock in rocks
+        ],
+    }
+    atomic_write_json(rockfield_path, payload)
+    print(f"Wrote rockfield: {rockfield_path}")
+    return rockfield_path
+
 
 def generate_one(
     crater_json: Path,
@@ -1277,12 +1374,17 @@ def generate_one(
     base_settings: RockGenSettings,
     metadata_path: Optional[Path],
     coords_centered: bool,
-    write_offline_instances: bool,
     cli_overrides: Optional[Dict[str, Any]] = None,
+    overwrite: bool = False,
 ) -> Dict[str, Any]:
-    terrain_name = terrain_name_from_crater_json(crater_json)
     settings = RockGenSettings(**asdict(base_settings))
     metadata = load_metadata(metadata_path)
+    crater_header = read_json(crater_json)
+    terrain_name = (
+        str(metadata.get("preset") or "").strip()
+        or str(crater_header.get("preset_name") or "").strip()
+        or terrain_name_from_crater_json(crater_json)
+    )
     apply_metadata_to_settings(settings, metadata)
 
     # CLI profile/use-scientific flags choose the preset and should beat metadata.
@@ -1299,19 +1401,75 @@ def generate_one(
     apply_cli_overrides(settings, overrides)
     settings.rock_profile = canonical_rock_profile(settings.rock_profile) if settings.use_scientific_preset_values else settings.rock_profile
 
+    validate_settings(settings)
     craters = load_craters_from_json(crater_json, settings.map_size_meters_x, settings.map_size_meters_y, coords_centered)
     gen = RockFieldGenerator(settings, craters)
     rocks = gen.generate_rocks_uniform()
-    write_outputs(out_dir, terrain_name, crater_json, metadata_path, settings, craters, rocks, gen.warnings, write_offline_instances)
+    rockfield_path = write_outputs(
+        out_dir, terrain_name, crater_json, metadata_path, settings, craters, rocks,
+        gen.warnings, overwrite=overwrite,
+    )
     return {
         "terrain_name": terrain_name,
         "out_dir": str(out_dir),
+        "rockfield_json": str(rockfield_path),
         "crater_json": str(crater_json),
         "metadata_json": str(metadata_path) if metadata_path else None,
         "rock_count": len(rocks),
         "crater_count": len(craters),
         "warnings": gen.warnings,
     }
+
+
+def validate_settings(settings: RockGenSettings) -> None:
+    errors: List[str] = []
+    if settings.map_size_meters_x <= 0 or settings.map_size_meters_y <= 0:
+        errors.append("map dimensions must be positive")
+    if settings.max_rocks < 0:
+        errors.append("max_rocks cannot be negative")
+    if settings.min_rock_diameter <= 0:
+        errors.append("min_rock_diameter must be positive")
+    if settings.max_rock_diameter_cap < settings.min_rock_diameter:
+        errors.append("max_rock_diameter_cap must be >= min_rock_diameter")
+    if settings.power_law_exponent <= 0:
+        errors.append("power_law_exponent must be positive")
+    for name in (
+        "background_fraction_cap", "background_clump_fraction",
+        "interior_fraction", "rim_fraction", "proximal_fraction",
+        "distal_fraction", "crater_clump_fraction", "freshness_floor",
+    ):
+        value = float(getattr(settings, name))
+        if not 0.0 <= value <= 1.0:
+            errors.append(f"{name} must be in [0, 1]")
+    zone_total = (
+        settings.interior_fraction + settings.rim_fraction
+        + settings.proximal_fraction + settings.distal_fraction
+    )
+    if not math.isclose(zone_total, 1.0, rel_tol=0.0, abs_tol=1.0e-6):
+        errors.append("crater zone fractions must sum to 1")
+    for prefix in ("interior", "rim", "proximal", "distal"):
+        low = float(getattr(settings, f"{prefix}_r_min"))
+        high = float(getattr(settings, f"{prefix}_r_max"))
+        if low < 0 or high < low:
+            errors.append(f"invalid {prefix} normalized-radius range")
+    if not 0.0 <= settings.max_source_crater_degrade <= 1.0:
+        errors.append("max_source_crater_degrade must be in [0, 1]")
+    if not 0.0 <= settings.min_burial_fraction <= settings.max_burial_fraction <= 1.0:
+        errors.append("burial fractions must satisfy 0 <= min <= max <= 1")
+    if settings.background_density_per_m2 < 0:
+        errors.append("background_density_per_m2 cannot be negative")
+    if settings.background_cap_mode not in {"unreal", "maxrocks"}:
+        errors.append("background_cap_mode must be 'unreal' or 'maxrocks'")
+    for name in (
+        "background_cluster_sigma_m", "mean_cluster_size", "cluster_sigma_m",
+        "random_big_rock_mean_rocks_per_clump", "random_big_rock_clump_sigma_m",
+    ):
+        if float(getattr(settings, name)) < 0:
+            errors.append(f"{name} cannot be negative")
+    if settings.random_big_rock_clump_count < 0:
+        errors.append("random_big_rock_clump_count cannot be negative")
+    if errors:
+        raise ValueError("Invalid rockfield settings: " + "; ".join(errors))
 
 
 def collect_crater_jsons(args: argparse.Namespace) -> List[Path]:
@@ -1329,6 +1487,12 @@ def collect_crater_jsons(args: argparse.Namespace) -> List[Path]:
 def metadata_for(crater_json: Path, args: argparse.Namespace) -> Optional[Path]:
     if args.metadata:
         return Path(args.metadata)
+    if crater_json.name.endswith("_craters.json"):
+        sibling = crater_json.with_name(
+            crater_json.name[:-len("_craters.json")] + "_metadata.json"
+        )
+        if sibling.is_file():
+            return sibling
     if not args.metadata_dir:
         return None
     base = terrain_name_from_crater_json(crater_json)
@@ -1423,12 +1587,13 @@ def apply_cli_overrides(settings: RockGenSettings, overrides: Dict[str, Any]) ->
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate one complete MoonSim Unreal rockfield JSON per terrain.")
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+    parser = argparse.ArgumentParser(description="Generate one complete LunarSim-PG rockfield JSON per terrain.")
 
     inputs = parser.add_argument_group("inputs")
-    inputs.add_argument("--crater-json", help="Single <terrain>_rockfield_craters.json file")
-    inputs.add_argument("--crater-json-dir", help="Directory containing *_rockfield_craters.json files")
-    inputs.add_argument("--pattern", default="*_rockfield_craters.json", help="Glob pattern used with --crater-json-dir")
+    inputs.add_argument("--crater-json", help="Single generated crater catalogue JSON")
+    inputs.add_argument("--crater-json-dir", help="Directory containing generated crater catalogue JSON files")
+    inputs.add_argument("--pattern", default="*_craters.json", help="Glob pattern used with --crater-json-dir")
     inputs.add_argument("--metadata", help="Metadata JSON for a single terrain; used for seed/map_size/preset when present")
     inputs.add_argument("--metadata-dir", help="Directory containing <terrain>.json metadata files")
     inputs.add_argument("--settings-json", help="Optional JSON file overriding generator settings")
@@ -1436,7 +1601,7 @@ def main() -> None:
     outputs = parser.add_argument_group("outputs")
     outputs.add_argument("--out-dir", help="Output directory for a single terrain")
     outputs.add_argument("--out-root", default="out/rockfields", help="Output root for batch mode; each terrain gets a subfolder")
-    outputs.add_argument("--write-offline-instances", action="store_true", help=argparse.SUPPRESS)
+    outputs.add_argument("--overwrite", action="store_true", help="Allow replacement of an identical timestamped output name")
 
     coords = parser.add_mutually_exclusive_group()
     coords.add_argument("--coords-centered", dest="coords_centered", action="store_true", help="Crater x_m/y_m are already centered around 0,0; default")
@@ -1466,7 +1631,6 @@ def main() -> None:
     base_settings = build_base_settings(args)
     cli_overrides = build_cli_overrides(args)
 
-    manifest = []
     for crater_json in crater_jsons:
         if not crater_json.exists():
             raise SystemExit(f"Crater JSON not found: {crater_json}")
@@ -1478,9 +1642,14 @@ def main() -> None:
         else:
             out_dir = Path(args.out_root) / terrain_name
         meta = metadata_for(crater_json, args)
-        result = generate_one(crater_json, out_dir, base_settings, meta, args.coords_centered, args.write_offline_instances, cli_overrides)
-        manifest.append(result)
-        print(f"Generated {result['rock_count']} rocks for {terrain_name} -> {out_dir}")
+        result = generate_one(
+            crater_json, out_dir, base_settings, meta, args.coords_centered,
+            cli_overrides, overwrite=args.overwrite,
+        )
+        print(
+            f"Generated {result['rock_count']} rocks for {terrain_name} "
+            f"-> {result['rockfield_json']}"
+        )
         if result["warnings"]:
             for warning in result["warnings"][:5]:
                 print(f"  warning: {warning}", file=sys.stderr)
