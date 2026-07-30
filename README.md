@@ -120,6 +120,7 @@ For example, you can select:
 - whether to publish stereo images through ROS 2
 - pose, trajectory, and timing outputs
 - rover control through WASD or ROS 2 `cmd_vel`
+- lunar illumination conditions through configurable sun elevation and azimuth
 
 When you are ready, press **Apply Settings**.
 
