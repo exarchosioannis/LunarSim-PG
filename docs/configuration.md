@@ -86,28 +86,45 @@ because all three use the same rover-controller speed-limiting path.
 
 ### Apply Settings
 
-Press **Apply Settings** after making changes. The button requires a complete
-rover setup in the open level and is unavailable while Play In Editor or
-simulation is running. If the level is missing that setup, use
-**Create / Update Rover + Ground Truth** in the next block.
+Press **Apply Settings** at the bottom of **Data Generation and ROS 2** after
+making changes. The button requires a complete rover setup in the open level
+and is unavailable while Play In Editor or simulation is running. If the level
+is missing that setup, use **Create / Update Rover + Ground Truth** in the next
+block.
 
 The action updates the current level, so save the level if you want to keep the
 settings for later editor sessions. If the level contains more than one
 complete rover setup, the window applies the settings to the first one it
-finds and reports this below the button.
+finds. After a successful apply, the button briefly displays
+**Settings Applied** and then returns to its normal label.
 
 ### World Setup
 
-This block prepares required actors in the current level. Both actions are
-disabled during Play In Editor.
+This block contains a **Sun Direction** card and a **Setup Actions** card. Its
+controls are disabled during Play In Editor.
 
 | Option | What it does |
 | --- | --- |
-| **Create / Update Sky, Earth and Sun** | Creates or updates the standard directional light, Earth, Sky, Sun, and Sun glow controller. Use this option to prepare a new level or restore the standard environment setup; it resets the Earth, Sky, and Sun to their preset transforms. |
-| **Create / Update Rover + Ground Truth** | Creates or updates the rover and ground-truth map publisher, then refreshes the window's configuration target. Use this option when the level does not yet have a complete rover setup; it places the rover and map publisher at the world origin. |
+| **Sun Elevation (deg)** | Sets the sun elevation from `0.0` to `90.0` degrees. Elevation maps to negative Unreal Pitch. |
+| **Sun Azimuth (deg)** | Sets the sun azimuth from `0.0` to `360.0` degrees. Azimuth maps directly to Unreal Yaw. |
+| **Apply Sun Direction** | Applies elevation and azimuth to the single Directional Light in the current level while preserving Roll. It does not change light intensity or other light properties. |
+| **Create / Update Sky, Earth and Sun** | Creates or updates the lunar lighting, sky, Earth, and sun-glow setup, including the Directional Light, Sun sphere, and sun-glow controller references. |
+| **Create / Update Rover + Ground Truth** | Creates or updates the rover and ground-truth pipeline, including rover ground placement and relevant sun-glow references when the environment exists. |
 
-These actions change the level immediately. Save the level when you want to
-keep the result.
+The sun-direction controls are available only when the current level contains
+exactly one Directional Light. **Apply Sun Direction** changes only that
+actor's rotation and briefly confirms success on the button itself; save the
+level when you want the change to persist.
+
+The **Setup Actions** card retains the existing environment and rover setup
+buttons and their behavior. These actions change the level immediately. Save
+the level when you want to keep the result. Apply feedback is temporary and
+does not add persistent status rows.
+
+When opened as a new floating tab, Simulator Config uses a responsive default
+size based on the preferred monitor's available work area. It remains
+resizable and dockable, and Unreal's restored tab layout takes precedence over
+this default.
 
 ### Terrain Generation
 

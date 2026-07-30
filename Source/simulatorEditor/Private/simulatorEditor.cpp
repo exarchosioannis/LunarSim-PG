@@ -4,10 +4,12 @@
 #include "EngineUtils.h"
 #include "Components/ChildActorComponent.h"
 #include "Components/LightComponent.h"
+#include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "CollisionQueryParams.h"
 #include "Engine/CollisionProfile.h"
 #include "Engine/DirectionalLight.h"
+#include "Engine/Level.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
@@ -25,6 +27,8 @@
 #include "RockBaking/SRockBakingPanel.h"
 
 #include "Framework/Docking/TabManager.h"
+#include "Framework/Application/SlateApplication.h"
+#include "HAL/PlatformApplicationMisc.h"
 #include "ScopedTransaction.h"
 #include "ToolMenus.h"
 
@@ -86,6 +90,16 @@ float NormalizeEditorCaptureHz(float InCaptureHz)
 constexpr float MinRoverSpeedKmh = 3.0f;
 constexpr float MaxForwardRoverSpeedKmh = 10.0f;
 constexpr float MaxReverseRoverSpeedKmh = 8.0f;
+constexpr float MinSunElevationDeg = 0.0f;
+constexpr float MaxSunElevationDeg = 90.0f;
+constexpr float MinSunAzimuthDeg = 0.0f;
+constexpr float MaxSunAzimuthDeg = 360.0f;
+constexpr float TemporaryButtonFeedbackSeconds = 1.75f;
+constexpr float SimulatorConfigWorkAreaFraction = 0.9f;
+constexpr float SimulatorConfigMinWidth = 1100.0f;
+constexpr float SimulatorConfigMaxWidth = 1500.0f;
+constexpr float SimulatorConfigMinHeight = 750.0f;
+constexpr float SimulatorConfigMaxHeight = 1000.0f;
 
 float ClampForwardRoverSpeedKmh(float InSpeedKmh)
 {
@@ -112,6 +126,36 @@ bool IsUsableEditorActor(AActor* Actor, const UWorld* ExpectedWorld)
 {
 	return IsValid(Actor) && Actor->GetWorld() == ExpectedWorld && !Actor->IsActorBeingDestroyed() &&
 	       !HasInvalidEditorFlags(Actor);
+}
+
+ADirectionalLight* FindUniqueDirectionalLight(UWorld* World, int32& OutLightCount)
+{
+	OutLightCount = 0;
+	ADirectionalLight* DirectionalLight = nullptr;
+
+	if (!World)
+		return nullptr;
+
+	for (TActorIterator<ADirectionalLight> It(World); It; ++It) {
+		ADirectionalLight* Candidate = *It;
+		if (!IsUsableEditorActor(Candidate, World))
+			continue;
+
+		DirectionalLight = Candidate;
+		++OutLightCount;
+	}
+
+	return OutLightCount == 1 ? DirectionalLight : nullptr;
+}
+
+void LogDirectionalLightLookupWarning(int32 LightCount)
+{
+	if (LightCount == 0) {
+		UE_LOG(LogTemp, Warning, TEXT("Simulator Config sun direction unavailable: no Directional Light found."));
+	} else {
+		UE_LOG(LogTemp, Warning,
+		       TEXT("Simulator Config sun direction unavailable: found %d Directional Lights."), LightCount);
+	}
 }
 
 bool IsUsableRobotCamRig(ARobotCamRig* RobotCamRig, const UWorld* ExpectedWorld)
@@ -252,8 +296,6 @@ const TArray<FString>& GetRoverBlueprintClassPaths()
 
 	return Paths;
 }
-
-FText WorldSetupStatus = LOCTEXT("WorldSetupReadyStatus", "World setup ready.");
 
 template <typename ActorType> ActorType* FindActorByLabel(UWorld* World, const FString& ActorLabel)
 {
@@ -889,6 +931,17 @@ TSharedRef<SWidget> MakeSimulatorConfigSection(const FText& Title, const TShared
 		];
 }
 
+TSharedRef<SWidget> MakeSimulatorConfigMainSectionTitle(const FText& Title)
+{
+	return SNew(SBox)
+		.Padding(FMargin(0.f, 8.f))
+		[
+			SNew(STextBlock)
+				.Text(Title)
+				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 12))
+		];
+}
+
 TSharedRef<SWidget> MakeSimulatorConfigFormRow(const FText& Label, const TSharedRef<SWidget>& Control)
 {
 	return SNew(SHorizontalBox)
@@ -919,12 +972,56 @@ TSharedRef<SWidget> MakeSimulatorConfigCheckRow(const TSharedRef<SWidget>& Check
 			CheckBox
 		];
 }
+
+void ShowTemporaryButtonText(const TWeakPtr<STextBlock>& WeakLabel, const FText& TemporaryText,
+                             const FText& DefaultText)
+{
+	TSharedPtr<STextBlock> Label = WeakLabel.Pin();
+	if (!Label)
+		return;
+
+	Label->SetText(TemporaryText);
+	Label->RegisterActiveTimer(
+	    TemporaryButtonFeedbackSeconds,
+	    FWidgetActiveTimerDelegate::CreateLambda(
+	        [WeakLabel, DefaultText](double, float) {
+		        if (TSharedPtr<STextBlock> PinnedLabel = WeakLabel.Pin())
+			        PinnedLabel->SetText(DefaultText);
+		        return EActiveTimerReturnType::Stop;
+	        }));
+}
+
+FVector2D GetSimulatorConfigDefaultWindowSize()
+{
+	const FSlateRect WorkArea = FSlateApplication::Get().GetPreferredWorkArea();
+	const float DpiScale =
+	    FMath::Max(FPlatformApplicationMisc::GetDPIScaleFactorAtPoint(WorkArea.Left, WorkArea.Top), KINDA_SMALL_NUMBER);
+	const float AvailableWidth = (WorkArea.Right - WorkArea.Left) / DpiScale;
+	const float AvailableHeight = (WorkArea.Bottom - WorkArea.Top) / DpiScale;
+
+	auto GetInitialDimension = [](float Available, float Minimum, float Maximum) {
+		if (Available <= 0.0f)
+			return Minimum;
+
+		const float UpperBound = FMath::Min(Available, Maximum);
+		const float LowerBound = FMath::Min(Minimum, UpperBound);
+		return FMath::Clamp(Available * SimulatorConfigWorkAreaFraction, LowerBound, UpperBound);
+	};
+
+	return FVector2D(
+	    GetInitialDimension(AvailableWidth, SimulatorConfigMinWidth, SimulatorConfigMaxWidth),
+	    GetInitialDimension(AvailableHeight, SimulatorConfigMinHeight, SimulatorConfigMaxHeight));
+}
 }
 
 void FsimulatorEditorModule::StartupModule()
 {
 	InitResolutionPresetOptions();
 	InitRoverControlOptions();
+
+	if (FSlateApplication::IsInitialized()) {
+		FTabManager::RegisterDefaultTabWindowSize(SimulatorConfigTabName, GetSimulatorConfigDefaultWindowSize());
+	}
 
 	FGlobalTabmanager::Get()
 	    ->RegisterNomadTabSpawner(SimulatorConfigTabName,
@@ -945,6 +1042,7 @@ void FsimulatorEditorModule::ShutdownModule()
 		UToolMenus::UnregisterOwner(this);
 	}
 
+	FTabManager::UnregisterDefaultTabWindowSize(SimulatorConfigTabName);
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(SimulatorConfigTabName);
 }
 
@@ -966,6 +1064,10 @@ void FsimulatorEditorModule::RegisterMenus()
 
 void FsimulatorEditorModule::OpenSimulatorConfigTab()
 {
+	if (FSlateApplication::IsInitialized()) {
+		FTabManager::RegisterDefaultTabWindowSize(SimulatorConfigTabName, GetSimulatorConfigDefaultWindowSize());
+	}
+
 	FGlobalTabmanager::Get()->TryInvokeTab(SimulatorConfigTabName);
 }
 
@@ -985,6 +1087,13 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 	InitRoverControlOptions();
 	SelectedResolutionPresetOption = FindResolutionPresetOption(ResolutionPreset);
 	SelectedRoverControlModeOption = FindRoverControlModeOption(RoverControlMode);
+
+	const TSharedRef<STextBlock> ApplySettingsButtonLabel =
+	    SNew(STextBlock).Text(LOCTEXT("ApplyButtonLabel", "Apply Settings"));
+	const TWeakPtr<STextBlock> WeakApplySettingsButtonLabel = ApplySettingsButtonLabel;
+	const TSharedRef<STextBlock> ApplySunDirectionButtonLabel =
+	    SNew(STextBlock).Text(LOCTEXT("ApplySunDirectionButtonLabel", "Apply Sun Direction"));
+	const TWeakPtr<STextBlock> WeakApplySunDirectionButtonLabel = ApplySunDirectionButtonLabel;
 
 	return SNew(SBox)
 		.Padding(12.0f)
@@ -1006,11 +1115,9 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 
 				+ SVerticalBox::Slot()
 				.AutoHeight()
-				.Padding(0.f, 0.f, 0.f, 8.f)
 				[
-					SNew(STextBlock)
-					.Text(LOCTEXT("DataGenerationTitle", "Data Generation and ROS 2"))
-					.Font(FCoreStyle::GetDefaultFontStyle("Bold", 12))
+					MakeSimulatorConfigMainSectionTitle(
+						LOCTEXT("DataGenerationTitle", "Data Generation and ROS 2"))
 				]
 
 				+ SVerticalBox::Slot()
@@ -1399,111 +1506,264 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 
 				+ SVerticalBox::Slot()
 				.AutoHeight()
-				.Padding(0.f, 0.f, 0.f, 0.f)
-				.HAlign(HAlign_Left)
+				.Padding(0.f, 4.f, 0.f, 18.f)
+				.HAlign(HAlign_Right)
 				[
-					SNew(SButton)
-					.Text(LOCTEXT("ApplyButtonLabel", "Apply Settings"))
-					.IsEnabled_Raw(this, &FsimulatorEditorModule::CanApplySettings)
-					.OnClicked_Lambda([this]() {
-						OnApplyClicked();
-						return FReply::Handled();
-					})
+					SNew(SBox)
+					.WidthOverride(180.f)
+					.MinDesiredHeight(28.f)
+					[
+						SNew(SButton)
+						.HAlign(HAlign_Center)
+						.VAlign(VAlign_Center)
+						.IsEnabled_Raw(this, &FsimulatorEditorModule::CanApplySettings)
+						.OnClicked_Lambda([this, WeakApplySettingsButtonLabel]() {
+							const bool bApplied = OnApplyClicked();
+							ShowTemporaryButtonText(
+								WeakApplySettingsButtonLabel,
+								bApplied
+									? LOCTEXT("SettingsAppliedButtonLabel", "✓ Settings Applied")
+									: LOCTEXT("SettingsApplyFailedButtonLabel", "Could Not Apply"),
+								LOCTEXT("ApplyButtonLabel", "Apply Settings"));
+							return FReply::Handled();
+						})
+						[
+							ApplySettingsButtonLabel
+						]
+					]
 				]
 
 				+ SVerticalBox::Slot()
 				.AutoHeight()
-				.Padding(0.f, 0.f, 0.f, 10.f)
 				[
-					MakeSimulatorConfigSection(
-						LOCTEXT("WorldSetupSectionLabel", "World Setup"),
-						SNew(SVerticalBox)
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						.Padding(0.f, 0.f, 0.f, 8.f)
-						[
-							SNew(SButton)
-							.Text(LOCTEXT("CreateMoonEnvironmentButtonLabel", "Create / Update Sky, Earth and Sun"))
-							.IsEnabled_Lambda([]() {
-								return !IsEditorPlaySessionRunning();
-							})
-							.OnClicked_Lambda([this]() {
-								UWorld* EditorWorld = GetEditorWorld();
-								if (!EditorWorld) {
-									WorldSetupStatus = LOCTEXT("WorldSetupNoWorldStatus", "No editor world available.");
-									return FReply::Handled();
-								}
-
-								const FScopedTransaction Transaction(
-								    LOCTEXT("CreateMoonEnvironmentTransaction", "Create Moon Environment"));
-								EditorWorld->Modify();
-
-								FString Status;
-								CreateOrUpdateMoonEnvironment(EditorWorld, Status);
-								WorldSetupStatus = FText::FromString(Status);
-								EditorWorld->MarkPackageDirty();
-
-								if (GEditor)
-									GEditor->RedrawLevelEditingViewports();
-
-								return FReply::Handled();
-							})
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						.Padding(0.f, 0.f, 0.f, 8.f)
-						[
-							SNew(SButton)
-							.Text(LOCTEXT("CreateRoverGroundTruthButtonLabel", "Create / Update Rover + Ground Truth"))
-							.IsEnabled_Lambda([]() {
-								return !IsEditorPlaySessionRunning();
-							})
-							.OnClicked_Lambda([this]() {
-								UWorld* EditorWorld = GetEditorWorld();
-								if (!EditorWorld) {
-									WorldSetupStatus = LOCTEXT("RoverSetupNoWorldStatus", "No editor world available.");
-									return FReply::Handled();
-								}
-
-								const FScopedTransaction Transaction(
-								    LOCTEXT("CreateRoverGroundTruthTransaction", "Create Rover and Ground Truth"));
-								EditorWorld->Modify();
-
-								FString Status;
-								const bool bSuccess = CreateOrUpdateRoverAndGroundTruth(EditorWorld, Status);
-								WorldSetupStatus = FText::FromString(Status);
-								EditorWorld->MarkPackageDirty();
-
-								if (bSuccess)
-									RefreshTargetsFromEditorWorld();
-
-								if (GEditor)
-									GEditor->RedrawLevelEditingViewports();
-
-								return FReply::Handled();
-							})
-						]
-
-						+ SVerticalBox::Slot()
-						.AutoHeight()
-						[
-							SNew(STextBlock)
-							.Text_Lambda([]() {
-								return WorldSetupStatus;
-							})
-							.AutoWrapText(true)
-						]
-					)
+					MakeSimulatorConfigMainSectionTitle(
+						LOCTEXT("WorldSetupSectionLabel", "World Setup"))
 				]
 
 				+ SVerticalBox::Slot()
 				.AutoHeight()
-				.Padding(0.f, 14.f, 0.f, 0.f)
+				.Padding(0.f, 0.f, 0.f, 18.f)
+				[
+					SNew(SHorizontalBox)
+
+					+ SHorizontalBox::Slot()
+					.FillWidth(1.f)
+					.Padding(0.f, 0.f, 5.f, 0.f)
+					[
+						MakeSimulatorConfigSection(
+							LOCTEXT("SunDirectionSectionLabel", "Sun Direction"),
+							SNew(SVerticalBox)
+							.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditSunDirection)
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigFormRow(
+									LOCTEXT("SunElevationLabel", "Sun Elevation (deg)"),
+									SNew(SBox)
+									.WidthOverride(100.f)
+									[
+										SNew(SNumericEntryBox<float>)
+										.Value_Lambda([this]() -> TOptional<float> {
+											return SunElevationDeg;
+										})
+										.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnSunElevationDegChanged)
+										.MinValue(MinSunElevationDeg)
+										.MaxValue(MaxSunElevationDeg)
+										.MinSliderValue(MinSunElevationDeg)
+										.MaxSliderValue(MaxSunElevationDeg)
+										.Delta(0.1f)
+										.MinFractionalDigits(1)
+										.MaxFractionalDigits(1)
+										.AllowSpin(true)
+									])
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigFormRow(
+									LOCTEXT("SunAzimuthLabel", "Sun Azimuth (deg)"),
+									SNew(SBox)
+									.WidthOverride(100.f)
+									[
+										SNew(SNumericEntryBox<float>)
+										.Value_Lambda([this]() -> TOptional<float> {
+											return SunAzimuthDeg;
+										})
+										.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnSunAzimuthDegChanged)
+										.MinValue(MinSunAzimuthDeg)
+										.MaxValue(MaxSunAzimuthDeg)
+										.MinSliderValue(MinSunAzimuthDeg)
+										.MaxSliderValue(MaxSunAzimuthDeg)
+										.Delta(0.1f)
+										.MinFractionalDigits(1)
+										.MaxFractionalDigits(1)
+										.AllowSpin(true)
+									])
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(0.f, 8.f, 0.f, 0.f)
+							.HAlign(HAlign_Right)
+							[
+								SNew(SBox)
+								.WidthOverride(210.f)
+								.MinDesiredHeight(28.f)
+								[
+									SNew(SButton)
+									.HAlign(HAlign_Center)
+									.VAlign(VAlign_Center)
+									.OnClicked_Lambda([this, WeakApplySunDirectionButtonLabel]() {
+										const bool bApplied = OnApplySunDirectionClicked();
+										ShowTemporaryButtonText(
+											WeakApplySunDirectionButtonLabel,
+											bApplied
+												? LOCTEXT("SunDirectionAppliedButtonLabel", "✓ Sun Direction Applied")
+												: LOCTEXT("SunDirectionApplyFailedButtonLabel", "Could Not Apply"),
+											LOCTEXT("ApplySunDirectionButtonLabel", "Apply Sun Direction"));
+										return FReply::Handled();
+									})
+									[
+										ApplySunDirectionButtonLabel
+									]
+								]
+							])
+					]
+
+					+ SHorizontalBox::Slot()
+					.FillWidth(1.f)
+					.Padding(5.f, 0.f, 0.f, 0.f)
+					[
+						MakeSimulatorConfigSection(
+							LOCTEXT("SetupActionsSectionLabel", "Setup Actions"),
+							SNew(SVerticalBox)
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.HAlign(HAlign_Left)
+							[
+								SNew(SBox)
+								.MaxDesiredWidth(280.f)
+								.MinDesiredHeight(28.f)
+								[
+									SNew(SButton)
+									.Text(LOCTEXT("CreateMoonEnvironmentButtonLabel", "Create / Update Sky, Earth and Sun"))
+									.IsEnabled_Lambda([]() {
+										return !IsEditorPlaySessionRunning();
+									})
+									.OnClicked_Lambda([this]() {
+										UWorld* EditorWorld = GetEditorWorld();
+										if (!EditorWorld) {
+											UE_LOG(LogTemp, Warning,
+											       TEXT("Moon environment setup failed: no editor world."));
+											return FReply::Handled();
+										}
+
+										const FScopedTransaction Transaction(
+										    LOCTEXT("CreateMoonEnvironmentTransaction", "Create Moon Environment"));
+										EditorWorld->Modify();
+
+										FString Status;
+										const bool bSuccess = CreateOrUpdateMoonEnvironment(EditorWorld, Status);
+										if (!bSuccess)
+											UE_LOG(LogTemp, Warning, TEXT("%s"), *Status);
+
+										EditorWorld->MarkPackageDirty();
+										RefreshSunDirectionFromWorld(EditorWorld);
+
+										if (GEditor)
+											GEditor->RedrawLevelEditingViewports();
+
+										return FReply::Handled();
+									})
+								]
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(0.f, 4.f, 0.f, 12.f)
+							[
+								SNew(STextBlock)
+									.Text(LOCTEXT(
+										"CreateMoonEnvironmentDescription",
+										"Creates or updates the lunar lighting, sky, Earth, and sun-glow setup."))
+									.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
+									.ColorAndOpacity(FSlateColor::UseSubduedForeground())
+									.AutoWrapText(true)
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.HAlign(HAlign_Left)
+							[
+								SNew(SBox)
+								.MaxDesiredWidth(280.f)
+								.MinDesiredHeight(28.f)
+								[
+									SNew(SButton)
+									.Text(LOCTEXT("CreateRoverGroundTruthButtonLabel", "Create / Update Rover + Ground Truth"))
+									.IsEnabled_Lambda([]() {
+										return !IsEditorPlaySessionRunning();
+									})
+									.OnClicked_Lambda([this]() {
+										UWorld* EditorWorld = GetEditorWorld();
+										if (!EditorWorld) {
+											UE_LOG(LogTemp, Warning,
+											       TEXT("Rover/Ground Truth setup failed: no editor world."));
+											return FReply::Handled();
+										}
+
+										const FScopedTransaction Transaction(
+										    LOCTEXT("CreateRoverGroundTruthTransaction", "Create Rover and Ground Truth"));
+										EditorWorld->Modify();
+
+										FString Status;
+										const bool bSuccess = CreateOrUpdateRoverAndGroundTruth(EditorWorld, Status);
+										if (!bSuccess)
+											UE_LOG(LogTemp, Warning, TEXT("%s"), *Status);
+
+										EditorWorld->MarkPackageDirty();
+
+										if (bSuccess)
+											RefreshTargetsFromEditorWorld();
+
+										if (GEditor)
+											GEditor->RedrawLevelEditingViewports();
+
+										return FReply::Handled();
+									})
+								]
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							.Padding(0.f, 4.f, 0.f, 0.f)
+							[
+								SNew(STextBlock)
+									.Text(LOCTEXT(
+										"CreateRoverGroundTruthDescription",
+										"Creates or updates the rover and ground-truth pipeline."))
+									.Font(FAppStyle::Get().GetFontStyle("SmallFont"))
+									.ColorAndOpacity(FSlateColor::UseSubduedForeground())
+									.AutoWrapText(true)
+							])
+					]
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				[
+					MakeSimulatorConfigMainSectionTitle(
+						LOCTEXT("TerrainGenerationSectionLabel", "Terrain Generation"))
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
 				[
 					MakeSimulatorConfigSection(
-						LOCTEXT("TerrainGenerationSectionLabel", "Terrain Generation"),
+						LOCTEXT("RockBakingTitle", "Rock Field Baking"),
 						SNew(SRockBakingPanel))
 				]
 			]
@@ -1744,6 +2004,16 @@ void FsimulatorEditorModule::OnMaxReverseSpeedKmhChanged(float NewValue)
 	MaxReverseSpeedKmh = ClampReverseRoverSpeedKmh(NewValue);
 }
 
+void FsimulatorEditorModule::OnSunElevationDegChanged(float NewValue)
+{
+	SunElevationDeg = FMath::Clamp(NewValue, MinSunElevationDeg, MaxSunElevationDeg);
+}
+
+void FsimulatorEditorModule::OnSunAzimuthDegChanged(float NewValue)
+{
+	SunAzimuthDeg = FMath::Clamp(NewValue, MinSunAzimuthDeg, MaxSunAzimuthDeg);
+}
+
 UWorld* FsimulatorEditorModule::GetEditorWorld() const
 {
 	if (!GEditor)
@@ -1764,6 +2034,8 @@ void FsimulatorEditorModule::RefreshTargetsFromEditorWorld()
 	if (!EditorWorld) {
 		return;
 	}
+
+	RefreshSunDirectionFromWorld(EditorWorld);
 
 	for (TActorIterator<AActor> It(EditorWorld); It; ++It) {
 		AActor* CandidateRoverActor = *It;
@@ -1850,9 +2122,71 @@ bool FsimulatorEditorModule::CanEditRoverControl() const
 	return FindUsableComponentByClass<URoverVehicleControllerComponent>(TargetRoverActor.Get()) != nullptr;
 }
 
+bool FsimulatorEditorModule::CanEditSunDirection() const
+{
+	if (IsEditorPlaySessionRunning())
+		return false;
+
+	int32 LightCount = 0;
+	return FindUniqueDirectionalLight(GetEditorWorld(), LightCount) != nullptr;
+}
+
 bool FsimulatorEditorModule::CanEditGroundTruthOutput() const
 {
 	return bGroundTruthImages;
+}
+
+void FsimulatorEditorModule::RefreshSunDirectionFromWorld(UWorld* EditorWorld)
+{
+	int32 LightCount = 0;
+	ADirectionalLight* DirectionalLight = FindUniqueDirectionalLight(EditorWorld, LightCount);
+	if (!DirectionalLight) {
+		LogDirectionalLightLookupWarning(LightCount);
+		return;
+	}
+
+	const FRotator Rotation = DirectionalLight->GetActorRotation();
+	SunElevationDeg = FMath::Clamp(-Rotation.Pitch, MinSunElevationDeg, MaxSunElevationDeg);
+	SunAzimuthDeg = FRotator::ClampAxis(Rotation.Yaw);
+}
+
+bool FsimulatorEditorModule::OnApplySunDirectionClicked()
+{
+	if (IsEditorPlaySessionRunning()) {
+		UE_LOG(LogTemp, Warning, TEXT("Simulator Config sun direction was not applied during PIE/simulation."));
+		return false;
+	}
+
+	UWorld* EditorWorld = GetEditorWorld();
+	int32 LightCount = 0;
+	ADirectionalLight* DirectionalLight = FindUniqueDirectionalLight(EditorWorld, LightCount);
+	if (!DirectionalLight) {
+		LogDirectionalLightLookupWarning(LightCount);
+		return false;
+	}
+
+	SunElevationDeg = FMath::Clamp(SunElevationDeg, MinSunElevationDeg, MaxSunElevationDeg);
+	SunAzimuthDeg = FMath::Clamp(SunAzimuthDeg, MinSunAzimuthDeg, MaxSunAzimuthDeg);
+
+	const FRotator ExistingRotation = DirectionalLight->GetActorRotation();
+	const FScopedTransaction Transaction(LOCTEXT("ApplySunDirectionTransaction", "Apply Sun Direction"));
+
+	DirectionalLight->Modify();
+	if (USceneComponent* RootComponent = DirectionalLight->GetRootComponent())
+		RootComponent->Modify();
+
+	DirectionalLight->SetActorRotation(
+	    FRotator(-SunElevationDeg, SunAzimuthDeg, ExistingRotation.Roll));
+	DirectionalLight->PostEditMove(true);
+	DirectionalLight->MarkPackageDirty();
+
+	if (ULevel* Level = DirectionalLight->GetLevel())
+		Level->MarkPackageDirty();
+
+	if (GEditor)
+		GEditor->RedrawLevelEditingViewports();
+
+	return true;
 }
 
 FCaptureConfig FsimulatorEditorModule::BuildCaptureConfigFromUi(const FCaptureConfig& ExistingConfig) const
@@ -1873,11 +2207,11 @@ FCaptureConfig FsimulatorEditorModule::BuildCaptureConfigFromUi(const FCaptureCo
 	return NewConfig;
 }
 
-void FsimulatorEditorModule::OnApplyClicked()
+bool FsimulatorEditorModule::OnApplyClicked()
 {
 	if (IsEditorPlaySessionRunning()) {
 		UE_LOG(LogTemp, Warning, TEXT("Simulator Config settings were not applied while PIE/simulation is running."));
-		return;
+		return false;
 	}
 
 	UWorld* EditorWorld = GetEditorWorld();
@@ -1886,19 +2220,19 @@ void FsimulatorEditorModule::OnApplyClicked()
 
 	if (!IsUsableEditorActor(RoverActor, EditorWorld)) {
 		UE_LOG(LogTemp, Warning, TEXT("Simulator Config settings were not applied because no ESA_Rover was found."));
-		return;
+		return false;
 	}
 
 	if (!FindUsableComponentByClass<URoverVehicleControllerComponent>(RoverActor)) {
 		UE_LOG(LogTemp, Warning,
 		       TEXT("Simulator Config settings were not applied because RoverVehicleController is missing."));
-		return;
+		return false;
 	}
 
 	if (!ResolveCompleteRoverPipeline(RoverActor, EditorWorld, Pipeline)) {
 		UE_LOG(LogTemp, Warning,
 		       TEXT("Simulator Config settings were not applied because the ESA_Rover pipeline is incomplete."));
-		return;
+		return false;
 	}
 	ARobotCamRig* RobotCamRig = Pipeline.RobotCamRig;
 	UChildActorComponent* ChildActorComponent = Pipeline.RobotCamRigChildComponent;
@@ -1977,6 +2311,7 @@ void FsimulatorEditorModule::OnApplyClicked()
 	}
 
 	RefreshTargetsFromEditorWorld();
+	return true;
 }
 
 void FsimulatorEditorModule::LoadConfigFromRobotCamRig()

@@ -68,20 +68,25 @@ private:
 	void OnImuHzChanged(float NewValue);
 	void OnMaxForwardSpeedKmhChanged(float NewValue);
 	void OnMaxReverseSpeedKmhChanged(float NewValue);
+	void OnSunElevationDegChanged(float NewValue);
+	void OnSunAzimuthDegChanged(float NewValue);
 
 	void RefreshTargetsFromEditorWorld();
 	bool CanApplySettings() const;
 	bool CanEditGroundTruthMaps() const;
 	bool CanEditImuHz() const;
 	bool CanEditRoverControl() const;
+	bool CanEditSunDirection() const;
 	bool CanEditGroundTruthOutput() const;
 
-	void OnApplyClicked();
+	bool OnApplyClicked();
+	bool OnApplySunDirectionClicked();
 	FCaptureConfig BuildCaptureConfigFromUi(const FCaptureConfig& ExistingConfig) const;
 	void LoadConfigFromRobotCamRig();
 	void LoadConfigFromRoverControl();
 	UWorld* GetEditorWorld() const;
 	void RefreshMapPublisherTargets(UWorld* EditorWorld);
+	void RefreshSunDirectionFromWorld(UWorld* EditorWorld);
 
 private:
 	static const FName SimulatorConfigTabName;
@@ -115,4 +120,6 @@ private:
 	bool bTrajectoryCsv = true;
 	bool bEnableGroundTruthMaps = true;
 	float ImuPublishHz = 100.0f;
+	float SunElevationDeg = 20.0f;
+	float SunAzimuthDeg = 60.0f;
 };

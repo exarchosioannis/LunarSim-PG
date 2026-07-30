@@ -14,7 +14,8 @@ public class simulatorEditor : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			"CoreUObject", "Engine", "Slate", "SlateCore", "InputCore", "UnrealEd", "LevelEditor",
-				"ToolMenus", "Projects", "simulator", "PropertyEditor", "AssetRegistry", "Json", "DesktopPlatform"
+				"ToolMenus", "Projects", "simulator", "PropertyEditor", "AssetRegistry", "Json", "DesktopPlatform",
+				"ApplicationCore"
 		});
 	}
 }

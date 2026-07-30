@@ -40,15 +40,6 @@ void SRockBakingPanel::Construct(const FArguments& InArgs)
 
 		+ SVerticalBox::Slot()
 		.AutoHeight()
-		.Padding(0.f, 0.f, 0.f, 8.f)
-		[
-			SNew(STextBlock)
-			.Text(LOCTEXT("RockBakingTitle", "Rock Field Baking"))
-			.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
-		]
-
-		+ SVerticalBox::Slot()
-		.AutoHeight()
 		.Padding(0.f, 0.f, 0.f, 10.f)
 		[
 			SNew(STextBlock)
