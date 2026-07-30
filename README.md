@@ -164,8 +164,12 @@ ground-truth state, maps, transforms, simulation time, capture control, and
 - [Installation](docs/installation.md)
 - [Simulator configuration](docs/configuration.md)
 - [Terrain generation](docs/terrain-generation.md)
+  - [Heightmap and crater generation model](terrain-generation-model.md)
+  - [Rock distribution model](rock-distribution-model.md)
 - [Data outputs and ROS 2](docs/data-and-ros2.md)
 - [Coordinate frames](docs/coordinate-frames.md)
+
+
 
 ## Current scope
 
