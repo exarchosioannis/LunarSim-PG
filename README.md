@@ -12,6 +12,8 @@ experiments and for offline synthetic dataset generation, including visual
 odometry, SLAM, obstacle detection, semantic segmentation, and traversability
 research.
 
+  ![Example view of LunarSim-PG with rover, sun and Earth](docs/images/header.png)
+
 ## Core capabilities
 
 - **High-fidelity lunar simulation** — Unreal Engine 5 rendering with
