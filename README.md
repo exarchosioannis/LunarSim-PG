@@ -197,9 +197,11 @@ the scope of the current framework.
 
 ## Contributors and acknowledgements
 
-**LunarSim-PG** was developed by **Ioannis Exarchos** and
-**María González Rodríguez** as their joint project at
-**ESA Spaceship Poland**.
+**LunarSim-PG** was developed by
+**[Ioannis Exarchos](https://www.linkedin.com/in/giannis-exarchos/)**
+and
+**[María González Rodríguez](https://www.linkedin.com/in/maria-gonzalez-rod/)**
+as their joint project at **ESA Spaceship Poland**.
 
 ### Main contributions
 
@@ -210,12 +212,12 @@ the scope of the current framework.
 - **María González Rodríguez** — Science-parameterised procedural
   terrain generation, regional terrain profiles, crater morphology
   model, and coupled crater–rock distribution models.
-- **Noora Archer** — Lunar visual assets, materials and environment
+- **[Noora Archer](https://www.linkedin.com/in/noora-archer/)** — Lunar visual assets, materials and environment
   modelling, and technical guidance on high-fidelity lunar scene
   representation.
 
 Additional scientific and technical guidance was provided by
-**Marek Kraft**.
+**[Marek Kraft](https://www.linkedin.com/in/marek-kraft/)**
 
 This work was supported by the **European Space Agency** through **ESA Spaceship Poland**.
 
