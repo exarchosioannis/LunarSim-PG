@@ -77,11 +77,11 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Rover Vehicle Controller")
 	bool IsOverReverseSpeedLimit() const;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rover Vehicle Controller|Speed", meta = (ClampMin = "0.0", UIMin = "0.0", Units = "km/h"))
-	float MaxForwardSpeedKmh = 4.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rover Vehicle Controller|Speed", meta = (ClampMin = "3.0", ClampMax = "10.0", UIMin = "3.0", UIMax = "10.0", Units = "km/h"))
+	float MaxForwardSpeedKmh = 5.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rover Vehicle Controller|Speed", meta = (ClampMin = "0.0", UIMin = "0.0", Units = "km/h"))
-	float MaxReverseSpeedKmh = 2.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rover Vehicle Controller|Speed", meta = (ClampMin = "3.0", ClampMax = "8.0", UIMin = "3.0", UIMax = "8.0", Units = "km/h"))
+	float MaxReverseSpeedKmh = 3.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rover Vehicle Controller|Input", meta = (ClampMin = "0.0", UIMin = "0.0"))
 	float AccelerationInputScale = 0.7f;

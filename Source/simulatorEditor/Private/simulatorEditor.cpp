@@ -83,6 +83,20 @@ float NormalizeEditorCaptureHz(float InCaptureHz)
 	                    FCaptureConfig::GetMaxCameraCaptureHz());
 }
 
+constexpr float MinRoverSpeedKmh = 3.0f;
+constexpr float MaxForwardRoverSpeedKmh = 10.0f;
+constexpr float MaxReverseRoverSpeedKmh = 8.0f;
+
+float ClampForwardRoverSpeedKmh(float InSpeedKmh)
+{
+	return FMath::Clamp(InSpeedKmh, MinRoverSpeedKmh, MaxForwardRoverSpeedKmh);
+}
+
+float ClampReverseRoverSpeedKmh(float InSpeedKmh)
+{
+	return FMath::Clamp(InSpeedKmh, MinRoverSpeedKmh, MaxReverseRoverSpeedKmh);
+}
+
 bool IsEditorPlaySessionRunning()
 {
 	return GEditor && GEditor->IsPlaySessionInProgress();
@@ -1329,6 +1343,56 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 											.Text_Raw(this, &FsimulatorEditorModule::GetRoverControlModeText)
 										]
 									])
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigFormRow(
+									LOCTEXT("MaxForwardSpeedKmhLabel", "Max Forward Speed (km/h)"),
+									SNew(SBox)
+									.WidthOverride(120.f)
+									.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditRoverControl)
+									[
+										SNew(SNumericEntryBox<float>)
+										.Value_Lambda([this]() -> TOptional<float> {
+											return MaxForwardSpeedKmh;
+										})
+										.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnMaxForwardSpeedKmhChanged)
+										.MinValue(MinRoverSpeedKmh)
+										.MaxValue(MaxForwardRoverSpeedKmh)
+										.MinSliderValue(MinRoverSpeedKmh)
+										.MaxSliderValue(MaxForwardRoverSpeedKmh)
+										.Delta(0.1f)
+										.MinFractionalDigits(1)
+										.MaxFractionalDigits(1)
+										.AllowSpin(true)
+									])
+							]
+
+							+ SVerticalBox::Slot()
+							.AutoHeight()
+							[
+								MakeSimulatorConfigFormRow(
+									LOCTEXT("MaxReverseSpeedKmhLabel", "Max Reverse Speed (km/h)"),
+									SNew(SBox)
+									.WidthOverride(120.f)
+									.IsEnabled_Raw(this, &FsimulatorEditorModule::CanEditRoverControl)
+									[
+										SNew(SNumericEntryBox<float>)
+										.Value_Lambda([this]() -> TOptional<float> {
+											return MaxReverseSpeedKmh;
+										})
+										.OnValueChanged_Raw(this, &FsimulatorEditorModule::OnMaxReverseSpeedKmhChanged)
+										.MinValue(MinRoverSpeedKmh)
+										.MaxValue(MaxReverseRoverSpeedKmh)
+										.MinSliderValue(MinRoverSpeedKmh)
+										.MaxSliderValue(MaxReverseRoverSpeedKmh)
+										.Delta(0.1f)
+										.MinFractionalDigits(1)
+										.MaxFractionalDigits(1)
+										.AllowSpin(true)
+									])
 							])
 					]
 				]
@@ -1345,14 +1409,6 @@ TSharedRef<SWidget> FsimulatorEditorModule::BuildSimulatorConfigPanel()
 						OnApplyClicked();
 						return FReply::Handled();
 					})
-				]
-
-				+ SVerticalBox::Slot()
-				.AutoHeight()
-				.Padding(0.f, 10.f, 0.f, 0.f)
-				[
-					SNew(STextBlock)
-					.Text_Raw(this, &FsimulatorEditorModule::GetApplyStatusText)
 				]
 
 				+ SVerticalBox::Slot()
@@ -1678,6 +1734,16 @@ void FsimulatorEditorModule::OnImuHzChanged(float NewValue)
 	ImuPublishHz = FMath::Clamp(NewValue, 1.0f, 400.0f);
 }
 
+void FsimulatorEditorModule::OnMaxForwardSpeedKmhChanged(float NewValue)
+{
+	MaxForwardSpeedKmh = ClampForwardRoverSpeedKmh(NewValue);
+}
+
+void FsimulatorEditorModule::OnMaxReverseSpeedKmhChanged(float NewValue)
+{
+	MaxReverseSpeedKmh = ClampReverseRoverSpeedKmh(NewValue);
+}
+
 UWorld* FsimulatorEditorModule::GetEditorWorld() const
 {
 	if (!GEditor)
@@ -1693,13 +1759,9 @@ void FsimulatorEditorModule::RefreshTargetsFromEditorWorld()
 	TargetRoverController.Reset();
 	TargetCmdVelController.Reset();
 	TargetMapPublishers.Empty();
-	RobotCamRigCount = 0;
-	GroundTruthMapPublisherCount = 0;
-	LastApplyStatus = FText::GetEmpty();
 
 	UWorld* EditorWorld = GetEditorWorld();
 	if (!EditorWorld) {
-		LastApplyStatus = LOCTEXT("NoEditorWorldStatus", "No editor world available.");
 		return;
 	}
 
@@ -1714,7 +1776,6 @@ void FsimulatorEditorModule::RefreshTargetsFromEditorWorld()
 			continue;
 		}
 
-		++RobotCamRigCount;
 		if (!TargetRoverActor.IsValid()) {
 			TargetRoverActor = CandidateRoverActor;
 			TargetRobotCamRig = Pipeline.RobotCamRig;
@@ -1730,10 +1791,9 @@ void FsimulatorEditorModule::RefreshTargetsFromEditorWorld()
 		if (UImuSensorPublisherComponent* ImuPublisher = TargetImuPublisher.Get()) {
 			ImuPublishHz = ImuPublisher->GetImuPublishHz();
 		}
-	} else {
-		LastApplyStatus =
-		    LOCTEXT("NoCompleteRoverPipelineStatus",
-		            "No complete ESA_Rover pipeline found in the level. Place an ESA_Rover in the level.");
+	} else if (AActor* RoverActor = FindActorByLabel<AActor>(EditorWorld, TEXT("ESA_Rover"))) {
+		TargetRoverActor = RoverActor;
+		TargetRoverController = FindUsableComponentByClass<URoverVehicleControllerComponent>(RoverActor);
 	}
 
 	RefreshMapPublisherTargets(EditorWorld);
@@ -1742,7 +1802,6 @@ void FsimulatorEditorModule::RefreshTargetsFromEditorWorld()
 void FsimulatorEditorModule::RefreshMapPublisherTargets(UWorld* EditorWorld)
 {
 	TargetMapPublishers.Empty();
-	GroundTruthMapPublisherCount = 0;
 
 	if (!EditorWorld)
 		return;
@@ -1758,7 +1817,6 @@ void FsimulatorEditorModule::RefreshMapPublisherTargets(UWorld* EditorWorld)
 			if (!IsUsableComponent(MapPublisher))
 				continue;
 
-			++GroundTruthMapPublisherCount;
 			TargetMapPublishers.Add(MapPublisher);
 		}
 	}
@@ -1797,27 +1855,6 @@ bool FsimulatorEditorModule::CanEditGroundTruthOutput() const
 	return bGroundTruthImages;
 }
 
-FText FsimulatorEditorModule::GetApplyStatusText() const
-{
-	if (IsEditorPlaySessionRunning()) {
-		return LOCTEXT("ApplyDisabledDuringPlayStatus", "Settings are locked while PIE/simulation is running.");
-	}
-
-	if (!LastApplyStatus.IsEmpty()) {
-		return LastApplyStatus;
-	}
-
-	if (RobotCamRigCount <= 0) {
-		return LOCTEXT("SimpleNoRoverPipelineStatus", "No complete ESA_Rover pipeline found in the level.");
-	}
-
-	if (RobotCamRigCount > 1) {
-		return LOCTEXT("SimpleMultipleRoverPipelinesStatus", "Multiple ESA_Rover pipelines found; using the first.");
-	}
-
-	return LOCTEXT("SimpleReadyStatus", "Ready.");
-}
-
 FCaptureConfig FsimulatorEditorModule::BuildCaptureConfigFromUi(const FCaptureConfig& ExistingConfig) const
 {
 	FCaptureConfig NewConfig = ExistingConfig;
@@ -1839,8 +1876,7 @@ FCaptureConfig FsimulatorEditorModule::BuildCaptureConfigFromUi(const FCaptureCo
 void FsimulatorEditorModule::OnApplyClicked()
 {
 	if (IsEditorPlaySessionRunning()) {
-		LastApplyStatus =
-		    LOCTEXT("ApplyDuringPlayStatus", "Settings were not applied because PIE/simulation is running.");
+		UE_LOG(LogTemp, Warning, TEXT("Simulator Config settings were not applied while PIE/simulation is running."));
 		return;
 	}
 
@@ -1848,9 +1884,20 @@ void FsimulatorEditorModule::OnApplyClicked()
 	AActor* RoverActor = TargetRoverActor.Get();
 	FResolvedRoverPipeline Pipeline;
 
+	if (!IsUsableEditorActor(RoverActor, EditorWorld)) {
+		UE_LOG(LogTemp, Warning, TEXT("Simulator Config settings were not applied because no ESA_Rover was found."));
+		return;
+	}
+
+	if (!FindUsableComponentByClass<URoverVehicleControllerComponent>(RoverActor)) {
+		UE_LOG(LogTemp, Warning,
+		       TEXT("Simulator Config settings were not applied because RoverVehicleController is missing."));
+		return;
+	}
+
 	if (!ResolveCompleteRoverPipeline(RoverActor, EditorWorld, Pipeline)) {
-		LastApplyStatus = LOCTEXT("ApplyNoRoverPipelineStatus",
-		                          "Settings were not applied because no complete ESA_Rover pipeline was found.");
+		UE_LOG(LogTemp, Warning,
+		       TEXT("Simulator Config settings were not applied because the ESA_Rover pipeline is incomplete."));
 		return;
 	}
 	ARobotCamRig* RobotCamRig = Pipeline.RobotCamRig;
@@ -1866,6 +1913,8 @@ void FsimulatorEditorModule::OnApplyClicked()
 	TargetCmdVelController = CmdVelController;
 
 	const FCaptureConfig NewConfig = BuildCaptureConfigFromUi(RobotCamRig->GetCaptureConfig());
+	MaxForwardSpeedKmh = ClampForwardRoverSpeedKmh(MaxForwardSpeedKmh);
+	MaxReverseSpeedKmh = ClampReverseRoverSpeedKmh(MaxReverseSpeedKmh);
 
 	const FScopedTransaction ApplyTransaction(LOCTEXT("ApplySimulatorSettingsTransaction", "Apply Simulator Settings"));
 	RoverActor->Modify();
@@ -1889,18 +1938,6 @@ void FsimulatorEditorModule::OnApplyClicked()
 		GEditor->SelectActor(RoverActor, true, true, true);
 	}
 
-	int32 MapsApplied = 0;
-	for (TWeakObjectPtr<UOccupancyMapPublisherComponent>& MapPublisherPtr : TargetMapPublishers) {
-		UOccupancyMapPublisherComponent* MapPublisher = MapPublisherPtr.Get();
-		if (!IsUsableComponent(MapPublisher))
-			continue;
-
-		// Map publishers consume NewConfig from the frozen dataset-run config at
-		// runtime. Count targets for status reporting; do not maintain a second flag.
-		++MapsApplied;
-	}
-
-	bool bImuApplied = false;
 	ImuPublisher = FindUsableComponentByClass<UImuSensorPublisherComponent>(RoverActor);
 	if (ImuPublisher) {
 		if (AActor* Owner = ImuPublisher->GetOwner()) {
@@ -1911,10 +1948,8 @@ void FsimulatorEditorModule::OnApplyClicked()
 		ImuPublisher->Modify();
 		ImuPublisher->SetImuPublishHz(ImuPublishHz);
 		ImuPublisher->MarkPackageDirty();
-		bImuApplied = true;
 	}
 
-	bool bRoverModeApplied = false;
 	RoverController = FindUsableComponentByClass<URoverVehicleControllerComponent>(RoverActor);
 	if (RoverController) {
 		if (AActor* Owner = RoverController->GetOwner()) {
@@ -1924,8 +1959,9 @@ void FsimulatorEditorModule::OnApplyClicked()
 
 		RoverController->Modify();
 		RoverController->SetControlMode(RoverControlMode);
+		RoverController->MaxForwardSpeedKmh = MaxForwardSpeedKmh;
+		RoverController->MaxReverseSpeedKmh = MaxReverseSpeedKmh;
 		RoverController->MarkPackageDirty();
-		bRoverModeApplied = true;
 	}
 
 	CmdVelController = FindUsableComponentByClass<URoverCmdVelVehicleControllerComponent>(RoverActor);
@@ -1940,30 +1976,7 @@ void FsimulatorEditorModule::OnApplyClicked()
 		CmdVelController->MarkPackageDirty();
 	}
 
-	FString Status = TEXT("Applied settings.");
-
-	TArray<FString> SkippedSettings;
-	if (!bImuApplied) {
-		SkippedSettings.Add(TEXT("IMU Hz"));
-	}
-	if (!bRoverModeApplied) {
-		SkippedSettings.Add(TEXT("rover control mode"));
-	}
-	if (MapsApplied == 0 && GroundTruthMapPublisherCount == 0 && bEnableGroundTruthMaps) {
-		SkippedSettings.Add(TEXT("map setting"));
-	}
-
-	if (SkippedSettings.Num() > 0) {
-		Status = FString::Printf(TEXT("Applied settings. Skipped %s."), *FString::Join(SkippedSettings, TEXT(", ")));
-	} else if (NewConfig.bGroundTruthImages && !NewConfig.HasAnyGroundTruthOutputType()) {
-		Status = TEXT("Applied settings. Ground Truth Images has no selected outputs.");
-	} else if (RobotCamRigCount > 1) {
-		Status = TEXT("Applied settings to first ESA_Rover pipeline.");
-	}
-
-	const FText StatusText = FText::FromString(Status);
 	RefreshTargetsFromEditorWorld();
-	LastApplyStatus = StatusText;
 }
 
 void FsimulatorEditorModule::LoadConfigFromRobotCamRig()
@@ -1996,8 +2009,12 @@ void FsimulatorEditorModule::LoadConfigFromRoverControl()
 {
 	if (URoverVehicleControllerComponent* RoverController = TargetRoverController.Get()) {
 		RoverControlMode = RoverController->GetControlMode();
+		MaxForwardSpeedKmh = ClampForwardRoverSpeedKmh(RoverController->MaxForwardSpeedKmh);
+		MaxReverseSpeedKmh = ClampReverseRoverSpeedKmh(RoverController->MaxReverseSpeedKmh);
 	} else {
 		RoverControlMode = ERoverControlMode::Manual;
+		MaxForwardSpeedKmh = 5.0f;
+		MaxReverseSpeedKmh = 3.0f;
 	}
 
 	if (URoverCmdVelVehicleControllerComponent* CmdVelController = TargetCmdVelController.Get()) {

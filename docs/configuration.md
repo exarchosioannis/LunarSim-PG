@@ -67,17 +67,22 @@ images and ground-truth images.
 
 ### Rover / Sensors
 
-This block controls the IMU publication rate and which input can drive the
-rover.
+This block controls the IMU publication rate, which input can drive the rover,
+and its forward and reverse speed limits.
 
 | Option | Default and allowed values | What it does |
 | --- | --- | --- |
 | **IMU Hz** | Default: `100`<br>Range: `1`–`400` Hz | Sets the requested ROS 2 IMU publication rate. Change it when your ROS 2 workflow needs a different sampling rate; it runs independently of capture and cannot exceed the simulation frame rate. |
 | **Control Mode** | Default: **WASD**<br>Choices: **WASD**, **cmd_vel** | Chooses the rover input source. Use **WASD** for keyboard driving, or choose **cmd_vel** before sending ROS 2 velocity commands. |
+| **Max Forward Speed (km/h)** | Default: `5.0` km/h<br>Range: `3.0`–`10.0` km/h | Sets the rover's velocity-based forward speed limit. The controller reduces drive input as the rover approaches the limit; this is not simple throttle scaling. |
+| **Max Reverse Speed (km/h)** | Default: `3.0` km/h<br>Range: `3.0`–`8.0` km/h | Sets the rover's velocity-based reverse speed limit independently of the forward limit. |
 
 In **WASD** mode, use `W` to drive forward, `S` to brake or reverse, and `A`
 and `D` to steer. For ROS 2 control commands and limits, see the
 [Data outputs and ROS 2](data-and-ros2.md) guide.
+
+Both speed limits apply to keyboard, joystick, and ROS 2 `cmd_vel` commands
+because all three use the same rover-controller speed-limiting path.
 
 ### Apply Settings
 

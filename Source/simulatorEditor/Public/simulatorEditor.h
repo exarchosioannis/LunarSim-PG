@@ -66,6 +66,8 @@ private:
 	void OnCameraHorizontalFovDegChanged(float NewValue);
 	void OnStereoBaselineCmChanged(float NewValue);
 	void OnImuHzChanged(float NewValue);
+	void OnMaxForwardSpeedKmhChanged(float NewValue);
+	void OnMaxReverseSpeedKmhChanged(float NewValue);
 
 	void RefreshTargetsFromEditorWorld();
 	bool CanApplySettings() const;
@@ -73,7 +75,6 @@ private:
 	bool CanEditImuHz() const;
 	bool CanEditRoverControl() const;
 	bool CanEditGroundTruthOutput() const;
-	FText GetApplyStatusText() const;
 
 	void OnApplyClicked();
 	FCaptureConfig BuildCaptureConfigFromUi(const FCaptureConfig& ExistingConfig) const;
@@ -99,6 +100,8 @@ private:
 
 	ELunarSimResolutionPreset ResolutionPreset = ELunarSimResolutionPreset::R1024x1024;
 	ERoverControlMode RoverControlMode = ERoverControlMode::Manual;
+	float MaxForwardSpeedKmh = 5.0f;
+	float MaxReverseSpeedKmh = 3.0f;
 	FRoverCmdVelControllerSettings CmdVelSettings;
 	float CustomCaptureHz = 6.0f;
 	float CameraHorizontalFovDeg = 90.0f;
@@ -112,7 +115,4 @@ private:
 	bool bTrajectoryCsv = true;
 	bool bEnableGroundTruthMaps = true;
 	float ImuPublishHz = 100.0f;
-	int32 RobotCamRigCount = 0;
-	int32 GroundTruthMapPublisherCount = 0;
-	FText LastApplyStatus;
 };
