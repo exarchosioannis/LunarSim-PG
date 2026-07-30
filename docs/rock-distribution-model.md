@@ -256,7 +256,7 @@ freshness-based proxy. It is not sampled from the generated heightmap. Actual
 terrain contact, ground-normal alignment, vertical position, and mesh-dependent
 burial are resolved by the Unreal Rock Baker.
 
-## Scientific basis
+<!-- ## Scientific basis
 
 The implementation uses the literature in the following limited ways:
 
@@ -270,7 +270,7 @@ The implementation uses the literature in the following limited ways:
   Highlands, and Fresh presets use different measured craters as anchors.
 - **Li and Wu (2018):** supports regionally varying rock abundance and the
   concentration of rocks around rocky ejecta craters. The conversion from
-  published areal abundance to generator count density is procedural.
+  published areal abundance to generator count density is procedural. -->
 
 ## What is measured and what is procedural
 
@@ -289,25 +289,6 @@ The implementation uses the literature in the following limited ways:
 | Clump fractions, means, and Gaussian widths | Procedural |
 | Independent big-rock clumps | Procedural scenario feature |
 | Random yaw, tilt, and burial ranges | Procedural placement metadata |
-
-## Limitations
-
-- The generator samples candidate rock centers in 2D; it does not perform ejecta
-  trajectories, fragmentation physics, collision avoidance, or stability tests.
-- The source crater catalog contains a simplified degradation scalar rather than
-  a physical crater age.
-- The rock count model is calibrated for visually useful 500 m-scale maps and
-  should not be extrapolated as a measured lunar density law.
-- Background rocks are independent of the heightmap's local slope, roughness,
-  and material boundaries.
-- Radial distributions are azimuthally symmetric except for Gaussian clumping;
-  impact-angle asymmetry and mapped rays are not represented.
-- `local_slope_deg` is a proxy, and actual Unreal placement depends on Landscape
-  traces and available rock meshes.
-- Internal command-line scientific profile defaults and GUI presets are not
-  identical. Use `rock_settings.json` when reporting or reproducing a GUI run.
-- Valid numeric input does not guarantee a scientifically plausible or
-  computationally practical field.
 
 ## References
 

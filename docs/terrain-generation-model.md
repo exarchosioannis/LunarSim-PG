@@ -201,7 +201,7 @@ validated physical bounds.
 | New Fresh Zone | 5.0 m | 22 | 0.00–0.45 | 0.145 | 1.20 | 1.50 | 0.80 | 0.20 |
 | Custom | 6.5 m | 48 | 0.60–1.00 | 0.080 | 0.75 | 0.40 | 0.20 | 0.50 |
 
-## Scientific basis
+<!-- ## Scientific basis
 
 The implementation uses the literature in the following limited ways:
 
@@ -224,7 +224,7 @@ The implementation uses the literature in the following limited ways:
   properties can suppress observed small-crater frequencies.
 - **Oetting et al. (2023):** supports using steep cumulative small-crater
   distributions around young Copernican craters while also emphasizing that
-  target properties, degradation, and secondaries affect the measured slope.
+  target properties, degradation, and secondaries affect the measured slope. -->
 
 ## What is measured and what is procedural
 
@@ -241,18 +241,6 @@ The implementation uses the literature in the following limited ways:
 | Slope survival probability | Procedural, observation-motivated |
 | Secondary-chain geometry and probability | Procedural, observation-motivated |
 | Regolith and crater-floor roughness | Procedural |
-
-## Limitations
-
-- The output is a static synthetic surface, not a time-evolving landscape.
-- It does not simulate excavation, ejecta ballistics, regolith transport,
-  seismic degradation, or material strength.
-- Crater centers are spatially uniform except for optional procedural secondary
-  chains; geological units and rays are not explicitly mapped.
-- The 2.5–250 m crater range and preset coefficients are tailored to compact
-  game-scale maps and should not be extrapolated without validation.
-- Editing preset values can produce numerically valid but scientifically or
-  visually implausible terrain.
 
 ## References
 
