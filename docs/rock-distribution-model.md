@@ -2,7 +2,8 @@
 
 This page describes the statistical rock-distribution model implemented by
 `Tools/Terrain_Generation/rockfield_generator.py` and configured by the MoonSim
-asset-generator GUI.
+asset-generator GUI. For generation, analysis, and Unreal import instructions,
+see [Terrain generation](terrain-generation.md).
 
 The model is a **crater-first, scientifically informed procedural model**. It
 uses empirical relationships for lunar ejecta boulder size and distance,

@@ -1,8 +1,9 @@
-# Terrain generation model
+# Heightmap and crater generation model
 
-This page describes the terrain model implemented by
+This page describes the heightmap and crater-generation model implemented by
 `Tools/Terrain_Generation/heightmap_generator.py` and configured by the MoonSim
-asset-generator GUI.
+asset-generator GUI. For generation, analysis, and Unreal import instructions, see
+[Terrain generation](terrain-generation.md).
 
 The model is a **scientifically informed procedural terrain model**. It uses
 published lunar crater statistics and morphology as constraints, then combines
@@ -30,7 +31,7 @@ The generated elevation field is built in the following order:
 The seed controls every stochastic stage. Reusing the same code, complete
 settings, and seed produces the same output.
 
-![Watch the terrain-generation demonstration](images/terrain-generation/four_terrain_pipeline.gif)
+![Watch the terrain-generation demonstration](images/terrain-generation/four_terrain_preset.gif)
 
 ## Base floor
 
@@ -120,7 +121,7 @@ This part is constrained by the small-crater morphology work of Mahanti et al.
 The exact blending weights, large-crater taper, and final bounds are
 implementation choices.
 
-![Effect of crater degradation](images/terrain-generation/terrain-generation/terrain-degradation-effect.png)
+![Effect of crater degradation](images/terrain-generation/terrain-degradation-effect.png)
 
 ## Crater integration
 
