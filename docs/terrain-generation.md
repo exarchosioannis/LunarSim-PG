@@ -161,22 +161,22 @@ Rock baking must be performed while the editor is not in Play In Editor.
 
 4. Click **Bake Rocks**.
 
-The Rock Baker reads the centered X/Y positions, diameters, and optional yaw, tilt, tilt-axis, and burial values from the JSON. Unreal resolves the final terrain height and places the mesh instances on the imported Landscape.
+The Rock Baker reads the centred X/Y positions, diameters, and optional yaw, tilt, tilt-axis, and burial values from the JSON. Unreal resolves the final terrain height and places the mesh instances on the imported Landscape.
 
 ### 9. Update level actors and lighting
 
-Use the buttons in **Simulator Config** to place the Sun, Sky, Earth, and Rover when needed.
+Use the **Setup Actions** buttons in **Simulator Config** to create or update the Sun, Sky, Earth, and Rover when needed.
 
-The azimuth and elevation stored by the terrain generator are used only for hillshade previews. Change Unreal lighting through the level's directional light and the relevant Sun Glow controller settings.
+The azimuth and elevation stored by the terrain generator are used only for offline hillshade previews. To change the Unreal scene lighting, use **Sun Elevation (deg)**, **Sun Azimuth (deg)**, and **Apply Sun Direction** in **Simulator Config**.
 
-Automatic illumination transfer is not implemented.
+Terrain-generator illumination values are not transferred to the Unreal level automatically.
 
 ### 10. Clear or rebake rocks
 
 To replace a baked rockfield:
 
 1. Open **Window > Simulator > Simulator Config**.
-2. Click **Clear Rocks**.
+2. Click **Clear Baked Rocks**.
 3. Select another rockfield JSON or mesh folder.
 4. Click **Bake Rocks** again.
 
@@ -210,13 +210,13 @@ Use files under `unreal_import/` for Unreal. Keep the corresponding `generated/`
 | --- | --- |
 | `heightmap.png` | 16-bit terrain elevation encoding for Unreal Landscape import |
 | `metadata.json` | Format/version, units, profile, seed, dimensions, meters per pixel, coordinate descriptions, actual height statistics, generator settings, output filenames, and Unreal X/Y/Z import scales |
-| `craters.json` | Terrain-generation and fixed preview-illumination metadata plus centered crater records |
+| `craters.json` | Terrain-generation and fixed preview-illumination metadata plus centred crater records |
 | `generation_summary.txt` | Human-readable settings, statistics, and Unreal scale summary |
 | `unreal_rockfield.json` | Unreal-ready rock placement data for the generated terrain |
 | `rock_settings.json` | Exact rock-generator settings selected for the run |
 | `source_heightmap.json` | Linkage to the source heightmap package |
 
-The heightmap coordinate description is top-left based, while crater and rockfield X/Y coordinates are centered about the map origin.
+The heightmap coordinate description is top-left based, while crater and rockfield X/Y coordinates are centred about the map origin.
 
 Analysis dialogs write timestamped PNG figures plus JSON, CSV, and text summaries under `analysis_results/`. These are offline analysis products, not the simulator data generated from the Unreal scene during Play In Editor. 
 
@@ -247,9 +247,9 @@ Analysis dialogs write timestamped PNG figures plus JSON, CSV, and text summarie
 | <a id="basic-seed"></a>**Seed** | Controls the deterministic random streams used for terrain, craters, rocks, tilt, and burial. | Increasing the number does not create more terrain features or rocks. It simply produces a different deterministic arrangement. | The same seed combined with the same settings produces the same output. |
 | <a id="basic-heightmap-size"></a>**Heightmap size** | Sets the number of height samples along each side of the terrain. Available values are `1009`, `2017`, and `4033`. | A larger value gives finer spatial resolution, smaller meters-per-pixel, smoother-looking crater edges, and better preservation of small features. It also increases memory use and generation and analysis time. | At the same map size, a larger heightmap gives more pixels to each terrain feature. |
 | <a id="basic-map-size-m"></a>**Map size, m** | Sets the real-world width and height of the square terrain. | A larger value covers more area. Expected crater count rises approximately with area, so doubling the side length gives roughly four times the expected craters before other effects. Background-rock demand also rises. At a fixed heightmap resolution, meters-per-pixel becomes larger and terrain features receive fewer pixels. | Keep this consistent with the selected heightmap package. A mismatch can crop rocks, change the background-rock area, or make rock coordinates disagree with the terrain. |
-| <a id="basic-height-range-m"></a>**Height range, m** | Sets the full vertical interval encoded into the 16-bit heightmap. In the GUI's fixed range mode, the interval is centered around zero. | A larger value provides more vertical headroom and produces a larger Unreal Landscape Z Scale. However, each 16-bit step represents more height, reducing vertical precision. | For example, a value of `80 m` encodes elevations from `-40 m` to `+40 m`. This setting changes the export encoding and Unreal Z Scale. It does **not** make the procedural terrain itself rougher, deeper, or taller. Terrain outside the selected range is clipped. |
+| <a id="basic-height-range-m"></a>**Height range, m** | Sets the full vertical interval encoded into the 16-bit heightmap. In the GUI's fixed range mode, the interval is centred around zero. | A larger value provides more vertical headroom and produces a larger Unreal Landscape Z Scale. However, each 16-bit step represents more height, reducing vertical precision. | For example, a value of `80 m` encodes elevations from `-40 m` to `+40 m`. This setting changes the export encoding and Unreal Z Scale. It does **not** make the procedural terrain itself rougher, deeper, or taller. Terrain outside the selected range is clipped. |
 | <a id="basic-heightmap-preset"></a>**Heightmap preset** | Selects the hidden heightmap morphology configuration. | Changing the preset replaces the non-GUI terrain settings used for base relief, broad landforms, crater degradation, crater depth, rim shape, ejecta, secondary chains, and surface roughness. | Choices are `mare_scientific`, `apollo17_scientific`, `highland_scientific`, `fresh_crater_scientific`, and `custom_scientific`. |
-| <a id="basic-rock-profile"></a>**Rock profile** | Selects the default rockfield configuration associated with a terrain type. | Changing the profile loads a different set of defaults for rock abundance, size distribution, crater zones, clumping, materials, and placement behavior. | Choices are `mare`, `apollo_17`, `polar_highlands`, `new_fresh_zone`, and `custom`. The values displayed in the advanced rock tabs can override the profile defaults. |
+| <a id="basic-rock-profile"></a>**Rock profile** | Selects the default rockfield configuration associated with a terrain type. | Changing the profile loads a different set of defaults for rock abundance, size distribution, crater zones, clumping, materials, and placement behaviour. | Choices are `mare`, `apollo_17`, `polar_highlands`, `new_fresh_zone`, and `custom`. The values displayed in the advanced rock tabs can override the profile defaults. |
 | <a id="basic-crater-k-2-5-50-m"></a>**Crater K, 2.5–50 m** | Controls the abundance coefficient for craters between `2.5 m` and `50 m` in diameter. | A larger value approximately linearly increases the expected number of small craters. More small craters can also create more potential rock sources, depending on the source-crater diameter and freshness filters. | A value of `0` disables the normal crater population for this diameter segment. A preset may still generate procedural secondary craters from larger parent craters. The expected crater count for each diameter segment is proportional to: map area × K × (Dmin^-b - Dmax^-b) Because crater generation is stochastic, this equation describes the expected population rather than guaranteeing an exact crater count.|
 | <a id="basic-crater-k-50-250-m"></a>**Crater K, 50–250 m** | Controls the abundance coefficient for craters between `50 m` and `250 m` in diameter. | A larger value increases the expected number of large craters. Large craters affect more terrain, may create wider ejecta zones, and can generate more and larger crater-owned rocks. | A value of `0` disables the normal large-crater segment. Because the map may only be a few hundred meters wide, large-crater counts are stochastic. A moderate change may produce no visible difference for one seed but a large difference for another. The expected crater count for each diameter segment is proportional to: map area × K × (Dmin^-b - Dmax^-b) Because crater generation is stochastic, this equation describes the expected population rather than guaranteeing an exact crater count.|
 | <a id="basic-heightmap-run-for-rock-generation"></a>**Heightmap run for rock generation** | Selects the complete generated heightmap package used as the source for rock generation. | Not applicable; this is a folder selection rather than a numeric value. Selecting a different run changes the terrain metadata and crater catalog used to place rocks. | Select a complete heightmap run folder, not an individual PNG or JSON file. **Browse** validates the folder and resolves its heightmap, metadata, and crater catalog. **Clear** removes the selected source. **Generate rocks** uses the selected run; if none is selected, it uses the current generated heightmap run when available. |
@@ -461,7 +461,7 @@ Size multipliers change the local maximum rock diameter. They do not directly ch
 
 `Cluster zone bias` options:
 
-| Choice | Parent-zone behavior |
+| Choice | Parent-zone behaviour |
 |---|---|
 | `rim` | All clump parents are sampled inside the rim zone. |
 | `proximal` | All clump parents are sampled inside proximal ejecta. |

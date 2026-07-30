@@ -5,6 +5,7 @@
 - [Installation](installation.md) — Set up Unreal Engine, prepare the project, build it, open it, and start the included ROS 2 Docker environment.
 - [Simulator configuration](configuration.md) — Learn what each option in **Window > Simulator > Simulator Config** does and how to prepare a run.
 - [Data outputs and ROS 2](data-and-ros2.md) — See the ground-truth files saved to disk, the available ROS 2 topics, and how the data can be used.
+- [Coordinate frames](coordinate-frames.md) — See the Unreal-to-ROS axis conversion, frame tree, topic frame IDs, and units.
 
 ## Terrain generation
 

@@ -130,16 +130,16 @@ Do not delete unrelated level actors.
 4. Select `unreal_import/heightmaps/<run>.png`.
 5. Enter the X, Y, and Z scales from the matching heightmap `metadata.json`.
 6. Select the material `M_Landscape_Material_Moon_Inst`.
-6. Click **Import**.
+7. Click **Import**.
 
-The generated PNG is a 16-bit Landscape heightmap. 
+The generated PNG is a 16-bit Landscape heightmap.
 
 ## 6. Apply the Moon landscape material
 
 After the Landscape imports:
 
 1. Select the Landscape.
-2. In the Details panel, and assign the Landscape Material if it was not done on the previous step:
+2. In the Details panel, assign the Landscape Material if it was not done on the previous step:
 
 ```text
 M_Landscape_Material_Moon_Inst
@@ -148,7 +148,7 @@ M_Landscape_Material_Moon_Inst
 3. Open the Landscape **Paint** tools.
 4. Choose **Create Layers From Assigned Material**.
 5. For **SoftSand**, assign the appropriate LayerInfo asset.
-7. Right-click **SoftSand** and choose **Fill Layer**.
+6. Right-click **SoftSand** and choose **Fill Layer**.
 
 
 ## 7. Bake rocks into the Unreal Engine level
@@ -170,29 +170,29 @@ Tools/Terrain_Generation/unreal_import/rockfields/<run>.json
 
 4. Click **Bake Rocks**.
 
-The Rock Baker reads the centered X/Y positions, diameters, and optional yaw,
+The Rock Baker reads the centred X/Y positions, diameters, and optional yaw,
 tilt, tilt-axis, and burial values from the JSON. Unreal resolves the final
 terrain height and places the mesh instances on the imported Landscape.
 
 ## 8. Update the Sun, Sky, Earth and Rover in the Unreal Engine level if needed
 
-Use the buttons in the Simulator Config window to place the Sun, Sky, Earth and Rover.
+Use the **Setup Actions** buttons in Simulator Config to create or update the Sun, Sky, Earth, and Rover. Use the separate **Sun Direction** controls when you need to change the lighting direction.
 
 ## 9. Clear or rebake rocks into the Unreal Engine level
 
 To replace a baked rockfield:
 
 1. Open **Window > Simulator > Simulator Config**.
-2. Use **Clear Rocks**.
+2. Use **Clear Baked Rocks**.
 3. Select another rockfield JSON or mesh folder.
 4. Click **Bake Rocks** again.
 
 ## 10. Analyze generated terrain
 
-The GUI's **Analyze heightmap** dialog creates elevation, hillshade, slope, and roughness visualizations plus metrics and summaries. **Analyze rockfield** creates crater/ejecta-zone, source-crater, density, and large-rock visualizations plus metrics and CSV files.
+The GUI's **Analyze heightmap** dialog creates elevation, hillshade, slope, and roughness visualisations plus metrics and summaries. **Analyze rockfield** creates crater/ejecta-zone, source-crater, density, and large-rock visualisations plus metrics and CSV files.
 
 These files are written under `analysis_results/`. They are offline analysis products and are not substitutes for the dataset occupancy, elevation, or slope modalities captured from the Unreal scene during Play In Editor.
 
 ## 11. Lighting
 
-The azimuth and elevation stored by the terrain generator are used only for hillshade previews. To change Unreal lighting, adjust the level's directional light and the relevant Sun Glow controller settings independently.
+The azimuth and elevation stored by the terrain generator are used only for offline hillshade previews. To change Unreal lighting, open **Window > Simulator > Simulator Config**, set **Sun Elevation (deg)** and **Sun Azimuth (deg)**, and press **Apply Sun Direction**. These preview values are not transferred to the Unreal level automatically.

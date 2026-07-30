@@ -136,7 +136,7 @@ For normalized radius `r`, the inner bowl follows the implemented profile:
 bowl(r) = -depth (1 - r^2.15), for r <= 1
 ```
 
-The rim is a Gaussian centered near `r = 1`. Its width increases with
+The rim is a Gaussian centred near `r = 1`. Its width increases with
 degradation, while its height decreases using a procedural degradation law.
 The ejecta apron begins outside the rim and decays approximately as
 `r^-ejecta_decay_exponent` until `crater_outer_radius_ratio`.
@@ -147,7 +147,7 @@ from more degraded to fresher, so fresh craters can overprint older terrain.
 
 The bowl construction, rim Gaussian, ejecta decay, blend masks, and rim
 irregularity harmonics are procedural geometry constrained by observed lunar
-crater behavior. They are not a hydrocode impact solution.
+crater behaviour. They are not a hydrocode impact solution.
 
 ![Rim irregularity](images/terrain-generation/terrain-rim-irregularity-outlines.png)
 ![Rim width](images/terrain-generation/terrain-rim-width-effect.png)
@@ -183,7 +183,7 @@ A final blurred random field, scaled by `post_regolith_roughness_m`, adds small
 surface texture. Optional crater-floor roughness exists in the generator but is
 zero in the current GUI presets unless manually overridden outside the GUI.
 
-The elevation field is mean-centered and encoded to 16-bit PNG. In fixed range
+The elevation field is mean-centred and encoded to 16-bit PNG. In fixed range
 mode, the selected height range defines the Unreal Landscape Z scale. Dither of
 less than one 16-bit level is added to reduce banding. The preview sun azimuth
 and elevation affect hillshade metadata only and do not affect the heightmap.
@@ -231,7 +231,7 @@ The implementation uses the literature in the following limited ways:
 | Component | Status |
 | --- | --- |
 | General crater SFD slopes and regional abundance order | Literature-constrained |
-| Fresh-to-degraded small-crater `d/D` behavior | Literature-constrained |
+| Fresh-to-degraded small-crater `d/D` behaviour | Literature-constrained |
 | Fresh ejecta being rougher and more blocky than old mare | Literature-constrained qualitatively |
 | Exact `K` conversion used by a GUI preset | Implementation-derived |
 | Second 50–250 m SFD segment | Partly procedural |

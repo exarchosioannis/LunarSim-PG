@@ -8,9 +8,10 @@ Editor run. It also provides actions for preparing the current level.
 
 1. Open the level you want to run.
 2. Go to **Window > Simulator > Simulator Config**.
-3. Choose the settings you need.
-4. Press **Apply Settings**.
-5. Start Play In Editor.
+3. Choose the capture, sensor, and rover settings you need.
+4. Press **Apply Settings** for those settings.
+5. If you change sun elevation or azimuth, press **Apply Sun Direction** separately.
+6. Start Play In Editor.
 
 ## Configuration blocks
 
@@ -27,7 +28,7 @@ maps.
 | Option | Default | What it does |
 | --- | --- | --- |
 | **Stereo ROS Images + CameraInfo** | Enabled | Publishes left and right RGB images with matching camera information during an active capture session. Enable this when ROS 2 needs the stereo camera stream; it does not write the stereo images to the dataset folder. |
-| **Trajectory CSV** | Enabled | Writes synchronized pose rows at **Capture Hz** while capture is active. Enable this when you need offline rover or camera poses; camera pose files depend on which camera outputs are enabled. |
+| **Trajectory CSV** | Enabled | Writes synchronised pose rows at **Capture Hz** while capture is active. Enable this when you need offline rover or camera poses; camera pose files depend on which camera outputs are enabled. |
 | **Ground Truth ROS Maps** | Enabled | Computes the ground-truth maps, writes the run-level map outputs, and publishes the ROS 2 map data. Enable this when you need occupancy and elevation products; the calculation starts during Play In Editor and does not wait for `C`. |
 
 **Ground Truth ROS Maps** can be changed only when the level contains the
@@ -45,7 +46,7 @@ choices are available only while the master switch is enabled.
 | **Ground Truth Images** | Enabled | Enables file-backed ground-truth capture. Enable this when you want any of the four outputs below. |
 | **RGB** | Enabled | Writes the ground-truth RGB image for each active capture frame. Choose this when you need a color image aligned with the other ground-truth products. |
 | **Depth** | Enabled | Writes a depth image for each active capture frame. Use this option when your dataset needs per-pixel distance information. |
-| **Segmentation** | Enabled | Writes the color-coded segmentation image and its legends. Enable this when you need labeled scene regions. |
+| **Segmentation** | Enabled | Writes the colour-coded segmentation image and its legends. Enable this when you need labelled scene regions. |
 | **Bounding Boxes** | Unchecked | Writes per-frame image-space bounding-box data. Enable this only when needed because it can significantly reduce capture performance in dense scenes. |
 
 Turning off **Ground Truth Images** leaves the four choices selected but makes
@@ -117,7 +118,7 @@ actor's rotation and briefly confirms success on the button itself; save the
 level when you want the change to persist.
 
 The **Setup Actions** card retains the existing environment and rover setup
-buttons and their behavior. These actions change the level immediately. Save
+buttons and their behaviour. These actions change the level immediately. Save
 the level when you want to keep the result. Apply feedback is temporary and
 does not add persistent status rows.
 
@@ -132,7 +133,7 @@ The **Terrain Generation** block contains the separate **Rock Field Baking**
 workflow. See [Terrain generator workflow](terrain-generator-workflow.md) for
 its inputs and actions.
 
-## Important behavior
+## Important behaviour
 
 - **Capture Hz** controls session capture frames. It affects enabled
   ground-truth images, stereo ROS 2 images, and **Trajectory CSV** sampling,

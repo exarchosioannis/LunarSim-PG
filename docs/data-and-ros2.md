@@ -1,12 +1,14 @@
 # Data outputs and ROS 2
 
-LunarSim-PG can save synchronized ground-truth data directly to
+LunarSim-PG can save synchronised ground-truth data directly to
 `Saved/Datasets/`, publish sensor and control data through ROS 2, or do both
 during the same run.
 
 Choose what to produce in
-[Simulator configuration](configuration.md), press **Apply Settings**, and then
-start Play In Editor.
+[Simulator configuration](configuration.md), press **Apply Settings** for the
+capture, sensor, and rover settings, and then start Play In Editor. Sun
+elevation and azimuth use the separate **Apply Sun Direction** action and do
+not change which data outputs are enabled.
 
 ## Data saved to disk
 
@@ -66,7 +68,7 @@ rover and the available cameras:
 Every trajectory row includes a capture frame index and simulation timestamp.
 This lets you match poses with the corresponding ground-truth images and align
 them with ROS 2 stereo images by timestamp. The trajectories can be used as
-reference data when evaluating visual odometry, SLAM, localization, or rover
+reference data when evaluating visual odometry, SLAM, localisation, or rover
 motion estimates.
 
 `manifest.csv` connects each captured frame with its generated files,
@@ -105,6 +107,43 @@ Unreal Engine–ROS 2 bridge.
 | `/cmd_vel` | Rover velocity commands when **Control Mode** is **cmd_vel** |
 | `/capture/control` | Starts capture with `1` and stops it with `0` |
 
+### Detailed topic reference
+
+| Topic | Message type | Frame or units | Default rate and QoS |
+| --- | --- | --- | --- |
+| `/stereo/left/image_raw`, `/stereo/right/image_raw` | `sensor_msgs/msg/Image` | `left_camera_optical_frame` or `right_camera_optical_frame`; `bgr8` encoding | **Capture Hz** while capture is active; reliable, volatile, queue depth `20` |
+| `/stereo/left/camera_info`, `/stereo/right/camera_info` | `sensor_msgs/msg/CameraInfo` | Matching optical frame; ideal pinhole calibration with `plumb_bob` and zero distortion coefficients | Published with each matching image; reliable, volatile, queue depth `20` |
+| `/imu/data` | `sensor_msgs/msg/Imu` | `imu_link`; angular velocity in rad/s and linear acceleration in m/s² | **IMU Hz**, default `100` Hz and limited by simulation FPS; reliable, volatile, queue depth `50` |
+| `/ground_truth/pose` | `geometry_msgs/msg/PoseStamped` | `map`; position in metres | Default `20` Hz; reliable, volatile, queue depth `10` |
+| `/ground_truth/odom` | `nav_msgs/msg/Odometry` | Header frame `map`, child frame `base_link`; twist in m/s and rad/s | Default `20` Hz; reliable, volatile, queue depth `10` |
+| `/ground_truth/path` | `nav_msgs/msg/Path` | `map`; retains up to `5000` poses | Default `10` Hz; reliable, transient local, queue depth `1` |
+| `/ground_truth/map/occupancy` | `nav_msgs/msg/OccupancyGrid` | `map`; default resolution `0.40` m/cell | Generated at run start when enabled and republished every `5` s; reliable, transient local, queue depth `1` |
+| `/ground_truth/map/elevation_points` | `sensor_msgs/msg/PointCloud2` | `map`; `x`, `y`, and `z` are `float32` metres | Generated and republished with the occupancy map; reliable, transient local, queue depth `1` |
+| `/cmd_vel` | `geometry_msgs/msg/Twist` | `linear.x` in m/s and `angular.z` in rad/s | Subscription active in **cmd_vel** mode; reliable, volatile, queue depth `1` |
+| `/capture/control` | `std_msgs/msg/Int32` | `1` starts capture and `0` stops capture | Reliable, volatile, queue depth `1` |
+| `/clock`, `/tf`, `/tf_static` | Standard ROS 2 clock and TF messages managed by TempoROS | Simulation time and dynamic/static transforms | Managed by the TempoROS clock and TF APIs |
+
+Rates above are implementation defaults. Effective runtime rates can be lower
+when Unreal cannot maintain the requested update frequency.
+
+### Frames and coordinate conventions
+
+The main frame tree is:
+
+```text
+map
+└── base_link
+    ├── imu_link
+    ├── left_camera_link
+    │   └── left_camera_optical_frame
+    └── right_camera_link
+        └── right_camera_optical_frame
+```
+
+See [Coordinate frames](coordinate-frames.md) for the Unreal-to-ROS axis
+conversion, units, camera optical frames, and the topics associated with each
+frame.
+
 The stereo camera topics publish only while capture is active. Press `C` in the
 Play In Editor viewport, or use `/capture/control`, to start and stop capture.
 
@@ -112,5 +151,5 @@ The IMU, rover ground truth, transforms, clock, and maps run independently of
 the capture session. Their effective rates can still be limited by Unreal
 runtime performance.
 
-Live ROS 2 topics are not automatically saved to the dataset directory. Use
+ROS 2 topics are not automatically saved to the dataset directory. Use
 `ros2 bag` when you need to keep them after the simulation ends.

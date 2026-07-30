@@ -19,7 +19,7 @@ reconstruction of a measured boulder field.
 Rock generation proceeds in this order:
 
 1. Filter the crater catalog by source-crater diameter and degradation.
-2. Generate crater-owned rocks, including single rocks and crater-centered
+2. Generate crater-owned rocks, including single rocks and crater-centred
    clumps.
 3. Generate a regional background population, including optional background
    clumps.

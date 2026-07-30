@@ -1,9 +1,14 @@
-# LunarSim-PG
+<h1 align="center">LunarSim-PG</h1>
 
-**LunarSim-PG**  is a high-fidelity lunar rover simulation framework built with
+<h3 align="center">
+  Scientifically Grounded Lunar Terrain Generation for High-Fidelity
+  Rover Perception and Navigation Simulation
+</h3>
+
+**LunarSim-PG** is a high-fidelity lunar rover simulation framework built with
 Unreal Engine 5 and integrated with ROS 2. It combines controllable rover and
-stereo-camera simulation, science-parameterized procedural terrain generation,
-configurable lunar illumination, and synchronized sensor and ground-truth data
+stereo-camera simulation, science-parameterised procedural terrain generation,
+configurable lunar illumination, and synchronised sensor and ground-truth data
 within a single environment.
 
 The framework supports both closed-loop robotics experiments and offline
@@ -13,8 +18,9 @@ control the rover through WASD or ROS 2 `cmd_vel`, and generate data for visual
 odometry, SLAM, obstacle detection, semantic segmentation, mapping, and
 traversability research.
 
-This enables repeatable evaluation of perception and navigation algorithms
-across different terrain, lighting, and sensor configurations.
+Together, these capabilities enable repeatable evaluation of perception and
+navigation algorithms across different terrain, lighting, and sensor
+configurations.
 
   ![Example view of LunarSim-PG with rover, sun and Earth](docs/images/header.png)
 
@@ -29,7 +35,7 @@ across different terrain, lighting, and sensor configurations.
   simulation time, while accepting rover commands through ROS 2.
 
 - **Ground-truth data generation** — Capture visual, geometric, semantic, pose,
-  trajectory, and terrain outputs organized by capture frame and simulation
+  trajectory, and terrain outputs organised by capture frame and simulation
   timestamp for perception, navigation, mapping, and dataset-generation
   workflows.
 
@@ -101,7 +107,7 @@ Once the project opens, choose one of the included levels from
 | Level | Description |
 | --- | --- |
 | `apollo17` | Apollo 17-inspired valley and highland terrain combining sloped landforms, impact craters, and scattered boulders. Intended for representative rover visual-navigation experiments. |
-| `highland` | Rugged, heavily cratered highland terrain with older, bigger, more degraded craters, pronounced relief, and increased surface roughness. Suitable for challenging perception and navigation tests.|
+| `highland` | Rugged, heavily cratered highland terrain with older, bigger, more degraded craters, pronounced relief, and increased surface roughness. Suitable for challenging perception and navigation tests. |
 | `mare` | Relatively smooth, low-relief basaltic mare terrain with fewer craters and sparse rocks. Provides a simpler baseline environment with broad, weakly textured surfaces. |
 | `fresh_crater` | Terrain dominated by a comparatively fresh impact crater with a sharp rim, visible ejecta structure, and concentrated blocky rocks. Intended for obstacle detection and traversability experiments. |
 | `custom` | A more densely populated terrain with increased crater and rock abundance, creating a visually richer and more obstacle-heavy environment for general testing and demonstrations. |
@@ -122,7 +128,8 @@ For example, you can select:
 - rover control through WASD or ROS 2 `cmd_vel`
 - lunar illumination conditions through configurable sun elevation and azimuth
 
-When you are ready, press **Apply Settings**.
+Press **Apply Settings** for capture, sensor, and rover-control changes.
+Use **Apply Sun Direction** separately for sun elevation and azimuth changes.
 
 For a full explanation of every option, see the
 [configuration guide](docs/configuration.md).
@@ -132,7 +139,7 @@ For a full explanation of every option, see the
 Start **Play In Editor** to begin the simulation.
 
 LunarSim-PG creates a new run directory under `Saved/Datasets/`, where your
-selected configuration and generated outputs are organized.
+selected configuration and generated outputs are organised.
 
 ### 4. Start and stop capture
 
@@ -145,7 +152,7 @@ stereo images through ROS 2. Each capture is stored in its own
 
 ## Data outputs
 
-LunarSim-PG can save synchronized ground-truth data directly to
+LunarSim-PG can save synchronised ground-truth data directly to
 `Saved/Datasets/` while also publishing live data through ROS 2.
 
 Saved datasets can include RGB, depth, segmentation, bounding boxes, rover and
@@ -167,7 +174,6 @@ ground-truth state, maps, transforms, simulation time, capture control, and
 - **Chaos Vehicles** is Unreal Engine’s built-in vehicle system used for the
   rover’s wheeled movement and control.
 
-
 ## Documentation
 
 - [Documentation home](docs/README.md)
@@ -177,12 +183,11 @@ ground-truth state, maps, transforms, simulation time, capture control, and
   - [Heightmap and crater generation model](docs/terrain-generation-model.md)
   - [Rock distribution model](docs/rock-distribution-model.md)
 - [Data outputs and ROS 2](docs/data-and-ros2.md)
-
-
+- [Coordinate frames](docs/coordinate-frames.md)
 
 ## Current scope
 
-**LunarSim-PG**  focuses on visual and geometric simulation for rover perception
+**LunarSim-PG** focuses on visual and geometric simulation for rover perception
 and navigation, supporting both ROS 2-based experiments and synthetic dataset
 generation.
 
@@ -198,21 +203,21 @@ the scope of the current framework.
 
 ### Main contributions
 
-- **Ioannis Exarchos** — system architecture and integration,
+- **Ioannis Exarchos** — System architecture and integration,
   Unreal Engine–ROS 2 integration, rover and sensor pipeline,
-  synchronized ground-truth and dataset-generation pipeline,
+  synchronised ground-truth and dataset-generation pipeline,
   and simulator configuration tools.
-- **María González Rodríguez** — science-parameterized procedural
+- **María González Rodríguez** — Science-parameterised procedural
   terrain generation, regional terrain profiles, crater morphology
   model, and coupled crater–rock distribution models.
-- **Noora Archer** — lunar visual assets, materials and environment
+- **Noora Archer** — Lunar visual assets, materials and environment
   modelling, and technical guidance on high-fidelity lunar scene
   representation.
 
 Additional scientific and technical guidance was provided by
 **Marek Kraft**.
 
-This work was supported by the **European Space Agency** through **ΕSA Spaceship Poland**.
+This work was supported by the **European Space Agency** through **ESA Spaceship Poland**.
 
 <br>
 
