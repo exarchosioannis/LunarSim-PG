@@ -1,7 +1,7 @@
 # Rock distribution model
 
 This page describes the statistical rock-distribution model implemented by
-`Tools/Terrain_Generation/rockfield_generator.py` and configured by the MoonSim
+`Tools/Terrain_Generation/rockfield_generator.py` and configured by the LunarSim-PG
 asset-generator GUI. For generation, analysis, and Unreal import instructions,
 see [Terrain generation](terrain-generation.md).
 
@@ -274,7 +274,7 @@ The implementation uses the literature in the following limited ways:
 
 ## What is measured and what is procedural
 
-| Component | Status in MoonSim |
+| Component | Status |
 | --- | --- |
 | Crater-to-maximum-boulder diameter trend | Empirically constrained |
 | Larger boulders preferentially near crater rims | Empirically constrained |

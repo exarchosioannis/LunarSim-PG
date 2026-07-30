@@ -21,13 +21,13 @@ Terrain generation requires Python 3 with `tkinter`, `NumPy`, and `Pillow`.
 Terrain analysis additionally requires `Matplotlib` and `SciPy`.
 
 `setup.sh` checks these imports and installs missing packages with `apt`.
-Run MoonSim from the repository root on a graphical desktop.
+Run LunarSim-PG asset generator from the repository root on a graphical desktop.
 
 ## Terrain generation workflow
 
-Use the MoonSim generator to create a heightmap and rockfield, inspect the generated assets, and import them into Unreal Engine.
+Use the LunarSim-PG generator to create a heightmap and rockfield, inspect the generated assets, and import them into Unreal Engine.
 
-![MoonSim main generator window](images/terrain-generation/GUI.png)
+![LunarSim-PG main generator window](images/terrain-generation/GUI.png)
 
 ### 1. Start the generator
 
@@ -110,7 +110,7 @@ The **Use newest generated** button selects the most recent complete rockfield r
 
 ### 6. Import the Landscape into Unreal Engine
 
-Open the target MoonSim level in Unreal Editor.
+Open the target LunarSim-PG level in Unreal Editor.
 
 When replacing the current terrain:
 

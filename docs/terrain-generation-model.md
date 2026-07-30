@@ -1,7 +1,7 @@
 # Heightmap and crater generation model
 
 This page describes the heightmap and crater-generation model implemented by
-`Tools/Terrain_Generation/heightmap_generator.py` and configured by the MoonSim
+`Tools/Terrain_Generation/heightmap_generator.py` and configured by the LunarSim-PG
 asset-generator GUI. For generation, analysis, and Unreal import instructions, see
 [Terrain generation](terrain-generation.md).
 
@@ -228,7 +228,7 @@ The implementation uses the literature in the following limited ways:
 
 ## What is measured and what is procedural
 
-| Component | Status in MoonSim |
+| Component | Status |
 | --- | --- |
 | General crater SFD slopes and regional abundance order | Literature-constrained |
 | Fresh-to-degraded small-crater `d/D` behavior | Literature-constrained |
