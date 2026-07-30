@@ -1,16 +1,20 @@
 # LunarSim-PG
 
-LunarSim-PG is a high-fidelity lunar rover simulation framework built on
-Unreal Engine 5 and integrated with ROS 2. It combines realistic lunar
-rendering, rover and stereo-camera simulation, science-parameterized procedural
-terrain generation, and synchronized sensor and ground-truth data in a single
-platform.
+LunarSim-PG is a high-fidelity lunar rover simulation framework built with
+Unreal Engine 5 and integrated with ROS 2. It combines controllable rover and
+stereo-camera simulation, science-parameterized procedural terrain generation,
+configurable lunar illumination, and synchronized sensor and ground-truth data
+within a single environment.
 
-LunarSim-PG is designed to support the development and evaluation of rover
-perception and navigation algorithms. It can be used both for closed-loop ROS 2
-experiments and for offline synthetic dataset generation, including visual
-odometry, SLAM, obstacle detection, semantic segmentation, and traversability
-research.
+The framework supports both closed-loop robotics experiments and offline
+synthetic dataset generation. Users can create reproducible lunar scenes with
+configurable crater and rock distributions, adjust sun elevation and azimuth,
+control the rover through WASD or ROS 2 `cmd_vel`, and generate data for visual
+odometry, SLAM, obstacle detection, semantic segmentation, mapping, and
+traversability research.
+
+This enables repeatable evaluation of perception and navigation algorithms
+across different terrain, lighting, and sensor configurations.
 
   ![Example view of LunarSim-PG with rover, sun and Earth](docs/images/header.png)
 
@@ -37,19 +41,22 @@ research.
 
   ![Watch the terrain-generation demonstration](docs/images/terrain-generation/four_terrain_preset.gif)
 
-## Requirements
+## Prerequisites
 
-| Component | Requirement |
-| --- | --- |
-| Operating system | Ubuntu 22.04 or 24.04 |
-| Unreal Engine | 5.7.x ([click here](https://dev.epicgames.com/documentation/unreal-engine/linux-development-quickstart-for-unreal-engine?application_version=5.7)) |
-| ROS 2 | Humble, through the included Docker environment |
+- Ubuntu 22.04 or 24.04.
+- Unreal Engine 5.7.x for Linux; project setup rejects other engine versions.
+- Git with Git LFS installed before cloning or pulling, plus `curl`, `jq`, and
+  Python 3.
+- Docker Engine.
+- Docker Compose v2.
+
+Docker Engine and Docker Compose v2 are required for the intended full
+LunarSim-PG workflow.
+
+See the [installation guide](docs/installation.md) for detailed setup
+instructions and workflow details.
 
 ## Quick start
-
-Install Unreal Engine 5.7.x before starting. See the
-[installation guide](docs/installation.md) for detailed prerequisites and
-troubleshooting.
 
 ### 1. Clone the repository
 
@@ -166,10 +173,9 @@ ground-truth state, maps, transforms, simulation time, capture control, and
 - [Installation](docs/installation.md)
 - [Simulator configuration](docs/configuration.md)
 - [Terrain generation](docs/terrain-generation.md)
-  - [Heightmap and crater generation model](terrain-generation-model.md)
-  - [Rock distribution model](rock-distribution-model.md)
+  - [Heightmap and crater generation model](docs/terrain-generation-model.md)
+  - [Rock distribution model](docs/rock-distribution-model.md)
 - [Data outputs and ROS 2](docs/data-and-ros2.md)
-- [Coordinate frames](docs/coordinate-frames.md)
 
 
 

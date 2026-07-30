@@ -2,10 +2,18 @@
 
 ## Requirements
 
-- Ubuntu 22.04 or 24.04
-- Unreal Engine 5.7.x
-- Git and Git LFS
-- Docker Engine with Docker Compose v2 for the ROS 2 environment
+- Ubuntu 22.04 or 24.04.
+- Unreal Engine 5.7.x for Linux. `setup.sh` validates the engine version and
+  rejects other releases.
+- Git with Git LFS installed before cloning or pulling, plus `curl`, `jq`, and
+  Python 3.
+- Docker Engine.
+- Docker Compose v2.
+- ROS 2 Humble is provided through the included Docker environment. Host ROS 2
+  installation is not required.
+
+Docker Engine and Docker Compose v2 are required for the intended full
+LunarSim-PG workflow.
 
 ## 1. Clone the repository
 
@@ -27,7 +35,9 @@ Run setup once and provide the path to your Unreal Engine installation:
 The path must point to the Unreal Engine root directory, not its `Engine/`
 subdirectory. Setup validates the installation, prepares the bundled plugins,
 and saves the path locally so you do not need to export it again in future
-terminal sessions.
+terminal sessions. It also pulls Git LFS assets, prepares TempoROS's bundled
+ROS libraries, and installs missing terrain-tool Python modules with `apt` on
+Ubuntu (requesting `sudo` when needed).
 
 ## 3. Build and open
 
@@ -51,6 +61,10 @@ docker compose -f docker/docker-compose.yml build
 docker compose -f docker/docker-compose.yml up -d
 docker exec -it sim_ros bash
 ```
+
+The Compose configuration expects a graphical X11 session and access to
+`/dev/dri` and `/dev/input` for its included GUI and joystick tools. It does
+not require NVIDIA-specific container support.
 
 Inside the container:
 
