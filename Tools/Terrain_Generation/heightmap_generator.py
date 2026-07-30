@@ -37,7 +37,7 @@ from PIL import Image, ImageFilter
 
 PROJECT_NAME = "LunarSim-PG"
 SCRIPT_NAME = "heightmap_generator"
-SCRIPT_VERSION = "2.0.0"
+SCRIPT_VERSION = "2.1.0"
 
 
 def utc_now() -> datetime:
@@ -579,18 +579,108 @@ def lerp(a: np.ndarray | float, b: np.ndarray | float, t: np.ndarray | float) ->
 # Base lunar floor
 # -----------------------------
 
+# Preset-specific floor-noise recipes. These remain deliberately close to the
+# original MoonSim recipe so the terrain keeps the same smooth visual style,
+# while each terrain family receives a mildly different spatial character.
+#
+# Each tuple is:
+#   (random grid size, layer weight, blur radius at 8129 px)
+FLOOR_NOISE_PROFILES: Dict[
+    str,
+    tuple[tuple[int, float, float], ...],
+] = {
+    # Original background recipe, unchanged.
+    "mare": (
+        (5, 1.00, 45.0),
+        (9, 0.55, 32.0),
+        (17, 0.25, 22.0),
+        (33, 0.08, 16.0),
+    ),
+
+    # Very close to the original, with slightly more middle-scale structure.
+    "apollo17": (
+        (5, 1.00, 45.0),
+        (10, 0.56, 31.0),
+        (18, 0.26, 21.0),
+        (35, 0.08, 15.0),
+    ),
+
+    # Slightly finer than the original, without becoming noisy.
+    "highland": (
+        (6, 0.96, 43.0),
+        (11, 0.58, 30.0),
+        (20, 0.28, 20.0),
+        (38, 0.09, 14.0),
+    ),
+
+    # Moderately finer, but still based on the original smooth structure.
+    "fresh": (
+        (6, 0.94, 42.0),
+        (12, 0.60, 29.0),
+        (22, 0.30, 19.0),
+        (42, 0.10, 13.0),
+    ),
+
+    # Smooth fresh impact-melt endmember, close to Mare.
+    "fresh_melt": (
+        (5, 1.00, 47.0),
+        (9, 0.52, 34.0),
+        (17, 0.22, 23.0),
+        (33, 0.07, 16.0),
+    ),
+
+    # Highland-like custom profile with a mild fine-scale increase.
+    "custom": (
+        (6, 0.95, 42.0),
+        (12, 0.59, 29.0),
+        (23, 0.29, 19.0),
+        (43, 0.10, 13.0),
+    ),
+}
+
+
+def canonical_floor_noise_profile(preset_name: str) -> str:
+    """Map every heightmap preset name to a floor-noise family."""
+    key = str(preset_name or "default").strip().lower()
+
+    aliases = {
+        "default": "mare",
+        "mare_smooth": "mare",
+        "mare_scientific": "mare",
+
+        "apollo17_scientific": "apollo17",
+
+        "highland_old": "highland",
+        "highland_scientific": "highland",
+
+        "fresh_crater_field": "fresh",
+        "fresh_crater_scientific": "fresh",
+        "fresh_clastic_ejecta": "fresh",
+        "fresh_blocky_ejecta": "fresh",
+
+        "fresh_impact_melt": "fresh_melt",
+
+        "custom_scientific": "custom",
+    }
+
+    return aliases.get(key, "mare")
+
+
+def floor_noise_layers_for_preset(
+    preset_name: str,
+) -> List[tuple[int, float, float]]:
+    """Return a copy of the selected preset's floor-noise layer recipe."""
+    profile = canonical_floor_noise_profile(preset_name)
+    return [tuple(layer) for layer in FLOOR_NOISE_PROFILES[profile]]
+
+
 def smooth_lunar_floor(settings: GeneratorSettings) -> np.ndarray:
     """Very smooth, low-frequency floor in meters."""
     rng = np.random.default_rng(settings.seed)
     size = settings.size
     height = np.zeros((size, size), dtype=np.float32)
 
-    layers = [
-        (5, 1.00, 45.0),
-        (9, 0.55, 32.0),
-        (17, 0.25, 22.0),
-        (33, 0.08, 16.0),
-    ]
+    layers = floor_noise_layers_for_preset(settings.preset)
 
     # Scale blur for non-8129 maps so previews/smaller tests behave similarly.
     blur_scale = size / 8129.0
