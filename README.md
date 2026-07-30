@@ -1,6 +1,6 @@
 # LunarSim-PG
 
-LunarSim-PG is a high-fidelity lunar rover simulation framework built with
+**LunarSim-PG**  is a high-fidelity lunar rover simulation framework built with
 Unreal Engine 5 and integrated with ROS 2. It combines controllable rover and
 stereo-camera simulation, science-parameterized procedural terrain generation,
 configurable lunar illumination, and synchronized sensor and ground-truth data
@@ -181,10 +181,48 @@ ground-truth state, maps, transforms, simulation time, capture control, and
 
 ## Current scope
 
-LunarSim-PG focuses on visual and geometric simulation for rover perception
+**LunarSim-PG**  focuses on visual and geometric simulation for rover perception
 and navigation, supporting both ROS 2-based experiments and synthetic dataset
 generation.
 
 It is not intended as a mission-analysis or terramechanics simulator.
 Terrain–wheel interaction, dust dynamics, and thermal modelling are outside
 the scope of the current framework.
+
+## Contributors and acknowledgements
+
+**LunarSim-PG** was developed by **Ioannis Exarchos** and
+**María González Rodríguez** as their joint project at
+**ESA Spaceship Poland**.
+
+### Main contributions
+
+- **Ioannis Exarchos** — system architecture and integration,
+  Unreal Engine–ROS 2 integration, rover and sensor pipeline,
+  synchronized ground-truth and dataset-generation pipeline,
+  and simulator configuration tools.
+- **María González Rodríguez** — science-parameterized procedural
+  terrain generation, regional terrain profiles, crater morphology
+  model, and coupled crater–rock distribution models.
+- **Noora Archer** — lunar visual assets, materials and environment
+  modelling, and technical guidance on high-fidelity lunar scene
+  representation.
+
+Additional scientific and technical guidance was provided by
+**Marek Kraft**.
+
+This work was supported by the **European Space Agency** through **ΕSA Spaceship Poland**.
+
+<br>
+
+<p align="center">
+  <img
+    src="docs/images/esa-spaceship-poland-logo.png"
+    alt="ESA Spaceship Poland"
+    width="400"
+  />
+</p>
+
+<p align="center">
+  <sub>Developed as part of ESA Spaceship Poland.</sub>
+</p>
